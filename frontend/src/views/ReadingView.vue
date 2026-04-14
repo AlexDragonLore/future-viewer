@@ -7,6 +7,7 @@ import CardFlip from '@/components/cards/CardFlip.vue'
 import { computeSlots } from '@/composables/useSpread'
 import { dealCards, shuffleDeck } from '@/composables/useCardAnimation'
 import type { ReadingCard, SpreadType } from '@/types'
+import { playShuffle, playDeal, playCardFlip, playReveal } from '@/composables/useAudio'
 
 const router = useRouter()
 const store = useReadingStore()
@@ -51,6 +52,7 @@ async function startReading() {
   if (!deckEl || !pendingSpread.value || !board.value) return
 
   stage.value = 'shuffling'
+  playShuffle()
   await new Promise<void>((resolve) => {
     shuffleDeck(deckEl, () => resolve())
   })
@@ -94,9 +96,11 @@ async function startReading() {
     stage.value = 'flipping'
     for (let i = 0; i < flippedFlags.value.length; i++) {
       await new Promise((r) => setTimeout(r, 320))
+      playCardFlip()
       flippedFlags.value[i] = true
     }
     setTimeout(() => {
+      playReveal()
       stage.value = 'done'
       router.push({ name: 'result' })
     }, 1200)

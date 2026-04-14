@@ -26,9 +26,15 @@ const rotation = computed(() => (props.card?.isReversed ? 180 : 0))
       </div>
       <div class="card-face card-front" :style="{ transform: `rotateY(180deg) rotate(var(--card-rotation))` }">
         <div v-if="card" class="card-front-inner">
-          <div class="card-title font-display gold-text">{{ card.cardName }}</div>
-          <div class="card-image" aria-hidden="true">✵</div>
-          <div class="card-hint">{{ card.isReversed ? 'перевёрнутая' : 'прямая' }}</div>
+          <img
+            v-if="card.imagePath"
+            :src="card.imagePath"
+            :alt="card.cardName"
+            class="card-img"
+            draggable="false"
+          />
+          <div v-else class="card-image" aria-hidden="true">✵</div>
+          <div class="card-name-overlay font-display">{{ card.cardName }}</div>
         </div>
       </div>
     </div>
@@ -93,42 +99,50 @@ const rotation = computed(() => (props.card?.isReversed ? 180 : 0))
 }
 
 .card-front {
-  background:
-    radial-gradient(circle at 50% 30%, rgba(245, 194, 107, 0.15), transparent 70%),
-    linear-gradient(180deg, #2a1248 0%, #13082a 100%);
+  background: linear-gradient(180deg, #2a1248 0%, #13082a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .card-front-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.6rem 0.4rem;
-  height: 100%;
+  position: relative;
   width: 100%;
+  height: 100%;
 }
 
-.card-title {
-  font-size: 0.72rem;
+.card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 11px;
+  display: block;
+  user-select: none;
+}
+
+.card-name-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0.3rem 0.25rem;
+  background: linear-gradient(transparent, rgba(10, 4, 20, 0.85));
+  border-radius: 0 0 11px 11px;
+  font-size: 0.6rem;
   text-align: center;
-  line-height: 1.1;
+  color: #f5c26b;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
 }
 
 .card-image {
   font-size: 2.4rem;
   color: #f5c26b;
   text-shadow: 0 0 20px rgba(245, 194, 107, 0.7);
-}
-
-.card-hint {
-  font-size: 0.55rem;
-  color: rgba(232, 213, 242, 0.6);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 </style>

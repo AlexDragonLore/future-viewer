@@ -54,7 +54,7 @@ public static class TarotDeckSeed
                 Number = n,
                 DescriptionUpright = up,
                 DescriptionReversed = rev,
-                ImagePath = $"/cards/major/{n:D2}.webp"
+                ImagePath = $"/cards/major/{n:D2}.jpg"
             };
         }
     }
@@ -90,7 +90,7 @@ public static class TarotDeckSeed
                 Number = num,
                 DescriptionUpright = up,
                 DescriptionReversed = rev,
-                ImagePath = $"/cards/{suit.ToString().ToLowerInvariant()}/{num:D2}.webp"
+                ImagePath = $"/cards/{suit.ToString().ToLowerInvariant()}/{num:D2}.jpg"
             };
         }
     }
