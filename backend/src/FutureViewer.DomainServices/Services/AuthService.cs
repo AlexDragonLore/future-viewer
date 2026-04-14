@@ -34,7 +34,13 @@ public sealed class AuthService
         await _users.AddAsync(user, ct);
 
         var (token, expires) = _jwt.CreateAccessToken(user);
-        return new AuthResponse(token, expires, user.Id, user.Email);
+        return new AuthResponse
+        {
+            AccessToken = token,
+            ExpiresAt = expires,
+            UserId = user.Id,
+            Email = user.Email
+        };
     }
 
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
@@ -47,6 +53,12 @@ public sealed class AuthService
             throw new UnauthorizedException("Invalid credentials");
 
         var (token, expires) = _jwt.CreateAccessToken(user);
-        return new AuthResponse(token, expires, user.Id, user.Email);
+        return new AuthResponse
+        {
+            AccessToken = token,
+            ExpiresAt = expires,
+            UserId = user.Id,
+            Email = user.Email
+        };
     }
 }

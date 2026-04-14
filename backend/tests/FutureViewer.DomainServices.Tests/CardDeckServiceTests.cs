@@ -3,7 +3,7 @@ using FutureViewer.DomainServices.Services;
 
 namespace FutureViewer.DomainServices.Tests;
 
-public class CardDeckServiceTests
+public sealed class CardDeckServiceTests
 {
     [Fact]
     public async Task Draw_returns_requested_count_of_distinct_cards()

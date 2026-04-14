@@ -8,7 +8,7 @@ using FutureViewer.Integration.Tests.Fixtures;
 
 namespace FutureViewer.Integration.Tests.Tests;
 
-public class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
+public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
 {
     private readonly IntegrationTestFixture _fixture;
 
@@ -23,12 +23,15 @@ public class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
         var client = _fixture.CreateClient();
         var email = $"hist-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "password123"));
+        var register = await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest { Email = email, Password = "password123" });
         var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
-        await client.PostAsJsonAsync("/api/readings", new CreateReadingRequest(SpreadType.SingleCard, "q1"));
-        await client.PostAsJsonAsync("/api/readings", new CreateReadingRequest(SpreadType.ThreeCard, "q2"));
+        await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q1" });
+        await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "q2" });
 
         var response = await client.GetAsync("/api/readings/history");
 

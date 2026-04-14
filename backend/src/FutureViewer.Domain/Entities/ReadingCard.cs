@@ -1,12 +1,12 @@
 namespace FutureViewer.Domain.Entities;
 
-public class ReadingCard
+public sealed class ReadingCard
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid ReadingId { get; set; }
-    public Reading Reading { get; set; } = null!;
-    public int CardId { get; set; }
-    public TarotCard Card { get; set; } = null!;
-    public int Position { get; set; }
-    public bool IsReversed { get; set; }
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid ReadingId { get; init; }
+    public Reading? Reading { get; init; }
+    public required int CardId { get; init; }
+    public required TarotCard Card { get; init; }
+    public required int Position { get; init; }
+    public required bool IsReversed { get; init; }
 }

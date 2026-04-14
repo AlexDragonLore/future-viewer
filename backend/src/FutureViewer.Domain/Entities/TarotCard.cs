@@ -2,13 +2,13 @@ using FutureViewer.Domain.Enums;
 
 namespace FutureViewer.Domain.Entities;
 
-public class TarotCard
+public sealed class TarotCard
 {
-    public int Id { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public CardSuit Suit { get; set; }
-    public int Number { get; set; }
-    public string DescriptionUpright { get; set; } = string.Empty;
-    public string DescriptionReversed { get; set; } = string.Empty;
-    public string ImagePath { get; set; } = string.Empty;
+    public required int Id { get; init; }
+    public required string Name { get; init; }
+    public required CardSuit Suit { get; init; }
+    public required int Number { get; init; }
+    public required string DescriptionUpright { get; init; }
+    public required string DescriptionReversed { get; init; }
+    public required string ImagePath { get; init; }
 }

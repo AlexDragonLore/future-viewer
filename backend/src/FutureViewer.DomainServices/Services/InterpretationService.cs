@@ -14,10 +14,11 @@ public sealed class InterpretationService
     }
 
     public Task<InterpretationResult> InterpretAsync(
-        Reading reading,
         Spread spread,
+        string question,
+        IReadOnlyList<ReadingCard> cards,
         CancellationToken ct = default)
     {
-        return _interpreter.InterpretAsync(reading, spread, ct);
+        return _interpreter.InterpretAsync(spread, question, cards, ct);
     }
 }

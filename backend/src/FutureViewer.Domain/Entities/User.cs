@@ -1,11 +1,11 @@
 namespace FutureViewer.Domain.Entities;
 
-public class User
+public sealed class User
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string Email { get; set; } = string.Empty;
-    public string PasswordHash { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public required string Email { get; init; }
+    public required string PasswordHash { get; init; }
+    public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
-    public ICollection<Reading> Readings { get; set; } = new List<Reading>();
+    public ICollection<Reading> Readings { get; init; } = new List<Reading>();
 }

@@ -1,3 +1,7 @@
 namespace FutureViewer.DomainServices.DTOs;
 
-public sealed record LoginRequest(string Email, string Password);
+public sealed class LoginRequest
+{
+    public required string Email { get; init; }
+    public required string Password { get; init; }
+}

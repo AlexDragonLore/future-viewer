@@ -7,7 +7,7 @@ using FutureViewer.Integration.Tests.Fixtures;
 
 namespace FutureViewer.Integration.Tests.Tests;
 
-public class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture>
+public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture>
 {
     private readonly IntegrationTestFixture _fixture;
 
@@ -21,7 +21,8 @@ public class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture>
     {
         var client = _fixture.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/readings", new CreateReadingRequest(SpreadType.ThreeCard, "What awaits me?"));
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "What awaits me?" });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         var result = await response.Content.ReadFromJsonAsync<ReadingResult>();
@@ -35,7 +36,8 @@ public class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture>
     {
         var client = _fixture.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/readings", new CreateReadingRequest(SpreadType.SingleCard, ""));
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "" });
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
@@ -44,7 +46,8 @@ public class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture>
     public async Task Get_reading_by_id_returns_reading()
     {
         var client = _fixture.CreateClient();
-        var createResponse = await client.PostAsJsonAsync("/api/readings", new CreateReadingRequest(SpreadType.SingleCard, "q"));
+        var createResponse = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q" });
         var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
 
         var getResponse = await client.GetAsync($"/api/readings/{created!.Id}");

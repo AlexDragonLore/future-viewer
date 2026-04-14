@@ -6,11 +6,17 @@ namespace FutureViewer.Integration.Tests.Fixtures;
 
 public sealed class StubAIInterpreter : IAIInterpreter
 {
-    public Task<InterpretationResult> InterpretAsync(Reading reading, Spread spread, CancellationToken ct = default)
+    public Task<InterpretationResult> InterpretAsync(
+        Spread spread,
+        string question,
+        IReadOnlyList<ReadingCard> cards,
+        CancellationToken ct = default)
     {
-        return Task.FromResult(new InterpretationResult(
-            $"Stub interpretation for {spread.Name} with {reading.Cards.Count} cards",
-            "stub-model",
-            DateTime.UtcNow));
+        return Task.FromResult(new InterpretationResult
+        {
+            Text = $"Stub interpretation for {spread.Name} with {cards.Count} cards",
+            Model = "stub-model",
+            GeneratedAt = DateTime.UtcNow
+        });
     }
 }

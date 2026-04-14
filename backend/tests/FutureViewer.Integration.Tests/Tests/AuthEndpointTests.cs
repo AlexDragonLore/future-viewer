@@ -6,7 +6,7 @@ using FutureViewer.Integration.Tests.Fixtures;
 
 namespace FutureViewer.Integration.Tests.Tests;
 
-public class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
+public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
 {
     private readonly IntegrationTestFixture _fixture;
 
@@ -21,10 +21,12 @@ public class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         var client = _fixture.CreateClient();
         var email = $"user-{Guid.NewGuid():N}@example.com";
 
-        var registerResponse = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "password123"));
+        var registerResponse = await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest { Email = email, Password = "password123" });
         registerResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var loginResponse = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "password123"));
+        var loginResponse = await client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest { Email = email, Password = "password123" });
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
         var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
@@ -38,8 +40,10 @@ public class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         var client = _fixture.CreateClient();
         var email = $"dup-{Guid.NewGuid():N}@example.com";
 
-        await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "password123"));
-        var second = await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "password123"));
+        await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest { Email = email, Password = "password123" });
+        var second = await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest { Email = email, Password = "password123" });
 
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
@@ -49,9 +53,11 @@ public class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
     {
         var client = _fixture.CreateClient();
         var email = $"wrong-{Guid.NewGuid():N}@example.com";
-        await client.PostAsJsonAsync("/api/auth/register", new RegisterRequest(email, "password123"));
+        await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest { Email = email, Password = "password123" });
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest(email, "wrongpw9"));
+        var response = await client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest { Email = email, Password = "wrongpw9" });
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

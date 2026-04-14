@@ -2,4 +2,8 @@ using FutureViewer.Domain.Enums;
 
 namespace FutureViewer.DomainServices.DTOs;
 
-public sealed record CreateReadingRequest(SpreadType SpreadType, string Question);
+public sealed class CreateReadingRequest
+{
+    public required SpreadType SpreadType { get; init; }
+    public required string Question { get; init; }
+}

@@ -1,3 +1,8 @@
 namespace FutureViewer.Domain.ValueObjects;
 
-public sealed record InterpretationResult(string Text, string Model, DateTime GeneratedAt);
+public sealed class InterpretationResult
+{
+    public required string Text { get; init; }
+    public required string Model { get; init; }
+    public required DateTime GeneratedAt { get; init; }
+}

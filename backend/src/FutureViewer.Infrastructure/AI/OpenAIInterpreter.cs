@@ -23,14 +23,15 @@ public sealed class OpenAIInterpreter : IAIInterpreter
     }
 
     public async Task<InterpretationResult> InterpretAsync(
-        Reading reading,
         Spread spread,
+        string question,
+        IReadOnlyList<ReadingCard> cards,
         CancellationToken ct = default)
     {
         var system = "Ты — опытный таролог. Отвечай на русском языке, стиль мистический, но не перегруженный. " +
                      "Структурируй ответ по позициям расклада, затем дай общий вывод (3-5 предложений).";
 
-        var prompt = BuildPrompt(reading, spread);
+        var prompt = BuildPrompt(spread, question, cards);
 
         var messages = new List<ChatMessage>
         {
@@ -41,21 +42,26 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         var response = await _chat.CompleteChatAsync(messages, cancellationToken: ct);
         var text = response.Value.Content[0].Text;
 
-        return new InterpretationResult(text, _options.Model, DateTime.UtcNow);
+        return new InterpretationResult
+        {
+            Text = text,
+            Model = _options.Model,
+            GeneratedAt = DateTime.UtcNow
+        };
     }
 
-    private static string BuildPrompt(Reading reading, Spread spread)
+    private static string BuildPrompt(Spread spread, string question, IReadOnlyList<ReadingCard> cards)
     {
         var sb = new StringBuilder();
         sb.Append("Расклад: ").AppendLine(spread.Name);
-        if (!string.IsNullOrWhiteSpace(reading.Question))
+        if (!string.IsNullOrWhiteSpace(question))
         {
-            sb.Append("Вопрос: ").AppendLine(reading.Question);
+            sb.Append("Вопрос: ").AppendLine(question);
         }
         sb.AppendLine();
         sb.AppendLine("Выпавшие карты:");
 
-        foreach (var rc in reading.Cards.OrderBy(c => c.Position))
+        foreach (var rc in cards.OrderBy(c => c.Position))
         {
             var position = spread.Positions[rc.Position];
             var orientation = rc.IsReversed ? "перевёрнутая" : "прямая";

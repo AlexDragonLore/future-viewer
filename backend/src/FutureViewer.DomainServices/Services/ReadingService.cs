@@ -1,5 +1,4 @@
 using FutureViewer.Domain.Entities;
-using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
@@ -30,29 +29,29 @@ public sealed class ReadingService
         var spread = Spread.From(request.SpreadType);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
+        var cards = drawn
+            .Select((x, idx) => new ReadingCard
+            {
+                CardId = x.Card.Id,
+                Card = x.Card,
+                Position = idx,
+                IsReversed = x.IsReversed
+            })
+            .ToList();
+
+        var interpretation = await _interpreter.InterpretAsync(spread, request.Question, cards, ct);
+
         var reading = new Reading
         {
             UserId = userId,
             SpreadType = spread.Type,
             Question = request.Question,
-            CreatedAt = DateTime.UtcNow,
-            Cards = drawn
-                .Select((x, idx) => new ReadingCard
-                {
-                    CardId = x.Card.Id,
-                    Card = x.Card,
-                    Position = idx,
-                    IsReversed = x.IsReversed
-                })
-                .ToList()
+            AiInterpretation = interpretation.Text,
+            AiModel = interpretation.Model,
+            Cards = cards
         };
 
         await _repo.AddAsync(reading, ct);
-
-        var interpretation = await _interpreter.InterpretAsync(reading, spread, ct);
-        reading.AiInterpretation = interpretation.Text;
-        reading.AiModel = interpretation.Model;
-        await _repo.UpdateAsync(reading, ct);
 
         return Map(reading, spread);
     }
@@ -79,25 +78,29 @@ public sealed class ReadingService
             {
                 var position = spread.Positions[c.Position];
                 var meaning = c.IsReversed ? c.Card.DescriptionReversed : c.Card.DescriptionUpright;
-                return new ReadingCardDto(
-                    c.Position,
-                    position.Name,
-                    position.Meaning,
-                    c.CardId,
-                    c.Card.Name,
-                    c.Card.ImagePath,
-                    c.IsReversed,
-                    meaning);
+                return new ReadingCardDto
+                {
+                    Position = c.Position,
+                    PositionName = position.Name,
+                    PositionMeaning = position.Meaning,
+                    CardId = c.CardId,
+                    CardName = c.Card.Name,
+                    ImagePath = c.Card.ImagePath,
+                    IsReversed = c.IsReversed,
+                    Meaning = meaning
+                };
             })
             .ToList();
 
-        return new ReadingResult(
-            reading.Id,
-            reading.SpreadType,
-            spread.Name,
-            reading.Question,
-            reading.CreatedAt,
-            cards,
-            reading.AiInterpretation);
+        return new ReadingResult
+        {
+            Id = reading.Id,
+            SpreadType = reading.SpreadType,
+            SpreadName = spread.Name,
+            Question = reading.Question,
+            CreatedAt = reading.CreatedAt,
+            Cards = cards,
+            Interpretation = reading.AiInterpretation
+        };
     }
 }

@@ -8,7 +8,7 @@ using Moq;
 
 namespace FutureViewer.DomainServices.Tests;
 
-public class AuthServiceTests
+public sealed class AuthServiceTests
 {
     [Fact]
     public async Task Register_creates_new_user_and_returns_token()
@@ -28,7 +28,7 @@ public class AuthServiceTests
 
         var sut = new AuthService(users.Object, hasher.Object, jwt.Object);
 
-        var result = await sut.RegisterAsync(new RegisterRequest("Test@Example.com", "password123"));
+        var result = await sut.RegisterAsync(new RegisterRequest { Email = "Test@Example.com", Password = "password123" });
 
         result.AccessToken.Should().Be("tok");
         result.Email.Should().Be("test@example.com");
@@ -40,11 +40,11 @@ public class AuthServiceTests
     {
         var users = new Mock<IUserRepository>();
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User { Email = "a@b.c" });
+            .ReturnsAsync(new User { Email = "a@b.c", PasswordHash = "x" });
 
         var sut = new AuthService(users.Object, Mock.Of<IPasswordHasher>(), Mock.Of<IJwtTokenService>());
 
-        var act = () => sut.RegisterAsync(new RegisterRequest("a@b.c", "password123"));
+        var act = () => sut.RegisterAsync(new RegisterRequest { Email = "a@b.c", Password = "password123" });
 
         await act.Should().ThrowAsync<ConflictException>();
     }
@@ -61,7 +61,7 @@ public class AuthServiceTests
 
         var sut = new AuthService(users.Object, hasher.Object, Mock.Of<IJwtTokenService>());
 
-        var act = () => sut.LoginAsync(new LoginRequest("a@b.c", "pw"));
+        var act = () => sut.LoginAsync(new LoginRequest { Email = "a@b.c", Password = "pw" });
 
         await act.Should().ThrowAsync<UnauthorizedException>();
     }

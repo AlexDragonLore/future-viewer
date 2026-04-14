@@ -6,7 +6,8 @@ namespace FutureViewer.DomainServices.Interfaces;
 public interface IAIInterpreter
 {
     Task<InterpretationResult> InterpretAsync(
-        Reading reading,
         Spread spread,
+        string question,
+        IReadOnlyList<ReadingCard> cards,
         CancellationToken ct = default);
 }

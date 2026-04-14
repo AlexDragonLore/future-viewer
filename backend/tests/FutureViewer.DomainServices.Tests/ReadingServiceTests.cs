@@ -9,7 +9,7 @@ using Moq;
 
 namespace FutureViewer.DomainServices.Tests;
 
-public class ReadingServiceTests
+public sealed class ReadingServiceTests
 {
     [Fact]
     public async Task CreateAsync_draws_cards_saves_and_sets_interpretation()
@@ -21,20 +21,28 @@ public class ReadingServiceTests
         var deck = new CardDeckService(new TestDeck());
 
         var ai = new Mock<IAIInterpreter>();
-        ai.Setup(a => a.InterpretAsync(It.IsAny<Reading>(), It.IsAny<Spread>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new InterpretationResult("mystical text", "stub-model", DateTime.UtcNow));
+        ai.Setup(a => a.InterpretAsync(
+                It.IsAny<Spread>(),
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<ReadingCard>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InterpretationResult
+            {
+                Text = "mystical text",
+                Model = "stub-model",
+                GeneratedAt = DateTime.UtcNow
+            });
         var interpret = new InterpretationService(ai.Object);
 
         var sut = new ReadingService(repo.Object, deck, interpret);
 
         var result = await sut.CreateAsync(
-            new CreateReadingRequest(SpreadType.ThreeCard, "Что меня ждёт?"),
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "Что меня ждёт?" },
             userId: Guid.NewGuid());
 
         result.Cards.Should().HaveCount(3);
         result.Interpretation.Should().Be("mystical text");
         result.SpreadName.Should().Be("Прошлое — Настоящее — Будущее");
         repo.Verify(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()), Times.Once);
-        repo.Verify(r => r.UpdateAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

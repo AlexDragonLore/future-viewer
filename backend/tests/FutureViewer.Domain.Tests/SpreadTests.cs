@@ -4,7 +4,7 @@ using FutureViewer.Domain.Enums;
 
 namespace FutureViewer.Domain.Tests;
 
-public class SpreadTests
+public sealed class SpreadTests
 {
     [Fact]
     public void SingleCard_has_one_position()
