@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: fv-postgres
+    environment:
+      POSTGRES_USER: future_viewer
+      POSTGRES_PASSWORD: future_viewer_dev
+      POSTGRES_DB: future_viewer
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U future_viewer -d future_viewer"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fv-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=future_viewer;Username=future_viewer;Password=future_viewer_dev
+      Jwt__Secret: ${JWT_SECRET:-dev-secret-please-change-me-in-prod-32chars-minimum}
+      Jwt__Issuer: future-viewer
+      Jwt__Audience: future-viewer
+      OpenAI__ApiKey: ${OPENAI_API_KEY:-}
+      OpenAI__Model: gpt-4o
+    ports:
+      - "5000:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: fv-frontend
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:5000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:

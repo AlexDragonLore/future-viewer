@@ -1,0 +1,28 @@
+using FutureViewer.Domain.Entities;
+using FutureViewer.DomainServices.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace FutureViewer.Infrastructure.Persistence.Repositories;
+
+public sealed class UserRepository : IUserRepository
+{
+    private readonly AppDbContext _db;
+
+    public UserRepository(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    public Task<User?> GetByEmailAsync(string email, CancellationToken ct = default) =>
+        _db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+
+    public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
+        _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public async Task<User> AddAsync(User user, CancellationToken ct = default)
+    {
+        await _db.Users.AddAsync(user, ct);
+        await _db.SaveChangesAsync(ct);
+        return user;
+    }
+}

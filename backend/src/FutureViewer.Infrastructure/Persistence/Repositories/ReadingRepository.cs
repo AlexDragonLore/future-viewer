@@ -1,0 +1,51 @@
+using FutureViewer.Domain.Entities;
+using FutureViewer.DomainServices.Interfaces;
+using Microsoft.EntityFrameworkCore;
+
+namespace FutureViewer.Infrastructure.Persistence.Repositories;
+
+public sealed class ReadingRepository : IReadingRepository
+{
+    private readonly AppDbContext _db;
+
+    public ReadingRepository(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task<Reading> AddAsync(Reading reading, CancellationToken ct = default)
+    {
+        foreach (var rc in reading.Cards)
+        {
+            _db.Entry(rc.Card).State = EntityState.Unchanged;
+        }
+        await _db.Readings.AddAsync(reading, ct);
+        await _db.SaveChangesAsync(ct);
+        return reading;
+    }
+
+    public async Task<Reading?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _db.Readings
+            .Include(r => r.Cards)
+            .ThenInclude(c => c.Card)
+            .FirstOrDefaultAsync(r => r.Id == id, ct);
+    }
+
+    public async Task<IReadOnlyList<Reading>> GetHistoryAsync(Guid userId, int take = 50, CancellationToken ct = default)
+    {
+        return await _db.Readings
+            .Include(r => r.Cards)
+            .ThenInclude(c => c.Card)
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
+    public async Task UpdateAsync(Reading reading, CancellationToken ct = default)
+    {
+        _db.Readings.Update(reading);
+        await _db.SaveChangesAsync(ct);
+    }
+}

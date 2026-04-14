@@ -10,10 +10,11 @@
 using System;
 using System.Reflection;
 
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("future-viewer-8b2f1e1a")]
 [assembly: System.Reflection.AssemblyCompanyAttribute("FutureViewer.Host")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f2cdcdbaf844d2ad35b2cac08ec2597d46c4dd18")]
 [assembly: System.Reflection.AssemblyProductAttribute("FutureViewer.Host")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FutureViewer.Host")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

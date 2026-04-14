@@ -1,0 +1,48 @@
+name: deploy-production
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    env:
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          tags: future-viewer-backend:${{ github.ref_name }}
+          load: true
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          target: prod
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+          push: false
+          tags: future-viewer-frontend:${{ github.ref_name }}
+          load: true
+
+      - name: Production deploy step
+        run: echo "Deploy ${{ github.ref_name }} to production (registry push / k8s / ssh compose)."

@@ -385,9 +385,13 @@
               "target": "Package",
               "version": "[11.11.0, )"
             },
-            "MediatR": {
+            "FluentValidation.DependencyInjectionExtensions": {
               "target": "Package",
-              "version": "[12.4.1, )"
+              "version": "[11.11.0, )"
+            },
+            "Microsoft.Extensions.DependencyInjection.Abstractions": {
+              "target": "Package",
+              "version": "[10.0.0, )"
             }
           },
           "imports": [

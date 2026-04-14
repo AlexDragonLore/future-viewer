@@ -1,0 +1,20 @@
+using FluentValidation;
+using FutureViewer.DomainServices.Services;
+using FutureViewer.DomainServices.Validation;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FutureViewer.DomainServices.DependencyInjection;
+
+public static class DomainServicesExtensions
+{
+    public static IServiceCollection AddDomainServices(this IServiceCollection services)
+    {
+        services.AddScoped<CardDeckService>();
+        services.AddScoped<InterpretationService>();
+        services.AddScoped<ReadingService>();
+        services.AddScoped<AuthService>();
+
+        services.AddValidatorsFromAssemblyContaining<CreateReadingRequestValidator>();
+        return services;
+    }
+}

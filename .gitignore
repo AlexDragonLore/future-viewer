@@ -1,0 +1,77 @@
+# ---------- .NET ----------
+bin/
+obj/
+*.user
+*.user.secrets
+*.suo
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.VC.VC.opendb
+project.lock.json
+project.fragment.lock.json
+artifacts/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+msbuild.log
+msbuild.err
+msbuild.wrn
+
+# User-specific files
+**/appsettings.*.local.json
+**/appsettings.Local.json
+**/secrets.json
+
+# EF Core
+**/Migrations/*.Designer.cs.bak
+
+# ---------- Node / Vite ----------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+.cache/
+
+# Env files
+.env
+.env.local
+.env.*.local
+
+# ---------- IDE ----------
+.idea/
+.vs/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# ---------- Logs ----------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- Docker ----------
+.docker/
+
+# ---------- Testcontainers ----------
+**/.testcontainers/

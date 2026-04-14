@@ -1,0 +1,47 @@
+name: deploy-staging
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    env:
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+      VITE_API_URL: ${{ vars.VITE_API_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          tags: future-viewer-backend:staging
+          load: true
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          target: prod
+          build-args: |
+            VITE_API_URL=${{ vars.VITE_API_URL }}
+          push: false
+          tags: future-viewer-frontend:staging
+          load: true
+
+      - name: Staging deploy step
+        run: echo "Deploy staging images here (e.g. push to registry, kubectl apply, ssh docker compose up)."

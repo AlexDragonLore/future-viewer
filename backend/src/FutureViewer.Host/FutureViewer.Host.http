@@ -1,6 +1,0 @@
-@FutureViewer.Host_HostAddress = http://localhost:5036
-
-GET {{FutureViewer.Host_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

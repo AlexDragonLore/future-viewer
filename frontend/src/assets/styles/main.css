@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0b0618;
+  color: #e8d5f2;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, .font-display {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.08em;
+}
+
+.mystic-card {
+  backdrop-filter: blur(14px);
+  background: linear-gradient(180deg, rgba(42, 18, 72, 0.55), rgba(19, 8, 42, 0.55));
+  border: 1px solid rgba(245, 194, 107, 0.25);
+  box-shadow: 0 0 40px rgba(245, 194, 107, 0.15);
+  border-radius: 16px;
+}
+
+.gold-text {
+  background: linear-gradient(180deg, #f8d98a 0%, #f5c26b 40%, #a36b26 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.glow-button {
+  position: relative;
+  padding: 0.75rem 2rem;
+  color: #f5c26b;
+  border: 1px solid rgba(245, 194, 107, 0.6);
+  border-radius: 999px;
+  background: rgba(245, 194, 107, 0.08);
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.glow-button:hover:not(:disabled) {
+  background: rgba(245, 194, 107, 0.2);
+  box-shadow: 0 0 40px rgba(245, 194, 107, 0.5);
+  transform: translateY(-1px);
+}
+
+.glow-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@keyframes breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-4px) scale(1.01); }
+}
+
+.breathe {
+  animation: breathe 3.5s ease-in-out infinite;
+}

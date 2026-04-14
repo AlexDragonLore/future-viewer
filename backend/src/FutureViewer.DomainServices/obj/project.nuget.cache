@@ -1,13 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "YbXabZBrXQ0=",
+  "dgSpecHash": "d0+K8KfPZtM=",
   "success": true,
   "projectFilePath": "/Users/aleksandr/RiderProjects/future-viewer/backend/src/FutureViewer.DomainServices/FutureViewer.DomainServices.csproj",
   "expectedPackageFiles": [
     "/Users/aleksandr/.nuget/packages/fluentvalidation/11.11.0/fluentvalidation.11.11.0.nupkg.sha512",
-    "/Users/aleksandr/.nuget/packages/mediatr/12.4.1/mediatr.12.4.1.nupkg.sha512",
-    "/Users/aleksandr/.nuget/packages/mediatr.contracts/2.0.1/mediatr.contracts.2.0.1.nupkg.sha512",
-    "/Users/aleksandr/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/8.0.0/microsoft.extensions.dependencyinjection.abstractions.8.0.0.nupkg.sha512"
+    "/Users/aleksandr/.nuget/packages/fluentvalidation.dependencyinjectionextensions/11.11.0/fluentvalidation.dependencyinjectionextensions.11.11.0.nupkg.sha512",
+    "/Users/aleksandr/.nuget/packages/microsoft.extensions.dependencyinjection.abstractions/10.0.0/microsoft.extensions.dependencyinjection.abstractions.10.0.0.nupkg.sha512"
   ],
   "logs": []
 }
