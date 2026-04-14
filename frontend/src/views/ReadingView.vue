@@ -13,7 +13,8 @@ const store = useReadingStore()
 
 const stage = ref<'idle' | 'shuffling' | 'loading' | 'dealing' | 'flipping' | 'done'>('idle')
 const board = ref<HTMLElement | null>(null)
-const deckRef = ref<HTMLElement | null>(null)
+const deckRef = ref<{ $el: HTMLElement } | null>(null)
+const getDeckEl = () => deckRef.value?.$el ?? null
 const cardRefs = ref<HTMLElement[]>([])
 const flippedFlags = ref<boolean[]>([])
 const placeholders = ref<ReadingCard[]>([])
@@ -47,11 +48,12 @@ onMounted(() => {
 
 async function startReading() {
   if (stage.value !== 'idle') return
-  if (!deckRef.value || !pendingSpread.value) return
+  const deckEl = getDeckEl()
+  if (!deckEl || !pendingSpread.value || !board.value) return
 
   stage.value = 'shuffling'
   await new Promise<void>((resolve) => {
-    shuffleDeck(deckRef.value!, () => resolve())
+    shuffleDeck(deckEl, () => resolve())
   })
 
   stage.value = 'loading'
@@ -62,31 +64,26 @@ async function startReading() {
     return
   }
 
-  stage.value = 'dealing'
-  await nextTick()
-
-  if (!store.current.value && !store.current) {
-    // pinia: store.current is Ref, access via .value? Actually using setup store returns refs.
-  }
-
   const reading = store.current
   if (!reading) {
     stage.value = 'idle'
     return
   }
 
-  placeholders.value = reading.cards
-  flippedFlags.value = reading.cards.map(() => false)
-  await nextTick()
-
-  const boardRect = board.value!.getBoundingClientRect()
-  const deckRect = deckRef.value!.getBoundingClientRect()
+  const boardRect = board.value.getBoundingClientRect()
+  const deckRect = deckEl.getBoundingClientRect()
   const slots = computeSlots(pendingSpread.value, boardRect.width, boardRect.height)
 
   const from = {
     x: deckRect.left - boardRect.left + deckRect.width / 2,
     y: deckRect.top - boardRect.top + deckRect.height / 2,
   }
+
+  placeholders.value = reading.cards
+  flippedFlags.value = reading.cards.map(() => false)
+
+  stage.value = 'dealing'
+  await nextTick()
 
   const targets = cardRefs.value.map((el, i) => ({
     el,

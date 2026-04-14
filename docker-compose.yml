@@ -34,7 +34,7 @@ services:
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__Model: gpt-4o
     ports:
-      - "5000:8080"
+      - "5050:8080"
 
   frontend:
     build:
@@ -45,7 +45,7 @@ services:
     depends_on:
       - backend
     environment:
-      VITE_API_URL: http://localhost:5000
+      VITE_API_URL: http://localhost:5050
     ports:
       - "5173:5173"
     volumes:
