@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FutureViewer.Domain/FutureViewer.Domain.csproj" />
+    <Project Path="src/FutureViewer.DomainServices/FutureViewer.DomainServices.csproj" />
+    <Project Path="src/FutureViewer.Host/FutureViewer.Host.csproj" />
+    <Project Path="src/FutureViewer.Infrastructure/FutureViewer.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FutureViewer.Domain.Tests/FutureViewer.Domain.Tests.csproj" />
+    <Project Path="tests/FutureViewer.DomainServices.Tests/FutureViewer.DomainServices.Tests.csproj" />
+    <Project Path="tests/FutureViewer.Integration.Tests/FutureViewer.Integration.Tests.csproj" />
+  </Folder>
+</Solution>

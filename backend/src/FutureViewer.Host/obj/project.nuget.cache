@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "NyVd5CDHRQ0=",
+  "success": true,
+  "projectFilePath": "/Users/aleksandr/RiderProjects/future-viewer/backend/src/FutureViewer.Host/FutureViewer.Host.csproj",
+  "expectedPackageFiles": [
+    "/Users/aleksandr/.nuget/packages/fluentvalidation/11.11.0/fluentvalidation.11.11.0.nupkg.sha512",
+    "/Users/aleksandr/.nuget/packages/mediatr/12.4.1/mediatr.12.4.1.nupkg.sha512",
+    "/Users/aleksandr/.nuget/packages/mediatr.contracts/2.0.1/mediatr.contracts.2.0.1.nupkg.sha512",
+    "/Users/aleksandr/.nuget/packages/microsoft.aspnetcore.openapi/10.0.5/microsoft.aspnetcore.openapi.10.0.5.nupkg.sha512",
+    "/Users/aleksandr/.nuget/packages/microsoft.openapi/2.0.0/microsoft.openapi.2.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
