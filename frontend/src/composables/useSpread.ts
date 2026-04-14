@@ -37,5 +37,8 @@ export function computeSlots(type: SpreadType, boardWidth: number, boardHeight: 
         { x: cx + unit * 2, y: cy - unit * 1.4 },
       ]
     }
+
+    default:
+      return [{ x: cx, y: cy }]
   }
 }

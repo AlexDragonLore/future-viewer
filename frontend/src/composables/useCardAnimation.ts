@@ -6,8 +6,8 @@ export interface DealTarget {
   from: { x: number; y: number }
 }
 
-export function dealCards(targets: DealTarget[]): gsap.core.Timeline {
-  const tl = gsap.timeline()
+export function dealCards(targets: DealTarget[], onComplete?: () => void): gsap.core.Timeline {
+  const tl = gsap.timeline({ onComplete })
 
   targets.forEach((t, i) => {
     gsap.set(t.el, {

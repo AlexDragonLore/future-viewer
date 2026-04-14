@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { readingApi } from '@/api/readingApi'
+import { extractApiError } from '@/api/httpClient'
 import type { Reading } from '@/types'
 
 const readings = ref<Reading[]>([])
@@ -10,8 +11,8 @@ const error = ref<string | null>(null)
 onMounted(async () => {
   try {
     readings.value = await readingApi.history()
-  } catch (e: any) {
-    error.value = e.response?.data?.message ?? e.message
+  } catch (e) {
+    error.value = extractApiError(e, 'Не удалось загрузить историю')
   } finally {
     loading.value = false
   }

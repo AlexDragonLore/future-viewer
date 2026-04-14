@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
 import CardFlip from '@/components/cards/CardFlip.vue'
 import { useTypewriter } from '@/composables/useTypewriter'
+import { marked } from 'marked'
 
 const router = useRouter()
 const store = useReadingStore()
@@ -11,6 +12,7 @@ const store = useReadingStore()
 const reading = computed(() => store.current)
 const interpretationSource = toRef(() => reading.value?.interpretation ?? '')
 const { output: typed } = useTypewriter(interpretationSource, 18)
+const typedHtml = computed(() => marked.parse(typed.value) as string)
 
 onMounted(() => {
   if (!reading.value) {
@@ -46,7 +48,7 @@ function again() {
 
     <section class="mystic-card max-w-2xl w-full p-8 mb-8">
       <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Интерпретация</div>
-      <p class="text-mystic-silver leading-relaxed whitespace-pre-line">{{ typed }}<span class="caret">▮</span></p>
+      <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="typedHtml" /><span class="caret">▮</span>
     </section>
 
     <button class="glow-button" @click="again">Новый расклад</button>
@@ -65,6 +67,29 @@ function again() {
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+.prose-mystic :deep(h2) {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f5c26b;
+  margin-top: 1.25rem;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.05em;
+}
+.prose-mystic :deep(strong) {
+  color: #e8d5a3;
+  font-weight: 600;
+}
+.prose-mystic :deep(ul) {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.4rem 0;
+}
+.prose-mystic :deep(li) {
+  margin-bottom: 0.2rem;
+}
+.prose-mystic :deep(p) {
+  margin-bottom: 0.6rem;
 }
 .caret {
   display: inline-block;

@@ -31,8 +31,7 @@ onMounted(() => {
   pendingSpread.value = parsed.spreadType
   pendingQuestion.value = parsed.question
 
-  const count =
-    parsed.spreadType === 1 ? 1 : parsed.spreadType === 3 ? 3 : 10
+  const count = parsed.spreadType as number
   placeholders.value = Array.from({ length: count }, (_, i) => ({
     position: i,
     positionName: '',
@@ -91,8 +90,7 @@ async function startReading() {
     to: { x: slots[i].x - 70, y: slots[i].y - 115 },
   }))
 
-  const tl = dealCards(targets)
-  tl.eventCallback('onComplete', async () => {
+  dealCards(targets, async () => {
     stage.value = 'flipping'
     for (let i = 0; i < flippedFlags.value.length; i++) {
       await new Promise((r) => setTimeout(r, 320))

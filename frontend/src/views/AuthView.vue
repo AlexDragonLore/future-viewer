@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { extractApiError } from '@/api/httpClient'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -21,8 +22,8 @@ async function submit() {
     else await auth.register(email.value, password.value)
     const redirect = (route.query.redirect as string) || '/'
     router.replace(redirect)
-  } catch (e: any) {
-    error.value = e.response?.data?.message ?? e.message ?? 'Что-то пошло не так'
+  } catch (e) {
+    error.value = extractApiError(e)
   } finally {
     busy.value = false
   }
