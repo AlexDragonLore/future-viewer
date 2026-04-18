@@ -4,7 +4,9 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
+using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Integration.Tests.Fixtures;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureViewer.Integration.Tests.Tests;
 
@@ -27,6 +29,15 @@ public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
             new RegisterRequest { Email = email, Password = "password123" });
         var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var user = await users.GetByIdAsync(auth.UserId);
+            user!.SubscriptionStatus = SubscriptionStatus.Active;
+            user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+            await users.UpdateAsync(user);
+        }
 
         await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q1" });

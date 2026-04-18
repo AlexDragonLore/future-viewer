@@ -12,15 +12,18 @@ public sealed class ReadingService
     private readonly IReadingRepository _repo;
     private readonly CardDeckService _deck;
     private readonly InterpretationService _interpreter;
+    private readonly SubscriptionService _subscription;
 
     public ReadingService(
         IReadingRepository repo,
         CardDeckService deck,
-        InterpretationService interpreter)
+        InterpretationService interpreter,
+        SubscriptionService subscription)
     {
         _repo = repo;
         _deck = deck;
         _interpreter = interpreter;
+        _subscription = subscription;
     }
 
     public async Task<ReadingResult> CreateAsync(
@@ -29,6 +32,8 @@ public sealed class ReadingService
         CancellationToken ct = default)
     {
         var spread = Spread.From(request.SpreadType);
+        if (userId is { } uid)
+            await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -64,6 +69,8 @@ public sealed class ReadingService
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var spread = Spread.From(request.SpreadType);
+        if (userId is { } uid)
+            await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn

@@ -34,7 +34,19 @@ public sealed class ReadingServiceTests
             });
         var interpret = new InterpretationService(ai.Object);
 
-        var sut = new ReadingService(repo.Object, deck, interpret);
+        var users = new Mock<IUserRepository>();
+        users.Setup(u => u.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Guid id, CancellationToken _) => new User
+            {
+                Id = id,
+                Email = "a@b.c",
+                PasswordHash = "x",
+                SubscriptionStatus = SubscriptionStatus.Active,
+                SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
+            });
+        var subscription = new SubscriptionService(users.Object, repo.Object);
+
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "Что меня ждёт?" },

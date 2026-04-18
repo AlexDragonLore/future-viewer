@@ -67,12 +67,12 @@
 - [x] `dotnet build` проходит
 
 ### Task 7: SubscriptionService + интеграция с ReadingService (Phase 2.3)
-- [ ] Создать `Services/SubscriptionService.cs` с `IsReadingAllowedAsync` и `GetStatusAsync`
-- [ ] Создать `DTOs/SubscriptionStatusDto.cs`
-- [ ] Создать исключения `QuotaExceededException`, `SubscriptionRequiredException`
-- [ ] Расширить `ReadingService.CreateAsync`/`CreateStreamAsync` — проверка через `SubscriptionService`
-- [ ] Расширить `ExceptionHandlerMiddleware` — маппинг 429/402
-- [ ] Unit-тесты для `SubscriptionService`
+- [x] Создать `Services/SubscriptionService.cs` с `IsReadingAllowedAsync` и `GetStatusAsync`
+- [x] Создать `DTOs/SubscriptionStatusDto.cs`
+- [x] Создать исключения `QuotaExceededException`, `SubscriptionRequiredException`
+- [x] Расширить `ReadingService.CreateAsync`/`CreateStreamAsync` — проверка через `SubscriptionService`
+- [x] Расширить `ExceptionHandlerMiddleware` — маппинг 429/402
+- [x] Unit-тесты для `SubscriptionService`
 
 ### Task 8: Host endpoints подписки + frontend (Phase 2.4-2.5)
 - [ ] Создать `SubscriptionEndpoints.cs` — `GET /api/subscription/status` с `.RequireAuthorization()`
