@@ -10,6 +10,10 @@ export const useReadingStore = defineStore('reading', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  const streamingText = ref('')
+  const streamingDone = ref(false)
+  const cardsReady = ref(false)
+
   async function loadSpreads() {
     if (spreads.value.length > 0) return
     try {
@@ -32,10 +36,70 @@ export const useReadingStore = defineStore('reading', () => {
     }
   }
 
+  function createStream(spreadType: SpreadType, question: string) {
+    loading.value = true
+    error.value = null
+    current.value = null
+    streamingText.value = ''
+    streamingDone.value = false
+    cardsReady.value = false
+
+    let resolveCards!: (reading: Reading) => void
+    let rejectCards!: (e: unknown) => void
+    const cardsPromise = new Promise<Reading>((res, rej) => {
+      resolveCards = res
+      rejectCards = rej
+    })
+
+    const donePromise = readingApi
+      .createStream(spreadType, question, {
+        onCards: (reading) => {
+          current.value = reading
+          cardsReady.value = true
+          resolveCards(reading)
+        },
+        onChunk: (delta) => {
+          streamingText.value += delta
+        },
+        onDone: () => {
+          streamingDone.value = true
+          if (current.value) {
+            current.value = { ...current.value, interpretation: streamingText.value }
+          }
+        },
+      })
+      .catch((e) => {
+        const msg = extractApiError(e, 'Не удалось создать расклад')
+        error.value = msg
+        if (!cardsReady.value) rejectCards(e)
+        throw e
+      })
+      .finally(() => {
+        loading.value = false
+      })
+
+    return { cardsPromise, donePromise }
+  }
+
   function reset() {
     current.value = null
     error.value = null
+    streamingText.value = ''
+    streamingDone.value = false
+    cardsReady.value = false
   }
 
-  return { spreads, current, loading, error, loadSpreads, create, reset }
+  return {
+    spreads,
+    current,
+    loading,
+    error,
+    streamingText,
+    streamingDone,
+    cardsReady,
+    loadSpreads,
+    create,
+    createStream,
+    reset,
+  }
 })

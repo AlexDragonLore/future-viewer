@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text;
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.ValueObjects;
@@ -22,24 +23,20 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         _chat = new OpenAIClient(_options.ApiKey).GetChatClient(_options.Model);
     }
 
+    public string Model => _options.Model;
+
+    private const string SystemPrompt =
+        "Ты — опытный таролог. Отвечай на русском языке, стиль мистический, но не перегруженный. " +
+        "Форматируй ответ в Markdown: используй ## для заголовков позиций расклада, **жирный** для названий карт, " +
+        "маркированные списки для ключевых тем. Завершай разделом ## Общий вывод (3–5 предложений).";
+
     public async Task<InterpretationResult> InterpretAsync(
         Spread spread,
         string question,
         IReadOnlyList<ReadingCard> cards,
         CancellationToken ct = default)
     {
-        var system = "Ты — опытный таролог. Отвечай на русском языке, стиль мистический, но не перегруженный. " +
-                     "Форматируй ответ в Markdown: используй ## для заголовков позиций расклада, **жирный** для названий карт, " +
-                     "маркированные списки для ключевых тем. Завершай разделом ## Общий вывод (3–5 предложений).";
-
-        var prompt = BuildPrompt(spread, question, cards);
-
-        var messages = new List<ChatMessage>
-        {
-            new SystemChatMessage(system),
-            new UserChatMessage(prompt)
-        };
-
+        var messages = BuildMessages(spread, question, cards);
         var response = await _chat.CompleteChatAsync(messages, cancellationToken: ct);
         var text = response.Value.Content[0].Text;
 
@@ -48,6 +45,35 @@ public sealed class OpenAIInterpreter : IAIInterpreter
             Text = text,
             Model = _options.Model,
             GeneratedAt = DateTime.UtcNow
+        };
+    }
+
+    public async IAsyncEnumerable<string> InterpretStreamAsync(
+        Spread spread,
+        string question,
+        IReadOnlyList<ReadingCard> cards,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var messages = BuildMessages(spread, question, cards);
+        var stream = _chat.CompleteChatStreamingAsync(messages, cancellationToken: ct);
+
+        await foreach (var update in stream.WithCancellation(ct))
+        {
+            if (update.ContentUpdate.Count == 0) continue;
+            foreach (var part in update.ContentUpdate)
+            {
+                if (!string.IsNullOrEmpty(part.Text))
+                    yield return part.Text;
+            }
+        }
+    }
+
+    private static List<ChatMessage> BuildMessages(Spread spread, string question, IReadOnlyList<ReadingCard> cards)
+    {
+        return new List<ChatMessage>
+        {
+            new SystemChatMessage(SystemPrompt),
+            new UserChatMessage(BuildPrompt(spread, question, cards))
         };
     }
 

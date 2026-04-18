@@ -12,7 +12,7 @@ import { playShuffle, playDeal, playCardFlip, playReveal } from '@/composables/u
 const router = useRouter()
 const store = useReadingStore()
 
-const stage = ref<'idle' | 'shuffling' | 'loading' | 'dealing' | 'flipping' | 'done'>('idle')
+const stage = ref<'idle' | 'shuffling' | 'dealing' | 'flipping' | 'done'>('idle')
 const board = ref<HTMLElement | null>(null)
 const deckRef = ref<{ $el: HTMLElement } | null>(null)
 const getDeckEl = () => deckRef.value?.$el ?? null
@@ -22,7 +22,7 @@ const placeholders = ref<ReadingCard[]>([])
 const pendingSpread = ref<SpreadType | null>(null)
 const pendingQuestion = ref('')
 
-onMounted(() => {
+onMounted(async () => {
   const saved = sessionStorage.getItem('fv_pending')
   if (!saved) {
     router.replace({ name: 'home' })
@@ -44,6 +44,9 @@ onMounted(() => {
     meaning: '',
   }))
   flippedFlags.value = Array.from({ length: count }, () => false)
+
+  await nextTick()
+  startReading()
 })
 
 async function startReading() {
@@ -53,23 +56,20 @@ async function startReading() {
 
   stage.value = 'shuffling'
   playShuffle()
+
+  const { cardsPromise, donePromise } = store.createStream(pendingSpread.value, pendingQuestion.value)
+  donePromise.catch(() => {})
+  let cardsFailed = false
+  cardsPromise.catch(() => {
+    cardsFailed = true
+    stage.value = 'idle'
+  })
+
   await new Promise<void>((resolve) => {
     shuffleDeck(deckEl, () => resolve())
   })
 
-  stage.value = 'loading'
-  try {
-    await store.create(pendingSpread.value, pendingQuestion.value)
-  } catch {
-    stage.value = 'idle'
-    return
-  }
-
-  const reading = store.current
-  if (!reading) {
-    stage.value = 'idle'
-    return
-  }
+  if (cardsFailed) return
 
   const boardRect = board.value.getBoundingClientRect()
   const deckRect = deckEl.getBoundingClientRect()
@@ -79,9 +79,6 @@ async function startReading() {
     x: deckRect.left - boardRect.left + deckRect.width / 2,
     y: deckRect.top - boardRect.top + deckRect.height / 2,
   }
-
-  placeholders.value = reading.cards
-  flippedFlags.value = reading.cards.map(() => false)
 
   stage.value = 'dealing'
   await nextTick()
@@ -93,9 +90,21 @@ async function startReading() {
   }))
 
   dealCards(targets, async () => {
+    let reading
+    try {
+      reading = await cardsPromise
+    } catch {
+      stage.value = 'idle'
+      return
+    }
+
+    placeholders.value = reading.cards
+    flippedFlags.value = reading.cards.map(() => false)
+    await nextTick()
+
     stage.value = 'flipping'
     for (let i = 0; i < flippedFlags.value.length; i++) {
-      await new Promise((r) => setTimeout(r, 320))
+      await new Promise((r) => setTimeout(r, 520))
       playCardFlip()
       flippedFlags.value[i] = true
     }
@@ -103,7 +112,7 @@ async function startReading() {
       playReveal()
       stage.value = 'done'
       router.push({ name: 'result' })
-    }, 1200)
+    }, 1800)
   })
 }
 
@@ -120,7 +129,6 @@ function setCardRef(el: Element | null, idx: number) {
         {{
           stage === 'idle' ? 'Коснись колоды' :
           stage === 'shuffling' ? 'Перемешиваю судьбу…' :
-          stage === 'loading' ? 'Карты зовут…' :
           stage === 'dealing' ? 'Раскладываю…' :
           stage === 'flipping' ? 'Раскрываю…' :
           'Готово'
@@ -142,7 +150,7 @@ function setCardRef(el: Element | null, idx: number) {
 
     <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
       <CardDeck
-        v-if="stage === 'idle' || stage === 'shuffling' || stage === 'loading'"
+        v-if="stage === 'idle' || stage === 'shuffling'"
         ref="deckRef"
         :size="140"
         :disabled="stage !== 'idle'"
@@ -151,7 +159,8 @@ function setCardRef(el: Element | null, idx: number) {
     </div>
 
     <div class="fixed bottom-6 left-0 right-0 text-center text-xs text-mystic-silver/50 z-10">
-      <span v-if="stage === 'idle'">коснись, чтобы перемешать колоду</span>
+      <span v-if="stage === 'idle' && !store.error">коснись, чтобы перемешать колоду</span>
+      <span v-else-if="store.error" class="text-red-400/80">{{ store.error }}</span>
     </div>
   </main>
 </template>

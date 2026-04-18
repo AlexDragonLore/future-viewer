@@ -1,24 +1,93 @@
 <script setup lang="ts">
-import { computed, onMounted, toRef } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
 import CardFlip from '@/components/cards/CardFlip.vue'
-import { useTypewriter } from '@/composables/useTypewriter'
 import { marked } from 'marked'
 
 const router = useRouter()
 const store = useReadingStore()
 
 const reading = computed(() => store.current)
-const interpretationSource = toRef(() => reading.value?.interpretation ?? '')
-const { output: typed } = useTypewriter(interpretationSource, 18)
-const typedHtml = computed(() => marked.parse(typed.value) as string)
+
+const displayed = ref('')
+let rafId: number | null = null
+let lastTick = 0
+
+function tick(now: number) {
+  rafId = null
+  const target = store.streamingText
+  if (displayed.value.length >= target.length) {
+    lastTick = now
+    if (!store.streamingDone) scheduleTick()
+    return
+  }
+
+  const dt = lastTick === 0 ? 16 : Math.min(now - lastTick, 80)
+  lastTick = now
+
+  const behind = target.length - displayed.value.length
+  const baseRate = 55
+  const catchUp = behind * 0.12
+  const charsPerSec = baseRate + catchUp
+  const step = Math.max(1, Math.round((charsPerSec * dt) / 1000))
+  const next = Math.min(target.length, displayed.value.length + step)
+  displayed.value = target.slice(0, next)
+
+  if (displayed.value.length < target.length || !store.streamingDone) {
+    scheduleTick()
+  }
+}
+
+function scheduleTick() {
+  if (rafId !== null) return
+  rafId = requestAnimationFrame(tick)
+}
+
+function cancelTick() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+}
+
+watch(
+  () => store.streamingText,
+  (text) => {
+    if (text.length < displayed.value.length) {
+      displayed.value = ''
+      lastTick = 0
+    }
+    scheduleTick()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => store.streamingDone,
+  (done) => {
+    if (done && displayed.value.length >= store.streamingText.length) cancelTick()
+  },
+)
+
+const typedHtml = computed(() => marked.parse(displayed.value) as string)
+const streaming = computed(() => !store.streamingDone || displayed.value.length < store.streamingText.length)
+
+watch(displayed, async () => {
+  if (!streaming.value) return
+  await nextTick()
+  const doc = document.documentElement
+  const nearBottom = window.innerHeight + window.scrollY >= doc.scrollHeight - 240
+  if (nearBottom) window.scrollTo({ top: doc.scrollHeight, behavior: 'auto' })
+})
 
 onMounted(() => {
   if (!reading.value) {
     router.replace({ name: 'home' })
   }
 })
+
+onBeforeUnmount(() => cancelTick())
 
 function again() {
   store.reset()
@@ -48,7 +117,7 @@ function again() {
 
     <section class="mystic-card max-w-2xl w-full p-8 mb-8">
       <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Интерпретация</div>
-      <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="typedHtml" /><span class="caret">▮</span>
+      <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="typedHtml" /><span v-if="streaming" class="caret">▮</span>
     </section>
 
     <button class="glow-button" @click="again">Новый расклад</button>

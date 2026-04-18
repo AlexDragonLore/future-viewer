@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using System.Text;
 using FutureViewer.Domain.Entities;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
@@ -54,6 +56,51 @@ public sealed class ReadingService
         await _repo.AddAsync(reading, ct);
 
         return Map(reading, spread);
+    }
+
+    public async IAsyncEnumerable<ReadingStreamEvent> CreateStreamAsync(
+        CreateReadingRequest request,
+        Guid? userId,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var spread = Spread.From(request.SpreadType);
+        var drawn = await _deck.DrawAsync(spread.CardCount, ct);
+
+        var cards = drawn
+            .Select((x, idx) => new ReadingCard
+            {
+                CardId = x.Card.Id,
+                Card = x.Card,
+                Position = idx,
+                IsReversed = x.IsReversed
+            })
+            .ToList();
+
+        var reading = new Reading
+        {
+            UserId = userId,
+            SpreadType = spread.Type,
+            Question = request.Question,
+            AiInterpretation = null,
+            AiModel = _interpreter.Model,
+            Cards = cards
+        };
+
+        await _repo.AddAsync(reading, ct);
+
+        yield return new ReadingStreamEvent.Cards(Map(reading, spread));
+
+        var sb = new StringBuilder();
+        await foreach (var delta in _interpreter.InterpretStreamAsync(spread, request.Question, cards, ct))
+        {
+            sb.Append(delta);
+            yield return new ReadingStreamEvent.Chunk(delta);
+        }
+
+        reading.AiInterpretation = sb.ToString();
+        await _repo.UpdateAsync(reading, ct);
+
+        yield return new ReadingStreamEvent.Done();
     }
 
     public async Task<ReadingResult> GetAsync(Guid id, CancellationToken ct = default)

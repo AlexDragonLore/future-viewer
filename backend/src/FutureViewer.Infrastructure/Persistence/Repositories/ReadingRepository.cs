@@ -45,7 +45,8 @@ public sealed class ReadingRepository : IReadingRepository
 
     public async Task UpdateAsync(Reading reading, CancellationToken ct = default)
     {
-        _db.Readings.Update(reading);
+        if (_db.Entry(reading).State == EntityState.Detached)
+            _db.Readings.Update(reading);
         await _db.SaveChangesAsync(ct);
     }
 }

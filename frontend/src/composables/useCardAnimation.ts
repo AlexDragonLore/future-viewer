@@ -7,30 +7,46 @@ export interface DealTarget {
 }
 
 export function dealCards(targets: DealTarget[], onComplete?: () => void): gsap.core.Timeline {
-  const tl = gsap.timeline({ onComplete })
+  const tl = gsap.timeline({ onComplete, defaults: { force3D: true } })
 
   targets.forEach((t, i) => {
     gsap.set(t.el, {
       x: t.from.x,
       y: t.from.y,
-      scale: 0.85,
+      scale: 0.82,
       rotation: 0,
       opacity: 0,
+      force3D: true,
+      willChange: 'transform, opacity',
     })
 
-    const midX = (t.from.x + t.to.x) / 2 + (Math.random() - 0.5) * 120
-    const midY = Math.min(t.from.y, t.to.y) - 140 - Math.random() * 80
+    const midX = (t.from.x + t.to.x) / 2 + (Math.random() - 0.5) * 100
+    const midY = Math.min(t.from.y, t.to.y) - 160 - Math.random() * 60
 
     tl.to(
       t.el,
       {
         keyframes: [
-          { x: midX, y: midY, scale: 1.05, rotation: (Math.random() - 0.5) * 18, duration: 0.45, ease: 'power1.out' },
-          { x: t.to.x, y: t.to.y, scale: 1, rotation: 0, duration: 0.45, ease: 'power2.in' },
+          {
+            x: midX,
+            y: midY,
+            scale: 1.04,
+            rotation: (Math.random() - 0.5) * 14,
+            duration: 1.0,
+            ease: 'sine.out',
+          },
+          {
+            x: t.to.x,
+            y: t.to.y,
+            scale: 1,
+            rotation: 0,
+            duration: 1.0,
+            ease: 'sine.inOut',
+          },
         ],
         opacity: 1,
       },
-      i * 0.28,
+      i * 0.55,
     )
   })
 
@@ -46,8 +62,10 @@ export function flipCards(cards: HTMLElement[]): gsap.core.Timeline {
 }
 
 export function shuffleDeck(el: HTMLElement, onComplete?: () => void): gsap.core.Timeline {
-  const tl = gsap.timeline({ onComplete })
-  tl.to(el, { rotate: 360, duration: 0.8, ease: 'power2.inOut' })
-    .to(el, { scale: 1.08, duration: 0.2, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0)
+  gsap.set(el, { force3D: true, willChange: 'transform', transformOrigin: '50% 50%' })
+  const tl = gsap.timeline({ onComplete, defaults: { force3D: true } })
+  tl.to(el, { rotate: 360, duration: 2.2, ease: 'sine.inOut' })
+    .to(el, { y: -16, duration: 1.1, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0)
+    .to(el, { scale: 1.06, duration: 1.1, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0)
   return tl
 }
