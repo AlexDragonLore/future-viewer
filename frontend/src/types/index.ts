@@ -79,6 +79,22 @@ export interface DeckVariantInfo {
   variantNote: string
 }
 
+export enum SubscriptionStatusValue {
+  None = 0,
+  Active = 1,
+  Expired = 2,
+  Cancelled = 3,
+}
+
+export interface SubscriptionStatus {
+  status: SubscriptionStatusValue
+  expiresAt: string | null
+  isActive: boolean
+  freeReadingsUsedToday: number
+  freeReadingsDailyLimit: number
+  canCreateFreeReading: boolean
+}
+
 export interface CardGlossary {
   id: number
   name: string

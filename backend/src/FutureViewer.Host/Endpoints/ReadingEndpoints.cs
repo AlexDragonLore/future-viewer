@@ -22,10 +22,11 @@ public static class ReadingEndpoints
             CancellationToken ct) =>
         {
             await validator.ValidateAndThrowAsync(request, ct);
-            var userId = GetUserId(ctx.User);
+            var userId = GetUserId(ctx.User)
+                ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
             var result = await service.CreateAsync(request, userId, ct);
             return Results.Created($"/api/readings/{result.Id}", result);
-        });
+        }).RequireAuthorization();
 
         group.MapPost("/stream", async (
             CreateReadingRequest request,
@@ -35,7 +36,8 @@ public static class ReadingEndpoints
             CancellationToken ct) =>
         {
             await validator.ValidateAndThrowAsync(request, ct);
-            var userId = GetUserId(ctx.User);
+            var userId = GetUserId(ctx.User)
+                ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
 
             ctx.Response.Headers.ContentType = "application/x-ndjson";
             ctx.Response.Headers.CacheControl = "no-cache";
@@ -56,7 +58,7 @@ public static class ReadingEndpoints
                 await ctx.Response.Body.WriteAsync(newline, ct);
                 await ctx.Response.Body.FlushAsync(ct);
             }
-        });
+        }).RequireAuthorization();
 
         group.MapGet("/{id:guid}", async (Guid id, ReadingService service, CancellationToken ct) =>
         {

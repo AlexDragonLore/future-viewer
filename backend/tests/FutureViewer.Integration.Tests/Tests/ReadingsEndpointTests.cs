@@ -1,9 +1,12 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
+using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Integration.Tests.Fixtures;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureViewer.Integration.Tests.Tests;
 
@@ -19,7 +22,7 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task Post_reading_returns_cards_and_interpretation()
     {
-        var client = _fixture.CreateClient();
+        var client = await CreateAuthenticatedSubscribedClient();
 
         var response = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "What awaits me?" });
@@ -34,7 +37,7 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task Post_reading_rejects_empty_question()
     {
-        var client = _fixture.CreateClient();
+        var client = await CreateAuthenticatedSubscribedClient();
 
         var response = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "" });
@@ -43,9 +46,20 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
-    public async Task Get_reading_by_id_returns_reading()
+    public async Task Post_reading_without_token_returns_unauthorized()
     {
         var client = _fixture.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Get_reading_by_id_returns_reading()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
         var createResponse = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q" });
         var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
@@ -55,5 +69,25 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
         getResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var fetched = await getResponse.Content.ReadFromJsonAsync<ReadingResult>();
         fetched!.Id.Should().Be(created.Id);
+    }
+
+    private async Task<HttpClient> CreateAuthenticatedSubscribedClient()
+    {
+        var client = _fixture.CreateClient();
+        var email = $"reader-{Guid.NewGuid():N}@example.com";
+
+        var register = await client.PostAsJsonAsync("/api/auth/register",
+            new RegisterRequest { Email = email, Password = "password123" });
+        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+
+        using var scope = _fixture.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var user = await users.GetByIdAsync(auth.UserId);
+        user!.SubscriptionStatus = SubscriptionStatus.Active;
+        user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+        await users.UpdateAsync(user);
+
+        return client;
     }
 }

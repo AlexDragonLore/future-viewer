@@ -75,11 +75,11 @@
 - [x] Unit-тесты для `SubscriptionService`
 
 ### Task 8: Host endpoints подписки + frontend (Phase 2.4-2.5)
-- [ ] Создать `SubscriptionEndpoints.cs` — `GET /api/subscription/status` с `.RequireAuthorization()`
-- [ ] Добавить `.RequireAuthorization()` на POST endpoints readings
-- [ ] Создать `frontend/src/api/subscriptionApi.ts`
-- [ ] Расширить `useAuthStore.ts` — состояние подписки
-- [ ] Расширить `HomeView.vue` — бейдж подписки, блокировка
+- [x] Создать `SubscriptionEndpoints.cs` — `GET /api/subscription/status` с `.RequireAuthorization()`
+- [x] Добавить `.RequireAuthorization()` на POST endpoints readings
+- [x] Создать `frontend/src/api/subscriptionApi.ts`
+- [x] Расширить `useAuthStore.ts` — состояние подписки
+- [x] Расширить `HomeView.vue` — бейдж подписки, блокировка
 
 ### Task 9: Интеграция ЮKassa (Phase 3)
 - [ ] Создать `Payment/YukassaOptions.cs` и `Payment/YukassaClient.cs`
