@@ -9,6 +9,8 @@ export const router = createRouter({
     { path: '/result', name: 'result', component: () => import('@/views/ResultView.vue') },
     { path: '/history', name: 'history', component: () => import('@/views/HistoryView.vue'), meta: { requiresAuth: true } },
     { path: '/auth', name: 'auth', component: () => import('@/views/AuthView.vue') },
+    { path: '/glossary', name: 'glossary', component: () => import('@/views/GlossaryView.vue') },
+    { path: '/glossary/:id', name: 'glossary-card', component: () => import('@/views/CardDetailView.vue') },
   ],
 })
 

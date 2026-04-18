@@ -50,3 +50,49 @@ export interface TarotCardInfo {
   name: string
   imagePath: string
 }
+
+export enum DeckType {
+  RWS = 1,
+  Thoth = 2,
+  Marseille = 3,
+  ViscontiSforza = 4,
+  ModernWitch = 5,
+}
+
+export enum SuggestedTone {
+  Neutral = 0,
+  Supportive = 1,
+  Strict = 2,
+  Contemplative = 3,
+}
+
+export enum CardSuit {
+  MajorArcana = 0,
+  Wands = 1,
+  Cups = 2,
+  Swords = 3,
+  Pentacles = 4,
+}
+
+export interface DeckVariantInfo {
+  deckType: DeckType
+  variantNote: string
+}
+
+export interface CardGlossary {
+  id: number
+  name: string
+  nameEn: string
+  suit: CardSuit
+  number: number
+  imagePath: string
+  descriptionUpright: string
+  descriptionReversed: string
+  shortUpright: string
+  shortReversed: string
+  uprightKeywords: string[]
+  reversedKeywords: string[]
+  suggestedTone: SuggestedTone
+  aliases: string[]
+  deckVariants: DeckVariantInfo[]
+}

@@ -49,13 +49,13 @@
 - [x] Добавить integration-тест для эндпоинтов
 
 ### Task 5: Frontend — глоссарий UI (Phase 1.5)
-- [ ] Создать `frontend/src/api/glossaryApi.ts`
-- [ ] Создать `frontend/src/stores/useGlossaryStore.ts`
-- [ ] Создать `GlossaryView.vue` с сеткой 78 карт и фильтром по мастям
-- [ ] Создать `CardDetailView.vue` с деталями и табами для вариантов колод
-- [ ] Расширить `router/index.ts` — `/glossary`, `/glossary/:id`
-- [ ] Расширить `types/index.ts` — `DeckType`, `SuggestedTone`, `CardGlossary`, `DeckVariantInfo`
-- [ ] `npm run build` проходит
+- [x] Создать `frontend/src/api/glossaryApi.ts`
+- [x] Создать `frontend/src/stores/useGlossaryStore.ts`
+- [x] Создать `GlossaryView.vue` с сеткой 78 карт и фильтром по мастям
+- [x] Создать `CardDetailView.vue` с деталями и табами для вариантов колод
+- [x] Расширить `router/index.ts` — `/glossary`, `/glossary/:id`
+- [x] Расширить `types/index.ts` — `DeckType`, `SuggestedTone`, `CardGlossary`, `DeckVariantInfo`
+- [x] `npm run build` проходит
 
 ### Task 6: Domain + Infrastructure для подписки (Phase 2.1-2.2)
 - [ ] Создать `Enums/SubscriptionStatus.cs` (None, Active, Expired, Cancelled)
