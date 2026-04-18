@@ -55,7 +55,10 @@ public sealed class ReadingRepository : IReadingRepository
         var todayUtc = DateTime.UtcNow.Date;
         var tomorrowUtc = todayUtc.AddDays(1);
         return _db.Readings
-            .Where(r => r.UserId == userId && r.CreatedAt >= todayUtc && r.CreatedAt < tomorrowUtc)
+            .Where(r => r.UserId == userId
+                        && r.CreatedAt >= todayUtc
+                        && r.CreatedAt < tomorrowUtc
+                        && r.AiInterpretation != null)
             .CountAsync(ct);
     }
 }

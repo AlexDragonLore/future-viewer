@@ -90,6 +90,41 @@ public sealed class YukassaClient : IPaymentProvider
         };
     }
 
+    public async Task<PaymentVerification?> VerifyPaymentAsync(string paymentId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(paymentId)) return null;
+        if (string.IsNullOrWhiteSpace(_options.ShopId) || string.IsNullOrWhiteSpace(_options.SecretKey))
+            throw new InvalidOperationException("Yukassa credentials are not configured");
+
+        using var response = await _http.GetAsync($"payments/{Uri.EscapeDataString(paymentId)}", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync(ct);
+            _logger.LogWarning("Yukassa payment verification failed: {Status} {Body}", response.StatusCode, errorBody);
+            return null;
+        }
+
+        var payment = await response.Content.ReadFromJsonAsync<PaymentDetailResponse>(JsonOptions, ct);
+        if (payment is null) return null;
+
+        Guid? userId = null;
+        if (payment.Metadata is not null
+            && payment.Metadata.TryGetValue("user_id", out var userIdStr)
+            && Guid.TryParse(userIdStr, out var parsed))
+        {
+            userId = parsed;
+        }
+
+        return new PaymentVerification
+        {
+            PaymentId = payment.Id,
+            Status = payment.Status,
+            Paid = payment.Paid,
+            UserId = userId
+        };
+    }
+
     public PaymentWebhookEvent? ParseWebhook(string body)
     {
         if (string.IsNullOrWhiteSpace(body)) return null;
@@ -169,6 +204,14 @@ public sealed class YukassaClient : IPaymentProvider
     {
         public required string Id { get; init; }
         public string? Status { get; init; }
+        public Dictionary<string, string>? Metadata { get; init; }
+    }
+
+    private sealed class PaymentDetailResponse
+    {
+        public required string Id { get; init; }
+        public required string Status { get; init; }
+        public bool Paid { get; init; }
         public Dictionary<string, string>? Metadata { get; init; }
     }
 }

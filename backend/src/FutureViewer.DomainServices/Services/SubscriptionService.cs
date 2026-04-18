@@ -79,22 +79,25 @@ public sealed class SubscriptionService
         var evt = _payments.ParseWebhook(body);
         if (evt is null) return false;
         if (evt.Type != PaymentWebhookEventType.PaymentSucceeded) return false;
-        if (evt.UserId is null) return false;
+        if (string.IsNullOrEmpty(evt.PaymentId)) return false;
 
-        var user = await _users.GetByIdAsync(evt.UserId.Value, ct);
+        var verified = await _payments.VerifyPaymentAsync(evt.PaymentId, ct);
+        if (verified is null) return false;
+        if (!verified.Paid) return false;
+        if (!string.Equals(verified.Status, "succeeded", StringComparison.OrdinalIgnoreCase)) return false;
+        if (verified.UserId is null) return false;
+
+        var user = await _users.GetByIdAsync(verified.UserId.Value, ct);
         if (user is null) return false;
 
-        if (!string.IsNullOrEmpty(evt.PaymentId)
-            && string.Equals(user.YukassaSubscriptionId, evt.PaymentId, StringComparison.Ordinal))
-        {
+        if (string.Equals(user.YukassaSubscriptionId, verified.PaymentId, StringComparison.Ordinal))
             return false;
-        }
 
         var now = DateTime.UtcNow;
         var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;
         user.SubscriptionStatus = SubscriptionStatus.Active;
         user.SubscriptionExpiresAt = currentExpiry.AddDays(SubscriptionDurationDays);
-        user.YukassaSubscriptionId = evt.PaymentId;
+        user.YukassaSubscriptionId = verified.PaymentId;
 
         await _users.UpdateAsync(user, ct);
         return true;

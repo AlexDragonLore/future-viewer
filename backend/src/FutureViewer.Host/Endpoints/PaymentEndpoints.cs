@@ -1,11 +1,14 @@
 using System.Security.Claims;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Services;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace FutureViewer.Host.Endpoints;
 
 public static class PaymentEndpoints
 {
+    private const long WebhookMaxBytes = 64 * 1024;
+
     public static IEndpointRouteBuilder MapPayments(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/payments").WithTags("Payments");
@@ -22,12 +25,28 @@ public static class PaymentEndpoints
         }).RequireAuthorization();
 
         group.MapPost("/webhook", async (
-            HttpRequest request,
+            HttpContext ctx,
             SubscriptionService service,
             CancellationToken ct) =>
         {
-            using var reader = new StreamReader(request.Body);
-            var body = await reader.ReadToEndAsync(ct);
+            if (ctx.Request.ContentLength is long cl && cl > WebhookMaxBytes)
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+
+            var sizeFeature = ctx.Features.Get<IHttpMaxRequestBodySizeFeature>();
+            if (sizeFeature is { IsReadOnly: false })
+                sizeFeature.MaxRequestBodySize = WebhookMaxBytes;
+
+            string body;
+            try
+            {
+                using var reader = new StreamReader(ctx.Request.Body);
+                body = await reader.ReadToEndAsync(ct);
+            }
+            catch (BadHttpRequestException)
+            {
+                return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
+            }
+
             var handled = await service.ProcessWebhookAsync(body, ct);
             return handled ? Results.Ok() : Results.Ok(new { handled = false });
         });

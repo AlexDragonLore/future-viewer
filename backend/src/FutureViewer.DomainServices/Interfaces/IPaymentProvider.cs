@@ -8,6 +8,8 @@ public interface IPaymentProvider
         CancellationToken ct = default);
 
     PaymentWebhookEvent? ParseWebhook(string body);
+
+    Task<PaymentVerification?> VerifyPaymentAsync(string paymentId, CancellationToken ct = default);
 }
 
 public sealed class PaymentCreationResult
@@ -28,5 +30,13 @@ public sealed class PaymentWebhookEvent
 {
     public required PaymentWebhookEventType Type { get; init; }
     public required string PaymentId { get; init; }
+    public Guid? UserId { get; init; }
+}
+
+public sealed class PaymentVerification
+{
+    public required string PaymentId { get; init; }
+    public required string Status { get; init; }
+    public required bool Paid { get; init; }
     public Guid? UserId { get; init; }
 }

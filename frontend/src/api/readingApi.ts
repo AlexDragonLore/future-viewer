@@ -50,7 +50,15 @@ export const readingApi = {
     }
 
     if (!response.ok || !response.body) {
-      const error = new Error(`Stream failed: ${response.status} ${response.statusText}`)
+      let message = `Stream failed: ${response.status} ${response.statusText}`
+      try {
+        const errBody = (await response.json()) as { message?: string; error?: string }
+        if (errBody?.message) message = errBody.message
+        else if (errBody?.error) message = errBody.error
+      } catch {
+        // body not JSON — keep default message
+      }
+      const error = new Error(message)
       handlers.onError?.(error)
       throw error
     }
