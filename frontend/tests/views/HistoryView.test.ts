@@ -24,6 +24,7 @@ async function mountHistory() {
     routes: [
       { path: '/', component: { template: '<div>h</div>' } },
       { path: '/history', name: 'history', component: HistoryView },
+      { path: '/reading/:id', name: 'reading-detail', component: { template: '<div>d</div>' } },
     ],
   })
   router.push('/history')
@@ -66,6 +67,14 @@ describe('HistoryView', () => {
     expect(wrapper.text()).toContain('Three card')
     expect(wrapper.text()).toContain('where to?')
     expect(wrapper.text()).toContain('The stars align')
+  })
+
+  it('each reading item links to its detail page', async () => {
+    historyMock.mockResolvedValue([sample])
+    const wrapper = await mountHistory()
+    await flushPromises()
+    const link = wrapper.find('a[href="/reading/r1"]')
+    expect(link.exists()).toBe(true)
   })
 
   it('shows an error when the request fails', async () => {

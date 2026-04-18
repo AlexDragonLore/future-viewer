@@ -33,13 +33,18 @@ onMounted(async () => {
     </div>
 
     <ul v-else class="space-y-4">
-      <li v-for="r in readings" :key="r.id" class="mystic-card p-5">
-        <div class="flex justify-between items-start mb-2">
-          <div class="font-display text-mystic-accent">{{ r.spreadName }}</div>
-          <div class="text-xs text-mystic-silver/50">{{ new Date(r.createdAt).toLocaleString() }}</div>
-        </div>
-        <p class="italic text-mystic-silver/70 mb-2">«{{ r.question }}»</p>
-        <p class="text-sm text-mystic-silver/90 line-clamp-3">{{ r.interpretation }}</p>
+      <li v-for="r in readings" :key="r.id">
+        <RouterLink
+          :to="{ name: 'reading-detail', params: { id: r.id } }"
+          class="mystic-card p-5 block transition hover:border-mystic-accent/60 hover:shadow-[0_0_24px_rgba(245,194,107,0.25)]"
+        >
+          <div class="flex justify-between items-start mb-2">
+            <div class="font-display text-mystic-accent">{{ r.spreadName }}</div>
+            <div class="text-xs text-mystic-silver/50">{{ new Date(r.createdAt).toLocaleString() }}</div>
+          </div>
+          <p class="italic text-mystic-silver/70 mb-2">«{{ r.question }}»</p>
+          <p class="text-sm text-mystic-silver/90 line-clamp-3">{{ r.interpretation }}</p>
+        </RouterLink>
       </li>
     </ul>
 

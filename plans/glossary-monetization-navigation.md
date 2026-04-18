@@ -95,9 +95,9 @@
 - [x] Стилизация: полупрозрачный фон, blur, золотые акценты
 
 ### Task 11: Детали расклада из истории (Phase 4.2)
-- [ ] Создать `views/ReadingDetailView.vue` — маршрут `/reading/:id`
-- [ ] Расширить `HistoryView.vue` — кликабельные элементы → `/reading/:id`
-- [ ] Расширить router
+- [x] Создать `views/ReadingDetailView.vue` — маршрут `/reading/:id`
+- [x] Расширить `HistoryView.vue` — кликабельные элементы → `/reading/:id`
+- [x] Расширить router
 
 ### Task 12: Выбор колоды (Phase 5)
 - [ ] Расширить `Reading` entity — `DeckType` (default RWS)
