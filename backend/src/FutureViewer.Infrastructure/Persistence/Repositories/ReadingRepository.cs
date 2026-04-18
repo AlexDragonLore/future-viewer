@@ -49,4 +49,13 @@ public sealed class ReadingRepository : IReadingRepository
             _db.Readings.Update(reading);
         await _db.SaveChangesAsync(ct);
     }
+
+    public Task<int> CountTodayByUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        var todayUtc = DateTime.UtcNow.Date;
+        var tomorrowUtc = todayUtc.AddDays(1);
+        return _db.Readings
+            .Where(r => r.UserId == userId && r.CreatedAt >= todayUtc && r.CreatedAt < tomorrowUtc)
+            .CountAsync(ct);
+    }
 }

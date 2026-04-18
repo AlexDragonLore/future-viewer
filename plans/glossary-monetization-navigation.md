@@ -58,13 +58,13 @@
 - [x] `npm run build` проходит
 
 ### Task 6: Domain + Infrastructure для подписки (Phase 2.1-2.2)
-- [ ] Создать `Enums/SubscriptionStatus.cs` (None, Active, Expired, Cancelled)
-- [ ] Расширить `User.cs` полями SubscriptionStatus, SubscriptionExpiresAt, YukassaSubscriptionId
-- [ ] Расширить `UserConfiguration.cs`
-- [ ] Миграция `AddSubscriptionFields`
-- [ ] Расширить `IReadingRepository` + `ReadingRepository` — `CountTodayByUserAsync(Guid)`
-- [ ] Расширить `IUserRepository` + `UserRepository` — `UpdateAsync(User)`
-- [ ] `dotnet build` проходит
+- [x] Создать `Enums/SubscriptionStatus.cs` (None, Active, Expired, Cancelled)
+- [x] Расширить `User.cs` полями SubscriptionStatus, SubscriptionExpiresAt, YukassaSubscriptionId
+- [x] Расширить `UserConfiguration.cs`
+- [x] Миграция `AddSubscriptionFields`
+- [x] Расширить `IReadingRepository` + `ReadingRepository` — `CountTodayByUserAsync(Guid)`
+- [x] Расширить `IUserRepository` + `UserRepository` — `UpdateAsync(User)`
+- [x] `dotnet build` проходит
 
 ### Task 7: SubscriptionService + интеграция с ReadingService (Phase 2.3)
 - [ ] Создать `Services/SubscriptionService.cs` с `IsReadingAllowedAsync` и `GetStatusAsync`
