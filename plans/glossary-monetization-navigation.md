@@ -29,13 +29,13 @@
 - [x] Сборка `dotnet build backend/FutureViewer.slnx` проходит
 
 ### Task 2: Infrastructure — EF конфигурация и seed (Phase 1.2)
-- [ ] Расширить `TarotCardConfiguration.cs` — маппинг новых колонок, jsonb для keywords/aliases
-- [ ] Создать `DeckVariantConfiguration.cs` — таблица `deck_variants`, уникальный индекс `(card_id, deck_type)`
-- [ ] Расширить `AppDbContext.cs` — `DbSet<DeckVariant>`
-- [ ] Переписать `TarotDeckSeed.cs` со всеми 78 картами (новые поля) + метод `BuildDeckVariants()` (390 записей)
-- [ ] Расширить `DatabaseInitializer.cs` — сидинг DeckVariants, апдейт карт новыми полями
-- [ ] Создать миграцию `AddGlossaryFields`
-- [ ] `dotnet build` проходит
+- [x] Расширить `TarotCardConfiguration.cs` — маппинг новых колонок, jsonb для keywords/aliases
+- [x] Создать `DeckVariantConfiguration.cs` — таблица `deck_variants`, уникальный индекс `(card_id, deck_type)`
+- [x] Расширить `AppDbContext.cs` — `DbSet<DeckVariant>`
+- [x] Переписать `TarotDeckSeed.cs` со всеми 78 картами (новые поля) + метод `BuildDeckVariants()` (390 записей)
+- [x] Расширить `DatabaseInitializer.cs` — сидинг DeckVariants, апдейт карт новыми полями
+- [x] Создать миграцию `AddGlossaryFields`
+- [x] `dotnet build` проходит
 
 ### Task 3: DomainServices — DTO и глоссарный сервис (Phase 1.3)
 - [ ] Создать `DTOs/CardGlossaryDto.cs` и `DTOs/DeckVariantDto.cs`

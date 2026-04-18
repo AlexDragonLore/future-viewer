@@ -10,6 +10,7 @@ public sealed class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<TarotCard> TarotCards => Set<TarotCard>();
+    public DbSet<DeckVariant> DeckVariants => Set<DeckVariant>();
     public DbSet<Reading> Readings => Set<Reading>();
     public DbSet<ReadingCard> ReadingCards => Set<ReadingCard>();
 
@@ -17,6 +18,7 @@ public sealed class AppDbContext : DbContext
     {
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new TarotCardConfiguration());
+        modelBuilder.ApplyConfiguration(new DeckVariantConfiguration());
         modelBuilder.ApplyConfiguration(new ReadingConfiguration());
         modelBuilder.ApplyConfiguration(new ReadingCardConfiguration());
         base.OnModelCreating(modelBuilder);
