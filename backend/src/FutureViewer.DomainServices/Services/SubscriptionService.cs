@@ -9,14 +9,17 @@ namespace FutureViewer.DomainServices.Services;
 public sealed class SubscriptionService
 {
     public const int FreeDailyLimit = 1;
+    public const int SubscriptionDurationDays = 30;
 
     private readonly IUserRepository _users;
     private readonly IReadingRepository _readings;
+    private readonly IPaymentProvider? _payments;
 
-    public SubscriptionService(IUserRepository users, IReadingRepository readings)
+    public SubscriptionService(IUserRepository users, IReadingRepository readings, IPaymentProvider? payments = null)
     {
         _users = users;
         _readings = readings;
+        _payments = payments;
     }
 
     public async Task EnsureReadingAllowedAsync(Guid userId, SpreadType spreadType, CancellationToken ct = default)
@@ -54,6 +57,47 @@ public sealed class SubscriptionService
             FreeReadingsDailyLimit = FreeDailyLimit,
             CanCreateFreeReading = isActive || usedToday < FreeDailyLimit
         };
+    }
+
+    public async Task<PaymentCreationDto> CreatePaymentAsync(Guid userId, CancellationToken ct = default)
+    {
+        if (_payments is null)
+            throw new InvalidOperationException("Payment provider is not configured");
+
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new UnauthorizedException("User not found");
+
+        var result = await _payments.CreateSubscriptionPaymentAsync(userId, user.Email, ct);
+
+        return new PaymentCreationDto
+        {
+            PaymentId = result.PaymentId,
+            ConfirmationUrl = result.ConfirmationUrl,
+            Status = result.Status
+        };
+    }
+
+    public async Task<bool> ProcessWebhookAsync(string body, CancellationToken ct = default)
+    {
+        if (_payments is null)
+            throw new InvalidOperationException("Payment provider is not configured");
+
+        var evt = _payments.ParseWebhook(body);
+        if (evt is null) return false;
+        if (evt.Type != PaymentWebhookEventType.PaymentSucceeded) return false;
+        if (evt.UserId is null) return false;
+
+        var user = await _users.GetByIdAsync(evt.UserId.Value, ct);
+        if (user is null) return false;
+
+        var now = DateTime.UtcNow;
+        var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;
+        user.SubscriptionStatus = SubscriptionStatus.Active;
+        user.SubscriptionExpiresAt = currentExpiry.AddDays(SubscriptionDurationDays);
+        user.YukassaSubscriptionId = evt.PaymentId;
+
+        await _users.UpdateAsync(user, ct);
+        return true;
     }
 
     private static bool IsSubscriptionActive(User user)

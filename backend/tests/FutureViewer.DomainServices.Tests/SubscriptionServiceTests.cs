@@ -128,4 +128,117 @@ public sealed class SubscriptionServiceTests
         status.CanCreateFreeReading.Should().BeFalse();
         status.FreeReadingsUsedToday.Should().Be(1);
     }
+
+    [Fact]
+    public async Task CreatePayment_returns_confirmation_url_from_provider()
+    {
+        var user = NewUser();
+        var payments = new Mock<IPaymentProvider>();
+        payments.Setup(p => p.CreateSubscriptionPaymentAsync(user.Id, user.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaymentCreationResult
+            {
+                PaymentId = "pay-1",
+                ConfirmationUrl = "https://yk/confirm",
+                Status = "pending"
+            });
+
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object);
+
+        var result = await sut.CreatePaymentAsync(user.Id);
+
+        result.PaymentId.Should().Be("pay-1");
+        result.ConfirmationUrl.Should().Be("https://yk/confirm");
+        result.Status.Should().Be("pending");
+    }
+
+    [Fact]
+    public async Task CreatePayment_throws_when_provider_not_configured()
+    {
+        var user = NewUser();
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object);
+
+        await sut.Invoking(s => s.CreatePaymentAsync(user.Id))
+            .Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_activates_subscription_on_payment_succeeded()
+    {
+        var user = NewUser();
+        var users = UserRepoFor(user);
+        var payments = new Mock<IPaymentProvider>();
+        payments.Setup(p => p.ParseWebhook(It.IsAny<string>())).Returns(new PaymentWebhookEvent
+        {
+            Type = PaymentWebhookEventType.PaymentSucceeded,
+            PaymentId = "pay-xyz",
+            UserId = user.Id
+        });
+
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object);
+
+        var handled = await sut.ProcessWebhookAsync("{}");
+
+        handled.Should().BeTrue();
+        user.SubscriptionStatus.Should().Be(SubscriptionStatus.Active);
+        user.SubscriptionExpiresAt.Should().NotBeNull();
+        user.SubscriptionExpiresAt!.Value.Should().BeAfter(DateTime.UtcNow.AddDays(SubscriptionService.SubscriptionDurationDays - 1));
+        user.YukassaSubscriptionId.Should().Be("pay-xyz");
+        users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_extends_existing_active_subscription()
+    {
+        var existingExpiry = DateTime.UtcNow.AddDays(5);
+        var user = NewUser(SubscriptionStatus.Active, existingExpiry);
+        var payments = new Mock<IPaymentProvider>();
+        payments.Setup(p => p.ParseWebhook(It.IsAny<string>())).Returns(new PaymentWebhookEvent
+        {
+            Type = PaymentWebhookEventType.PaymentSucceeded,
+            PaymentId = "pay-ext",
+            UserId = user.Id
+        });
+
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object);
+
+        await sut.ProcessWebhookAsync("{}");
+
+        user.SubscriptionExpiresAt.Should().BeAfter(existingExpiry.AddDays(SubscriptionService.SubscriptionDurationDays - 1));
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_ignores_cancelled_events()
+    {
+        var user = NewUser();
+        var users = UserRepoFor(user);
+        var payments = new Mock<IPaymentProvider>();
+        payments.Setup(p => p.ParseWebhook(It.IsAny<string>())).Returns(new PaymentWebhookEvent
+        {
+            Type = PaymentWebhookEventType.PaymentCanceled,
+            PaymentId = "pay-cancel",
+            UserId = user.Id
+        });
+
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object);
+
+        var handled = await sut.ProcessWebhookAsync("{}");
+
+        handled.Should().BeFalse();
+        user.SubscriptionStatus.Should().Be(SubscriptionStatus.None);
+        users.Verify(u => u.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProcessWebhook_ignores_unparseable_body()
+    {
+        var user = NewUser();
+        var payments = new Mock<IPaymentProvider>();
+        payments.Setup(p => p.ParseWebhook(It.IsAny<string>())).Returns((PaymentWebhookEvent?)null);
+
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object);
+
+        var handled = await sut.ProcessWebhookAsync("not-json");
+
+        handled.Should().BeFalse();
+    }
 }

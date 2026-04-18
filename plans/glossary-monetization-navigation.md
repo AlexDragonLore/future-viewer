@@ -82,12 +82,12 @@
 - [x] Расширить `HomeView.vue` — бейдж подписки, блокировка
 
 ### Task 9: Интеграция ЮKassa (Phase 3)
-- [ ] Создать `Payment/YukassaOptions.cs` и `Payment/YukassaClient.cs`
-- [ ] Создать `Interfaces/IPaymentProvider.cs`
-- [ ] Расширить `SubscriptionService` методами `CreatePaymentAsync`, `ProcessWebhookAsync`
-- [ ] Создать `PaymentEndpoints.cs` — `POST /api/payments/subscribe`, `POST /api/payments/webhook`
-- [ ] Создать `frontend/src/api/paymentApi.ts`, `SubscriptionBanner.vue`, `PaymentSuccessView.vue`
-- [ ] Расширить router — `/payment/success`
+- [x] Создать `Payment/YukassaOptions.cs` и `Payment/YukassaClient.cs`
+- [x] Создать `Interfaces/IPaymentProvider.cs`
+- [x] Расширить `SubscriptionService` методами `CreatePaymentAsync`, `ProcessWebhookAsync`
+- [x] Создать `PaymentEndpoints.cs` — `POST /api/payments/subscribe`, `POST /api/payments/webhook`
+- [x] Создать `frontend/src/api/paymentApi.ts`, `SubscriptionBanner.vue`, `PaymentSuccessView.vue`
+- [x] Расширить router — `/payment/success`
 
 ### Task 10: Верхнее меню сайта (Phase 4.1)
 - [ ] Создать `components/SiteHeader.vue` с логотипом, ссылкой на глоссарий, селектором колоды, auth-состоянием

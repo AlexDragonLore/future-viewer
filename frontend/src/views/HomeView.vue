@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { SpreadType } from '@/types'
+import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
 
 const router = useRouter()
 const store = useReadingStore()
@@ -123,6 +124,11 @@ function begin() {
       <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
         {{ auth.isAuthenticated ? 'Начать расклад' : 'Войти и начать' }}
       </button>
+
+      <SubscriptionBanner
+        v-if="auth.isAuthenticated && !auth.isSubscribed && blocked"
+        :message="requiresSubscription ? 'Расклад требует подписки' : 'Лимит бесплатных раскладов исчерпан'"
+      />
 
       <div class="flex justify-between text-xs text-mystic-silver/50">
         <RouterLink v-if="!auth.isAuthenticated" to="/auth" class="hover:text-mystic-accent transition">Войти / Регистрация</RouterLink>

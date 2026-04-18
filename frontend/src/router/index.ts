@@ -11,6 +11,7 @@ export const router = createRouter({
     { path: '/auth', name: 'auth', component: () => import('@/views/AuthView.vue') },
     { path: '/glossary', name: 'glossary', component: () => import('@/views/GlossaryView.vue') },
     { path: '/glossary/:id', name: 'glossary-card', component: () => import('@/views/CardDetailView.vue') },
+    { path: '/payment/success', name: 'payment-success', component: () => import('@/views/PaymentSuccessView.vue') },
   ],
 })
 
