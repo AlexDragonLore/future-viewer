@@ -90,9 +90,9 @@
 - [x] Расширить router — `/payment/success`
 
 ### Task 10: Верхнее меню сайта (Phase 4.1)
-- [ ] Создать `components/SiteHeader.vue` с логотипом, ссылкой на глоссарий, селектором колоды, auth-состоянием
-- [ ] Расширить `App.vue` — рендер SiteHeader над RouterView, padding-top
-- [ ] Стилизация: полупрозрачный фон, blur, золотые акценты
+- [x] Создать `components/SiteHeader.vue` с логотипом, ссылкой на глоссарий, селектором колоды, auth-состоянием
+- [x] Расширить `App.vue` — рендер SiteHeader над RouterView, padding-top
+- [x] Стилизация: полупрозрачный фон, blur, золотые акценты
 
 ### Task 11: Детали расклада из истории (Phase 4.2)
 - [ ] Создать `views/ReadingDetailView.vue` — маршрут `/reading/:id`

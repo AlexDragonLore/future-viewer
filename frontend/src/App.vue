@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Starfield from '@/components/fx/Starfield.vue'
 import MistLayer from '@/components/fx/MistLayer.vue'
+import SiteHeader from '@/components/SiteHeader.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 </script>
 
@@ -8,7 +9,8 @@ import SiteFooter from '@/components/SiteFooter.vue'
   <div class="min-h-screen relative overflow-hidden bg-gradient-to-b from-mystic-deepest via-mystic-deep to-mystic-mid text-mystic-silver font-body">
     <Starfield />
     <MistLayer />
-    <div class="relative z-10 flex flex-col min-h-screen">
+    <SiteHeader />
+    <div class="relative z-10 flex flex-col min-h-screen pt-16">
       <RouterView v-slot="{ Component }">
         <Transition name="fade" mode="out-in">
           <component :is="Component" />
