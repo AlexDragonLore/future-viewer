@@ -1,6 +1,7 @@
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.Interfaces;
+using FutureViewer.DomainServices.Services;
 
 namespace FutureViewer.Host.Endpoints;
 
@@ -26,6 +27,18 @@ public static class CardEndpoints
                 cardCount = s.CardCount,
                 positions = s.Positions
             }));
+        });
+
+        group.MapGet("/glossary", async (CardDeckService service, CancellationToken ct) =>
+        {
+            var glossary = await service.GetGlossaryAsync(ct);
+            return Results.Ok(glossary);
+        });
+
+        group.MapGet("/{id:int}", async (int id, CardDeckService service, CancellationToken ct) =>
+        {
+            var card = await service.GetCardDetailAsync(id, ct);
+            return card is null ? Results.NotFound() : Results.Ok(card);
         });
 
         return app;

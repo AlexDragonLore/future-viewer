@@ -45,8 +45,8 @@
 - [x] Добавить unit-тесты для новых методов сервиса
 
 ### Task 4: Host — глоссарные API эндпоинты (Phase 1.4)
-- [ ] Расширить `CardEndpoints.cs` — `GET /api/cards/glossary`, `GET /api/cards/{id:int}`
-- [ ] Добавить integration-тест для эндпоинтов
+- [x] Расширить `CardEndpoints.cs` — `GET /api/cards/glossary`, `GET /api/cards/{id:int}`
+- [x] Добавить integration-тест для эндпоинтов
 
 ### Task 5: Frontend — глоссарий UI (Phase 1.5)
 - [ ] Создать `frontend/src/api/glossaryApi.ts`
