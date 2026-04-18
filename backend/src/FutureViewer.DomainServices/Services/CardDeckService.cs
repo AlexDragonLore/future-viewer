@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 
 namespace FutureViewer.DomainServices.Services;
@@ -31,6 +32,39 @@ public sealed class CardDeckService
         }
         return drawn;
     }
+
+    public async Task<IReadOnlyList<CardGlossaryDto>> GetGlossaryAsync(CancellationToken ct = default)
+    {
+        var cards = await _deck.GetAllWithVariantsAsync(ct);
+        return cards.Select(ToDto).ToList();
+    }
+
+    public async Task<CardGlossaryDto?> GetCardDetailAsync(int id, CancellationToken ct = default)
+    {
+        var card = await _deck.GetByIdWithVariantsAsync(id, ct);
+        return card is null ? null : ToDto(card);
+    }
+
+    private static CardGlossaryDto ToDto(TarotCard card) => new()
+    {
+        Id = card.Id,
+        Name = card.Name,
+        NameEn = card.NameEn,
+        Suit = card.Suit,
+        Number = card.Number,
+        ImagePath = card.ImagePath,
+        DescriptionUpright = card.DescriptionUpright,
+        DescriptionReversed = card.DescriptionReversed,
+        ShortUpright = card.ShortUpright,
+        ShortReversed = card.ShortReversed,
+        UprightKeywords = card.UprightKeywords.ToList(),
+        ReversedKeywords = card.ReversedKeywords.ToList(),
+        SuggestedTone = card.SuggestedTone,
+        Aliases = card.Aliases?.ToList() ?? new List<string>(),
+        DeckVariants = card.DeckVariants
+            .Select(v => new DeckVariantDto { DeckType = v.DeckType, VariantNote = v.VariantNote })
+            .ToList()
+    };
 
     private static void Shuffle<T>(T[] array)
     {

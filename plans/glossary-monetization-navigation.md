@@ -38,11 +38,11 @@
 - [x] `dotnet build` проходит
 
 ### Task 3: DomainServices — DTO и глоссарный сервис (Phase 1.3)
-- [ ] Создать `DTOs/CardGlossaryDto.cs` и `DTOs/DeckVariantDto.cs`
-- [ ] Расширить `ICardDeck` методами `GetAllWithVariantsAsync()`, `GetByIdWithVariantsAsync(int id)`
-- [ ] Расширить `CardDeckRepository` реализациями с `.Include(c => c.DeckVariants)`
-- [ ] Расширить `CardDeckService` методами `GetGlossaryAsync()`, `GetCardDetailAsync(int id)`
-- [ ] Добавить unit-тесты для новых методов сервиса
+- [x] Создать `DTOs/CardGlossaryDto.cs` и `DTOs/DeckVariantDto.cs`
+- [x] Расширить `ICardDeck` методами `GetAllWithVariantsAsync()`, `GetByIdWithVariantsAsync(int id)`
+- [x] Расширить `CardDeckRepository` реализациями с `.Include(c => c.DeckVariants)`
+- [x] Расширить `CardDeckService` методами `GetGlossaryAsync()`, `GetCardDetailAsync(int id)`
+- [x] Добавить unit-тесты для новых методов сервиса
 
 ### Task 4: Host — глоссарные API эндпоинты (Phase 1.4)
 - [ ] Расширить `CardEndpoints.cs` — `GET /api/cards/glossary`, `GET /api/cards/{id:int}`

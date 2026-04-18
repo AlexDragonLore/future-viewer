@@ -17,4 +17,22 @@ public sealed class CardDeckRepository : ICardDeck
     {
         return await _db.TarotCards.AsNoTracking().ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<TarotCard>> GetAllWithVariantsAsync(CancellationToken ct = default)
+    {
+        return await _db.TarotCards
+            .AsNoTracking()
+            .Include(c => c.DeckVariants)
+            .OrderBy(c => c.Suit)
+            .ThenBy(c => c.Number)
+            .ToListAsync(ct);
+    }
+
+    public async Task<TarotCard?> GetByIdWithVariantsAsync(int id, CancellationToken ct = default)
+    {
+        return await _db.TarotCards
+            .AsNoTracking()
+            .Include(c => c.DeckVariants)
+            .FirstOrDefaultAsync(c => c.Id == id, ct);
+    }
 }
