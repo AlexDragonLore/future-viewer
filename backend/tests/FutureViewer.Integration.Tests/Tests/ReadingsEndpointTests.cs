@@ -89,6 +89,28 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
         fetched!.Id.Should().Be(created.Id);
     }
 
+    [Fact]
+    public async Task Get_reading_by_id_without_token_returns_unauthorized()
+    {
+        var anon = _fixture.CreateClient();
+        var response = await anon.GetAsync($"/api/readings/{Guid.NewGuid()}");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Get_reading_by_id_of_other_user_returns_not_found()
+    {
+        var owner = await CreateAuthenticatedSubscribedClient();
+        var createResponse = await owner.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "private" });
+        var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
+
+        var intruder = await CreateAuthenticatedSubscribedClient();
+        var response = await intruder.GetAsync($"/api/readings/{created!.Id}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     private async Task<HttpClient> CreateAuthenticatedSubscribedClient()
     {
         var client = _fixture.CreateClient();

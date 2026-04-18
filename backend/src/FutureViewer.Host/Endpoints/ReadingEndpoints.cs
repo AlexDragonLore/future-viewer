@@ -60,11 +60,17 @@ public static class ReadingEndpoints
             }
         }).RequireAuthorization();
 
-        group.MapGet("/{id:guid}", async (Guid id, ReadingService service, CancellationToken ct) =>
+        group.MapGet("/{id:guid}", async (
+            Guid id,
+            ReadingService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
         {
-            var result = await service.GetAsync(id, ct);
+            var userId = GetUserId(ctx.User)
+                ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
+            var result = await service.GetAsync(id, userId, ct);
             return Results.Ok(result);
-        });
+        }).RequireAuthorization();
 
         group.MapGet("/history", async (
             ReadingService service,

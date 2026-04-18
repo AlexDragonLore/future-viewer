@@ -124,10 +124,12 @@ public sealed class ReadingService
         yield return new ReadingStreamEvent.Done();
     }
 
-    public async Task<ReadingResult> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<ReadingResult> GetAsync(Guid id, Guid userId, CancellationToken ct = default)
     {
         var reading = await _repo.GetByIdAsync(id, ct)
             ?? throw new NotFoundException($"Reading {id} not found");
+        if (reading.UserId != userId)
+            throw new NotFoundException($"Reading {id} not found");
         var spread = Spread.From(reading.SpreadType);
         return Map(reading, spread);
     }

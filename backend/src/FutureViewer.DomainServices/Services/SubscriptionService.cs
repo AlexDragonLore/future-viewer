@@ -13,9 +13,9 @@ public sealed class SubscriptionService
 
     private readonly IUserRepository _users;
     private readonly IReadingRepository _readings;
-    private readonly IPaymentProvider? _payments;
+    private readonly IPaymentProvider _payments;
 
-    public SubscriptionService(IUserRepository users, IReadingRepository readings, IPaymentProvider? payments = null)
+    public SubscriptionService(IUserRepository users, IReadingRepository readings, IPaymentProvider payments)
     {
         _users = users;
         _readings = readings;
@@ -61,9 +61,6 @@ public sealed class SubscriptionService
 
     public async Task<PaymentCreationDto> CreatePaymentAsync(Guid userId, CancellationToken ct = default)
     {
-        if (_payments is null)
-            throw new InvalidOperationException("Payment provider is not configured");
-
         var user = await _users.GetByIdAsync(userId, ct)
             ?? throw new UnauthorizedException("User not found");
 
@@ -79,9 +76,6 @@ public sealed class SubscriptionService
 
     public async Task<bool> ProcessWebhookAsync(string body, CancellationToken ct = default)
     {
-        if (_payments is null)
-            throw new InvalidOperationException("Payment provider is not configured");
-
         var evt = _payments.ParseWebhook(body);
         if (evt is null) return false;
         if (evt.Type != PaymentWebhookEventType.PaymentSucceeded) return false;
@@ -89,6 +83,12 @@ public sealed class SubscriptionService
 
         var user = await _users.GetByIdAsync(evt.UserId.Value, ct);
         if (user is null) return false;
+
+        if (!string.IsNullOrEmpty(evt.PaymentId)
+            && string.Equals(user.YukassaSubscriptionId, evt.PaymentId, StringComparison.Ordinal))
+        {
+            return false;
+        }
 
         var now = DateTime.UtcNow;
         var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;

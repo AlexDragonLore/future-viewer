@@ -18,6 +18,15 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // JWT auth
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
 var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
+var jwtSecret = jwtOptions.Secret;
+if (string.IsNullOrEmpty(jwtSecret))
+{
+    if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing"))
+        jwtSecret = new string('x', 32);
+    else
+        throw new InvalidOperationException(
+            "Jwt:Secret is not configured. Set the Jwt:Secret configuration value (or JWT_SECRET env var) outside Development/Testing.");
+}
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(opt =>
@@ -30,10 +39,7 @@ builder.Services
             ValidateIssuerSigningKey = true,
             ValidIssuer = jwtOptions.Issuer,
             ValidAudience = jwtOptions.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(string.IsNullOrEmpty(jwtOptions.Secret)
-                    ? new string('x', 32)
-                    : jwtOptions.Secret))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
     });
 builder.Services.AddAuthorization();
