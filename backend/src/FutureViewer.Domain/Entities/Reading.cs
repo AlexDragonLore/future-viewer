@@ -12,6 +12,7 @@ public sealed class Reading
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public string? AiInterpretation { get; set; }
     public string? AiModel { get; set; }
+    public DeckType DeckType { get; init; } = DeckType.RWS;
 
     public ICollection<ReadingCard> Cards { get; init; } = new List<ReadingCard>();
 }

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { readingApi } from '@/api/readingApi'
 import { extractApiError } from '@/api/httpClient'
+import { useDeckStore } from '@/stores/useDeckStore'
 import type { Reading, SpreadInfo, SpreadType } from '@/types'
 
 export const useReadingStore = defineStore('reading', () => {
@@ -27,7 +28,7 @@ export const useReadingStore = defineStore('reading', () => {
     loading.value = true
     error.value = null
     try {
-      current.value = await readingApi.create(spreadType, question)
+      current.value = await readingApi.create(spreadType, question, useDeckStore().current)
     } catch (e) {
       error.value = extractApiError(e, 'Не удалось создать расклад')
       throw e
@@ -44,6 +45,8 @@ export const useReadingStore = defineStore('reading', () => {
     streamingDone.value = false
     cardsReady.value = false
 
+    const deckType = useDeckStore().current
+
     let resolveCards!: (reading: Reading) => void
     let rejectCards!: (e: unknown) => void
     const cardsPromise = new Promise<Reading>((res, rej) => {
@@ -52,7 +55,7 @@ export const useReadingStore = defineStore('reading', () => {
     })
 
     const donePromise = readingApi
-      .createStream(spreadType, question, {
+      .createStream(spreadType, question, deckType, {
         onCards: (reading) => {
           current.value = reading
           cardsReady.value = true

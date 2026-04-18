@@ -36,6 +36,7 @@ export interface Reading {
   createdAt: string
   cards: ReadingCard[]
   interpretation: string | null
+  deckType: DeckType
 }
 
 export interface AuthResponse {

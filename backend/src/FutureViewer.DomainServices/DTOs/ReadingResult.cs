@@ -11,4 +11,5 @@ public sealed class ReadingResult
     public required DateTime CreatedAt { get; init; }
     public required IReadOnlyList<ReadingCardDto> Cards { get; init; }
     public string? Interpretation { get; init; }
+    public DeckType DeckType { get; init; } = DeckType.RWS;
 }

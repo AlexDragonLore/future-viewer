@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
-import { SpreadType, type Reading } from '@/types'
+import { DeckType, SpreadType, type Reading } from '@/types'
 import { useReadingStore } from '@/stores/useReadingStore'
 
 import ResultView from '@/views/ResultView.vue'
@@ -26,6 +26,7 @@ const sample: Reading = {
     },
   ],
   interpretation: 'The stars align.',
+  deckType: DeckType.RWS,
 }
 
 async function mountResult(withReading: Reading | null): Promise<{ wrapper: ReturnType<typeof mount>; router: Router }> {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
-import { SpreadType, type Reading } from '@/types'
+import { DeckType, SpreadType, type Reading } from '@/types'
 
 const getMock = vi.fn()
 
@@ -36,6 +36,7 @@ const sample: Reading = {
     },
   ],
   interpretation: 'The stars align.',
+  deckType: DeckType.RWS,
 }
 
 async function mountDetail(id: string): Promise<{ wrapper: ReturnType<typeof mount>; router: Router }> {

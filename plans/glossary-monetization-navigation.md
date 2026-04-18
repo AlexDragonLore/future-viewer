@@ -12,12 +12,12 @@
 Пять фаз: глоссарий, модель подписки, интеграция ЮKassa, навигация/UI, выбор колоды. Каждая фаза разбита на задачи по слоям Clean Architecture (Domain → DomainServices → Infrastructure → Host → Frontend).
 
 ## Success criteria
-- [ ] `dotnet test backend/FutureViewer.slnx` — все существующие тесты проходят
-- [ ] `npm run build` (frontend) — сборка без ошибок
-- [ ] Глоссарий доступен публично на `/glossary`
-- [ ] Авторизованный пользователь без подписки видит лимит 1 SingleCard/день
-- [ ] Подписка через ЮKassa sandbox активируется корректно
-- [ ] Выбор колоды меняет тон AI-интерпретации
+- [x] `dotnet test backend/FutureViewer.slnx` — все существующие тесты проходят
+- [x] `npm run build` (frontend) — сборка без ошибок
+- [x] Глоссарий доступен публично на `/glossary`
+- [x] Авторизованный пользователь без подписки видит лимит 1 SingleCard/день
+- [x] Подписка через ЮKassa sandbox активируется корректно
+- [x] Выбор колоды меняет тон AI-интерпретации
 
 ---
 
@@ -100,14 +100,14 @@
 - [x] Расширить router
 
 ### Task 12: Выбор колоды (Phase 5)
-- [ ] Расширить `Reading` entity — `DeckType` (default RWS)
-- [ ] Расширить `ReadingConfiguration` — колонка `deck_type`
-- [ ] Миграция `AddDeckTypeToReading`
-- [ ] Расширить `CreateReadingRequest`, `InterpretationService`, `ReadingService`, `OpenAIInterpreter` — учёт `DeckType` в промпте, вариант notes
-- [ ] Расширить `ICardDeck` методом `GetVariantNotesAsync`
-- [ ] Создать `frontend/src/stores/useDeckStore.ts` (persisted в localStorage `fv_deck`)
-- [ ] Активировать dropdown выбора колоды в SiteHeader
-- [ ] Расширить `useReadingStore.ts`, `readingApi.ts` — передача `deckType`
+- [x] Расширить `Reading` entity — `DeckType` (default RWS)
+- [x] Расширить `ReadingConfiguration` — колонка `deck_type`
+- [x] Миграция `AddDeckTypeToReading`
+- [x] Расширить `CreateReadingRequest`, `InterpretationService`, `ReadingService`, `OpenAIInterpreter` — учёт `DeckType` в промпте, вариант notes
+- [x] Расширить `ICardDeck` методом `GetVariantNotesAsync`
+- [x] Создать `frontend/src/stores/useDeckStore.ts` (persisted в localStorage `fv_deck`)
+- [x] Активировать dropdown выбора колоды в SiteHeader
+- [x] Расширить `useReadingStore.ts`, `readingApi.ts` — передача `deckType`
 
 ---
 

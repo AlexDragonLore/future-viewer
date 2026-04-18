@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,5 +35,22 @@ public sealed class CardDeckRepository : ICardDeck
             .AsNoTracking()
             .Include(c => c.DeckVariants)
             .FirstOrDefaultAsync(c => c.Id == id, ct);
+    }
+
+    public async Task<IReadOnlyDictionary<int, string>> GetVariantNotesAsync(
+        DeckType deckType,
+        IReadOnlyCollection<int> cardIds,
+        CancellationToken ct = default)
+    {
+        if (cardIds.Count == 0)
+            return new Dictionary<int, string>();
+
+        var variants = await _db.DeckVariants
+            .AsNoTracking()
+            .Where(v => v.DeckType == deckType && cardIds.Contains(v.CardId))
+            .Select(v => new { v.CardId, v.VariantNote })
+            .ToListAsync(ct);
+
+        return variants.ToDictionary(v => v.CardId, v => v.VariantNote);
     }
 }

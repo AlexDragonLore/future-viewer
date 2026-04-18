@@ -57,6 +57,24 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
+    public async Task Post_reading_persists_requested_deck_type()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest
+            {
+                SpreadType = SpreadType.SingleCard,
+                Question = "q",
+                DeckType = DeckType.Thoth
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var result = await response.Content.ReadFromJsonAsync<ReadingResult>();
+        result!.DeckType.Should().Be(DeckType.Thoth);
+    }
+
+    [Fact]
     public async Task Get_reading_by_id_returns_reading()
     {
         var client = await CreateAuthenticatedSubscribedClient();

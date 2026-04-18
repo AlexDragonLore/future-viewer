@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 
@@ -43,6 +44,14 @@ public sealed class CardDeckService
     {
         var card = await _deck.GetByIdWithVariantsAsync(id, ct);
         return card is null ? null : ToDto(card);
+    }
+
+    public Task<IReadOnlyDictionary<int, string>> GetVariantNotesAsync(
+        DeckType deckType,
+        IReadOnlyCollection<int> cardIds,
+        CancellationToken ct = default)
+    {
+        return _deck.GetVariantNotesAsync(deckType, cardIds, ct);
     }
 
     private static CardGlossaryDto ToDto(TarotCard card) => new()

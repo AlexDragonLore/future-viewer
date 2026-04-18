@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
-import { SpreadType, type Reading } from '@/types'
+import { DeckType, SpreadType, type Reading } from '@/types'
 
 const historyMock = vi.fn()
 
@@ -40,6 +40,7 @@ const sample: Reading = {
   createdAt: '2026-04-14T12:00:00Z',
   cards: [],
   interpretation: 'The stars align',
+  deckType: DeckType.RWS,
 }
 
 describe('HistoryView', () => {

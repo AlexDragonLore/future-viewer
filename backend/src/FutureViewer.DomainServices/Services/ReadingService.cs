@@ -46,7 +46,13 @@ public sealed class ReadingService
             })
             .ToList();
 
-        var interpretation = await _interpreter.InterpretAsync(spread, request.Question, cards, ct);
+        var variantNotes = await _deck.GetVariantNotesAsync(
+            request.DeckType,
+            cards.Select(c => c.CardId).ToList(),
+            ct);
+
+        var interpretation = await _interpreter.InterpretAsync(
+            spread, request.Question, cards, request.DeckType, variantNotes, ct);
 
         var reading = new Reading
         {
@@ -55,6 +61,7 @@ public sealed class ReadingService
             Question = request.Question,
             AiInterpretation = interpretation.Text,
             AiModel = interpretation.Model,
+            DeckType = request.DeckType,
             Cards = cards
         };
 
@@ -83,6 +90,11 @@ public sealed class ReadingService
             })
             .ToList();
 
+        var variantNotes = await _deck.GetVariantNotesAsync(
+            request.DeckType,
+            cards.Select(c => c.CardId).ToList(),
+            ct);
+
         var reading = new Reading
         {
             UserId = userId,
@@ -90,6 +102,7 @@ public sealed class ReadingService
             Question = request.Question,
             AiInterpretation = null,
             AiModel = _interpreter.Model,
+            DeckType = request.DeckType,
             Cards = cards
         };
 
@@ -98,7 +111,8 @@ public sealed class ReadingService
         yield return new ReadingStreamEvent.Cards(Map(reading, spread));
 
         var sb = new StringBuilder();
-        await foreach (var delta in _interpreter.InterpretStreamAsync(spread, request.Question, cards, ct))
+        await foreach (var delta in _interpreter.InterpretStreamAsync(
+            spread, request.Question, cards, request.DeckType, variantNotes, ct))
         {
             sb.Append(delta);
             yield return new ReadingStreamEvent.Chunk(delta);
@@ -154,7 +168,8 @@ public sealed class ReadingService
             Question = reading.Question,
             CreatedAt = reading.CreatedAt,
             Cards = cards,
-            Interpretation = reading.AiInterpretation
+            Interpretation = reading.AiInterpretation,
+            DeckType = reading.DeckType
         };
     }
 }

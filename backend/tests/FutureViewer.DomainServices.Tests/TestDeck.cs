@@ -48,4 +48,19 @@ internal sealed class TestDeck : ICardDeck
         var card = BuildCards().FirstOrDefault(c => c.Id == id);
         return Task.FromResult(card);
     }
+
+    public Task<IReadOnlyDictionary<int, string>> GetVariantNotesAsync(
+        DeckType deckType,
+        IReadOnlyCollection<int> cardIds,
+        CancellationToken ct = default)
+    {
+        var all = BuildCards();
+        var dict = all
+            .Where(c => cardIds.Contains(c.Id))
+            .SelectMany(c => c.DeckVariants)
+            .Where(v => v.DeckType == deckType)
+            .ToDictionary(v => v.CardId, v => v.VariantNote);
+        IReadOnlyDictionary<int, string> result = dict;
+        return Task.FromResult(result);
+    }
 }

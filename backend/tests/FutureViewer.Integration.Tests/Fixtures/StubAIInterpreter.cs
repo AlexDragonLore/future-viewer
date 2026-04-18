@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.Domain.ValueObjects;
 using FutureViewer.DomainServices.Interfaces;
 
@@ -12,11 +13,13 @@ public sealed class StubAIInterpreter : IAIInterpreter
         Spread spread,
         string question,
         IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes,
         CancellationToken ct = default)
     {
         return Task.FromResult(new InterpretationResult
         {
-            Text = $"Stub interpretation for {spread.Name} with {cards.Count} cards",
+            Text = $"Stub interpretation for {spread.Name} with {cards.Count} cards ({deckType})",
             Model = Model,
             GeneratedAt = DateTime.UtcNow
         });
@@ -26,9 +29,11 @@ public sealed class StubAIInterpreter : IAIInterpreter
         Spread spread,
         string question,
         IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        yield return $"Stub interpretation for {spread.Name} with {cards.Count} cards";
+        yield return $"Stub interpretation for {spread.Name} with {cards.Count} cards ({deckType})";
         await Task.CompletedTask;
     }
 }

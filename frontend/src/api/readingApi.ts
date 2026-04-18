@@ -1,5 +1,5 @@
 import { httpClient } from './httpClient'
-import type { Reading, SpreadType, SpreadInfo } from '@/types'
+import type { DeckType, Reading, SpreadType, SpreadInfo } from '@/types'
 
 export interface ReadingStreamHandlers {
   onCards: (reading: Reading) => void
@@ -14,14 +14,19 @@ type StreamEvent =
   | { type: 'done' }
 
 export const readingApi = {
-  async create(spreadType: SpreadType, question: string): Promise<Reading> {
-    const { data } = await httpClient.post<Reading>('/api/readings', { spreadType, question })
+  async create(spreadType: SpreadType, question: string, deckType: DeckType): Promise<Reading> {
+    const { data } = await httpClient.post<Reading>('/api/readings', {
+      spreadType,
+      question,
+      deckType,
+    })
     return data
   },
 
   async createStream(
     spreadType: SpreadType,
     question: string,
+    deckType: DeckType,
     handlers: ReadingStreamHandlers,
     signal?: AbortSignal,
   ): Promise<void> {
@@ -36,7 +41,7 @@ export const readingApi = {
       response = await fetch(`${baseURL}/api/readings/stream`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ spreadType, question }),
+        body: JSON.stringify({ spreadType, question, deckType }),
         signal,
       })
     } catch (e) {

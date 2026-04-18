@@ -2,9 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { useDeckStore } from '@/stores/useDeckStore'
 import { DeckType } from '@/types'
 
 const auth = useAuthStore()
+const deck = useDeckStore()
 const router = useRouter()
 
 const menuOpen = ref(false)
@@ -18,13 +20,12 @@ const deckOptions: { value: DeckType; label: string }[] = [
   { value: DeckType.ModernWitch, label: 'Modern Witch' },
 ]
 
-const currentDeck = ref<DeckType>(DeckType.RWS)
 const currentDeckLabel = computed(
-  () => deckOptions.find((o) => o.value === currentDeck.value)?.label ?? 'RWS',
+  () => deckOptions.find((o) => o.value === deck.current)?.label ?? 'RWS',
 )
 
 function selectDeck(value: DeckType) {
-  currentDeck.value = value
+  deck.select(value)
   deckOpen.value = false
 }
 
@@ -82,9 +83,9 @@ const quotaLabel = computed(() => {
             <li v-for="opt in deckOptions" :key="opt.value">
               <button
                 class="deck-option"
-                :class="{ active: opt.value === currentDeck }"
+                :class="{ active: opt.value === deck.current }"
                 role="option"
-                :aria-selected="opt.value === currentDeck"
+                :aria-selected="opt.value === deck.current"
                 type="button"
                 @click="selectDeck(opt.value)"
               >
