@@ -29,3 +29,8 @@ public sealed class SubscriptionRequiredException : DomainException
 {
     public SubscriptionRequiredException(string message) : base(message) { }
 }
+
+public sealed class SubscriptionAlreadyActiveException : DomainException
+{
+    public SubscriptionAlreadyActiveException(string message) : base(message) { }
+}

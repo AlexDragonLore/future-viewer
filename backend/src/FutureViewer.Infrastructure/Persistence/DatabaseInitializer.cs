@@ -19,7 +19,11 @@ public static class DatabaseInitializer
         {
             if (existing.TryGetValue(card.Id, out var tracked))
             {
+                tracked.Name = card.Name;
                 tracked.NameEn = card.NameEn;
+                tracked.ImagePath = card.ImagePath;
+                tracked.DescriptionUpright = card.DescriptionUpright;
+                tracked.DescriptionReversed = card.DescriptionReversed;
                 tracked.ShortUpright = card.ShortUpright;
                 tracked.ShortReversed = card.ShortReversed;
                 tracked.UprightKeywords = card.UprightKeywords;

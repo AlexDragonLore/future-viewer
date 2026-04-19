@@ -57,8 +57,7 @@ public sealed class ReadingRepository : IReadingRepository
         return _db.Readings
             .Where(r => r.UserId == userId
                         && r.CreatedAt >= todayUtc
-                        && r.CreatedAt < tomorrowUtc
-                        && r.AiInterpretation != null)
+                        && r.CreatedAt < tomorrowUtc)
             .CountAsync(ct);
     }
 }

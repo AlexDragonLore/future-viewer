@@ -14,12 +14,18 @@ public sealed class SubscriptionService
     private readonly IUserRepository _users;
     private readonly IReadingRepository _readings;
     private readonly IPaymentProvider _payments;
+    private readonly IProcessedPaymentRepository _processedPayments;
 
-    public SubscriptionService(IUserRepository users, IReadingRepository readings, IPaymentProvider payments)
+    public SubscriptionService(
+        IUserRepository users,
+        IReadingRepository readings,
+        IPaymentProvider payments,
+        IProcessedPaymentRepository processedPayments)
     {
         _users = users;
         _readings = readings;
         _payments = payments;
+        _processedPayments = processedPayments;
     }
 
     public async Task EnsureReadingAllowedAsync(Guid userId, SpreadType spreadType, CancellationToken ct = default)
@@ -64,6 +70,10 @@ public sealed class SubscriptionService
         var user = await _users.GetByIdAsync(userId, ct)
             ?? throw new UnauthorizedException("User not found");
 
+        if (IsSubscriptionActive(user))
+            throw new SubscriptionAlreadyActiveException(
+                "Subscription is already active. It will auto-renew at expiry.");
+
         var result = await _payments.CreateSubscriptionPaymentAsync(userId, user.Email, ct);
 
         return new PaymentCreationDto
@@ -90,7 +100,7 @@ public sealed class SubscriptionService
         var user = await _users.GetByIdAsync(verified.UserId.Value, ct);
         if (user is null) return false;
 
-        if (string.Equals(user.YukassaSubscriptionId, verified.PaymentId, StringComparison.Ordinal))
+        if (!await _processedPayments.TryRecordAsync(verified.PaymentId, user.Id, ct))
             return false;
 
         var now = DateTime.UtcNow;

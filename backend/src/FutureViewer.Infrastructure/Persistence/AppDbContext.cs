@@ -13,6 +13,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<DeckVariant> DeckVariants => Set<DeckVariant>();
     public DbSet<Reading> Readings => Set<Reading>();
     public DbSet<ReadingCard> ReadingCards => Set<ReadingCard>();
+    public DbSet<ProcessedPayment> ProcessedPayments => Set<ProcessedPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,6 +22,7 @@ public sealed class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new DeckVariantConfiguration());
         modelBuilder.ApplyConfiguration(new ReadingConfiguration());
         modelBuilder.ApplyConfiguration(new ReadingCardConfiguration());
+        modelBuilder.ApplyConfiguration(new ProcessedPaymentConfiguration());
         base.OnModelCreating(modelBuilder);
     }
 }

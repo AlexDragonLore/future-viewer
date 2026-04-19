@@ -29,6 +29,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IReadingRepository, ReadingRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ICardDeck, CardDeckRepository>();
+        services.AddScoped<IProcessedPaymentRepository, ProcessedPaymentRepository>();
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
