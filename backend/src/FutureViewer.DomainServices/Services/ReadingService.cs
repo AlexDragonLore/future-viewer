@@ -13,17 +13,20 @@ public sealed class ReadingService
     private readonly CardDeckService _deck;
     private readonly InterpretationService _interpreter;
     private readonly SubscriptionService _subscription;
+    private readonly FeedbackService _feedback;
 
     public ReadingService(
         IReadingRepository repo,
         CardDeckService deck,
         InterpretationService interpreter,
-        SubscriptionService subscription)
+        SubscriptionService subscription,
+        FeedbackService feedback)
     {
         _repo = repo;
         _deck = deck;
         _interpreter = interpreter;
         _subscription = subscription;
+        _feedback = feedback;
     }
 
     public async Task<ReadingResult> CreateAsync(
@@ -66,6 +69,12 @@ public sealed class ReadingService
         };
 
         await _repo.AddAsync(reading, ct);
+
+        if (reading.UserId is not null)
+        {
+            try { await _feedback.ScheduleAsync(reading, ct); }
+            catch { /* best-effort — don't fail the reading creation */ }
+        }
 
         return Map(reading, spread);
     }
@@ -137,6 +146,12 @@ public sealed class ReadingService
                 {
                     // Best-effort persist; don't mask the original exception.
                 }
+            }
+
+            if (persisted && reading.UserId is not null)
+            {
+                try { await _feedback.ScheduleAsync(reading, CancellationToken.None); }
+                catch { /* best-effort */ }
             }
         }
 

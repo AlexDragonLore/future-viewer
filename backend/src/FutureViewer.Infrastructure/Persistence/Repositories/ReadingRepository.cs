@@ -60,4 +60,23 @@ public sealed class ReadingRepository : IReadingRepository
                         && r.CreatedAt < tomorrowUtc)
             .CountAsync(ct);
     }
+
+    public Task<int> CountByUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        return _db.Readings.CountAsync(r => r.UserId == userId, ct);
+    }
+
+    public async Task<IReadOnlyList<DateTime>> GetDistinctReadingDatesAsync(
+        Guid userId,
+        DateTime fromUtc,
+        CancellationToken ct = default)
+    {
+        var dates = await _db.Readings
+            .Where(r => r.UserId == userId && r.CreatedAt >= fromUtc)
+            .Select(r => r.CreatedAt.Date)
+            .Distinct()
+            .OrderByDescending(d => d)
+            .ToListAsync(ct);
+        return dates;
+    }
 }

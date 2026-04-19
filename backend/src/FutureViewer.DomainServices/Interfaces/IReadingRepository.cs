@@ -9,4 +9,6 @@ public interface IReadingRepository
     Task<IReadOnlyList<Reading>> GetHistoryAsync(Guid userId, int take = 50, CancellationToken ct = default);
     Task UpdateAsync(Reading reading, CancellationToken ct = default);
     Task<int> CountTodayByUserAsync(Guid userId, CancellationToken ct = default);
+    Task<int> CountByUserAsync(Guid userId, CancellationToken ct = default);
+    Task<IReadOnlyList<DateTime>> GetDistinctReadingDatesAsync(Guid userId, DateTime fromUtc, CancellationToken ct = default);
 }

@@ -124,16 +124,16 @@ Unique constraint на (UserId, AchievementId).
 
 ### Task 3: Phase 3 - Interfaces, DTOs, Services
 
-- [ ] Add `IFeedbackRepository`, `IAchievementRepository`, `ILeaderboardRepository`, `ITelegramNotifier`
-- [ ] Add DTOs (TelegramLinkResponse, LeaderboardEntryDto, UserScoreSummaryDto, AchievementDto, FeedbackDto, SubmitFeedbackRequest, FeedbackScoringResult)
-- [ ] Implement `FeedbackService`
-- [ ] Implement `AchievementService`
-- [ ] Implement `LeaderboardService`
-- [ ] Implement `TelegramLinkService`
-- [ ] Integrate FeedbackService.ScheduleAsync into ReadingService
-- [ ] Add `SubmitFeedbackValidator`
-- [ ] Register services in DomainServicesExtensions
-- [ ] Ensure backend builds
+- [x] Add `IFeedbackRepository`, `IAchievementRepository`, `ILeaderboardRepository`, `ITelegramNotifier`
+- [x] Add DTOs (TelegramLinkResponse, LeaderboardEntryDto, UserScoreSummaryDto, AchievementDto, FeedbackDto, SubmitFeedbackRequest, FeedbackScoringResult)
+- [x] Implement `FeedbackService`
+- [x] Implement `AchievementService`
+- [x] Implement `LeaderboardService`
+- [x] Implement `TelegramLinkService`
+- [x] Integrate FeedbackService.ScheduleAsync into ReadingService
+- [x] Add `SubmitFeedbackValidator`
+- [x] Register services in DomainServicesExtensions
+- [x] Ensure backend builds
 
 ### 3.1 Новые интерфейсы в `DomainServices/Interfaces/`
 - `IFeedbackRepository` — Add, GetById, GetByToken, GetByReadingId, GetPendingToNotify(DateTime before, int batch), Update, GetScoredByUser(userId)
