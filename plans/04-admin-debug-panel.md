@@ -180,12 +180,12 @@ Nested under `/admin` with `meta: { requiresAuth: true, requiresAdmin: true }` o
 
 ### Task 3: Subscriptions + Users list
 
-- [ ] `IUserRepository` additions (`SearchAsync`, `CountAsync`, `DeleteAsync`)
-- [ ] `IReadingRepository` additions (`CountAsync`, `CountSinceAsync`, `GetByUserAsync`)
-- [ ] `GET /api/admin/users`, `GET /api/admin/users/{id}`, `PUT /api/admin/users/{id}/admin`, `DELETE /api/admin/users/{id}`
-- [ ] `PUT /api/admin/users/{id}/subscription`
-- [ ] Frontend: Users tab + detail drawer
-- [ ] Tests + verification
+- [x] `IUserRepository` additions (`SearchAsync`, `CountAsync`, `DeleteAsync`)
+- [x] `IReadingRepository` additions (`CountAsync`, `CountSinceAsync`, `GetByUserAsync`)
+- [x] `GET /api/admin/users`, `GET /api/admin/users/{id}`, `PUT /api/admin/users/{id}/admin`, `DELETE /api/admin/users/{id}`
+- [x] `PUT /api/admin/users/{id}/subscription`
+- [x] Frontend: Users tab + detail drawer
+- [x] Tests + verification
 
 ### Task 4: Achievements + Telegram
 

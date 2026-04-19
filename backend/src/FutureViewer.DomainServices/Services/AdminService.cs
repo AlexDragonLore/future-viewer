@@ -13,6 +13,7 @@ public sealed class AdminService
     private readonly IFeedbackRepository _feedbacks;
     private readonly IReadingRepository _readings;
     private readonly IUserRepository _users;
+    private readonly IAchievementRepository _achievementsRepo;
     private readonly AchievementService _achievements;
     private readonly ILogger<AdminService> _logger;
 
@@ -20,12 +21,14 @@ public sealed class AdminService
         IFeedbackRepository feedbacks,
         IReadingRepository readings,
         IUserRepository users,
+        IAchievementRepository achievementsRepo,
         AchievementService achievements,
         ILogger<AdminService> logger)
     {
         _feedbacks = feedbacks;
         _readings = readings;
         _users = users;
+        _achievementsRepo = achievementsRepo;
         _achievements = achievements;
         _logger = logger;
     }
@@ -198,6 +201,179 @@ public sealed class AdminService
             actorEmail, actorId, feedbackId);
     }
 
+    public async Task<AdminUserListResult> SearchUsersAsync(
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var safePage = Math.Max(1, page);
+        var safeSize = Math.Clamp(pageSize, 1, 100);
+        var skip = (safePage - 1) * safeSize;
+
+        var users = await _users.SearchAsync(search, skip, safeSize, ct);
+        var total = await _users.CountAsync(search, ct);
+
+        var items = new List<AdminUserListItem>(users.Count);
+        foreach (var user in users)
+        {
+            items.Add(await BuildListItemAsync(user, ct));
+        }
+
+        return new AdminUserListResult
+        {
+            Items = items,
+            Total = total
+        };
+    }
+
+    public async Task<AdminUserDetailDto> GetUserDetailAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        var totalReadings = await _readings.CountByUserAsync(userId, ct);
+        var scoredFeedbacks = await _feedbacks.GetScoredByUserAsync(userId, ct);
+        var totalScore = scoredFeedbacks.Sum(f => f.AiScore ?? 0);
+        var allFeedbacksCount = await _feedbacks.CountAsync(userId, null, ct);
+
+        var recentReadings = await _readings.GetByUserAsync(userId, 20, ct);
+        var recentFeedbacks = await _feedbacks.GetByUserAsync(userId, 20, ct);
+        var userAchievements = await _achievementsRepo.GetByUserAsync(userId, ct);
+        var allAchievements = await _achievementsRepo.GetAllAsync(ct);
+        var byId = allAchievements.ToDictionary(a => a.Id, a => a);
+
+        return new AdminUserDetailDto
+        {
+            Id = user.Id,
+            Email = user.Email,
+            CreatedAt = user.CreatedAt,
+            IsAdmin = user.IsAdmin,
+            SubscriptionStatus = user.SubscriptionStatus,
+            SubscriptionExpiresAt = user.SubscriptionExpiresAt,
+            YukassaSubscriptionId = user.YukassaSubscriptionId,
+            TelegramChatId = user.TelegramChatId,
+            HasTelegramLinkToken = !string.IsNullOrEmpty(user.TelegramLinkToken),
+            TotalReadings = totalReadings,
+            TotalFeedbacks = allFeedbacksCount,
+            TotalScore = totalScore,
+            RecentReadings = recentReadings.Select(r => new AdminReadingSummary
+            {
+                Id = r.Id,
+                Question = r.Question,
+                SpreadType = r.SpreadType,
+                DeckType = r.DeckType,
+                CreatedAt = r.CreatedAt
+            }).ToList(),
+            RecentFeedbacks = recentFeedbacks.Select(f => MapAdmin(f, f.Reading, user)).ToList(),
+            Achievements = userAchievements
+                .Where(ua => byId.ContainsKey(ua.AchievementId))
+                .OrderByDescending(ua => ua.UnlockedAt)
+                .Select(ua => new AdminAchievementDto
+                {
+                    Id = ua.AchievementId,
+                    Code = byId[ua.AchievementId].Code,
+                    Name = byId[ua.AchievementId].NameRu,
+                    UnlockedAt = ua.UnlockedAt
+                }).ToList()
+        };
+    }
+
+    public async Task<AdminUserListItem> SetAdminAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        bool isAdmin,
+        CancellationToken ct = default)
+    {
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        if (actorId == userId && !isAdmin)
+            throw new ConflictException("Admin cannot revoke their own admin role");
+
+        if (user.IsAdmin != isAdmin)
+        {
+            user.IsAdmin = isAdmin;
+            await _users.UpdateAsync(user, ct);
+            _logger.LogInformation(
+                "Admin {ActorEmail} ({ActorId}) set IsAdmin={IsAdmin} on user {UserId}",
+                actorEmail, actorId, isAdmin, userId);
+        }
+
+        return await BuildListItemAsync(user, ct);
+    }
+
+    public async Task DeleteUserAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        if (actorId == userId)
+            throw new ConflictException("Admin cannot delete themselves");
+
+        var deleted = await _users.DeleteAsync(userId, ct);
+        if (!deleted)
+            throw new NotFoundException("User not found");
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) deleted user {UserId}",
+            actorEmail, actorId, userId);
+    }
+
+    public async Task<AdminUserDetailDto> SetSubscriptionAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        SubscriptionStatus status,
+        DateTime? expiresAt,
+        CancellationToken ct = default)
+    {
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        user.SubscriptionStatus = status;
+        if (status == SubscriptionStatus.Active)
+        {
+            user.SubscriptionExpiresAt = expiresAt ?? DateTime.UtcNow.AddDays(SubscriptionService.SubscriptionDurationDays);
+        }
+        else
+        {
+            user.SubscriptionExpiresAt = expiresAt;
+        }
+
+        await _users.UpdateAsync(user, ct);
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) set subscription on {UserId}: status={Status} expiresAt={ExpiresAt}",
+            actorEmail, actorId, userId, status, user.SubscriptionExpiresAt);
+
+        return await GetUserDetailAsync(userId, ct);
+    }
+
+    private async Task<AdminUserListItem> BuildListItemAsync(User user, CancellationToken ct)
+    {
+        var totalReadings = await _readings.CountByUserAsync(user.Id, ct);
+        var totalFeedbacks = await _feedbacks.CountAsync(user.Id, null, ct);
+        var scored = await _feedbacks.GetScoredByUserAsync(user.Id, ct);
+        var totalScore = scored.Sum(f => f.AiScore ?? 0);
+
+        return new AdminUserListItem
+        {
+            Id = user.Id,
+            Email = user.Email,
+            CreatedAt = user.CreatedAt,
+            IsAdmin = user.IsAdmin,
+            SubscriptionStatus = user.SubscriptionStatus,
+            SubscriptionExpiresAt = user.SubscriptionExpiresAt,
+            TelegramChatId = user.TelegramChatId,
+            TotalReadings = totalReadings,
+            TotalFeedbacks = totalFeedbacks,
+            TotalScore = totalScore
+        };
+    }
+
     private static AdminFeedbackDto MapAdmin(ReadingFeedback feedback) =>
         MapAdmin(feedback, feedback.Reading, feedback.User);
 
@@ -248,4 +424,10 @@ public sealed class AdminFeedbackUpdate
     public DateTime? ScheduledAt { get; init; }
     public DateTime? NotifiedAt { get; init; }
     public DateTime? AnsweredAt { get; init; }
+}
+
+public sealed class AdminUserListResult
+{
+    public required IReadOnlyList<AdminUserListItem> Items { get; init; }
+    public required int Total { get; init; }
 }

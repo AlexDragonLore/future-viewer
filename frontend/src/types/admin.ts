@@ -1,4 +1,4 @@
-import type { FeedbackStatus } from '@/types'
+import type { DeckType, FeedbackStatus, SpreadType, SubscriptionStatusValue } from '@/types'
 
 export interface AdminFeedback {
   id: string
@@ -58,4 +58,66 @@ export interface FeedbackSearchFilters {
 
 export interface RunNotificationsResult {
   processed: number
+}
+
+export interface AdminUserListItem {
+  id: string
+  email: string
+  createdAt: string
+  isAdmin: boolean
+  subscriptionStatus: SubscriptionStatusValue
+  subscriptionExpiresAt: string | null
+  telegramChatId: number | null
+  totalReadings: number
+  totalFeedbacks: number
+  totalScore: number
+}
+
+export interface AdminUserListResponse {
+  items: AdminUserListItem[]
+  total: number
+}
+
+export interface AdminReadingSummary {
+  id: string
+  question: string
+  spreadType: SpreadType
+  deckType: DeckType
+  createdAt: string
+}
+
+export interface AdminAchievement {
+  id: string
+  code: string
+  name: string
+  unlockedAt: string
+}
+
+export interface AdminUserDetail {
+  id: string
+  email: string
+  createdAt: string
+  isAdmin: boolean
+  subscriptionStatus: SubscriptionStatusValue
+  subscriptionExpiresAt: string | null
+  yukassaSubscriptionId: string | null
+  telegramChatId: number | null
+  hasTelegramLinkToken: boolean
+  totalReadings: number
+  totalFeedbacks: number
+  totalScore: number
+  recentReadings: AdminReadingSummary[]
+  recentFeedbacks: AdminFeedback[]
+  achievements: AdminAchievement[]
+}
+
+export interface UserSearchFilters {
+  search?: string | null
+  page?: number
+  pageSize?: number
+}
+
+export interface SetSubscriptionPayload {
+  status: SubscriptionStatusValue
+  expiresAt?: string | null
 }

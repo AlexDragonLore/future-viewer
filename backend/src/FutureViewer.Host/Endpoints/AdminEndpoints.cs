@@ -15,6 +15,7 @@ public static class AdminEndpoints
             .RequireAuthorization("Admin");
 
         MapFeedbackEndpoints(group);
+        MapUserEndpoints(group);
 
         return app;
     }
@@ -105,6 +106,66 @@ public static class AdminEndpoints
         });
     }
 
+    private static void MapUserEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/users", async (
+            string? search,
+            int? page,
+            int? pageSize,
+            AdminService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.SearchUsersAsync(search, page ?? 1, pageSize ?? 20, ct);
+            return Results.Ok(new { items = result.Items, total = result.Total });
+        });
+
+        group.MapGet("/users/{id:guid}", async (
+            Guid id,
+            AdminService service,
+            CancellationToken ct) =>
+        {
+            var dto = await service.GetUserDetailAsync(id, ct);
+            return Results.Ok(dto);
+        });
+
+        group.MapPut("/users/{id:guid}/admin", async (
+            Guid id,
+            SetAdminBody body,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            if (body is null) return Results.BadRequest();
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            var dto = await service.SetAdminAsync(actorId, actorEmail, id, body.IsAdmin, ct);
+            return Results.Ok(dto);
+        });
+
+        group.MapDelete("/users/{id:guid}", async (
+            Guid id,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            await service.DeleteUserAsync(actorId, actorEmail, id, ct);
+            return Results.NoContent();
+        });
+
+        group.MapPut("/users/{id:guid}/subscription", async (
+            Guid id,
+            SetSubscriptionBody body,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            if (body is null) return Results.BadRequest();
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            var dto = await service.SetSubscriptionAsync(actorId, actorEmail, id, body.Status, body.ExpiresAt, ct);
+            return Results.Ok(dto);
+        });
+    }
+
     private static (Guid Id, string Email) GetActor(this ClaimsPrincipal principal)
     {
         var id = principal.GetUserId() ?? throw new UnauthorizedException("Authentication required");
@@ -141,5 +202,16 @@ public static class AdminEndpoints
         public DateTime? ScheduledAt { get; init; }
         public DateTime? NotifiedAt { get; init; }
         public DateTime? AnsweredAt { get; init; }
+    }
+
+    public sealed class SetAdminBody
+    {
+        public bool IsAdmin { get; init; }
+    }
+
+    public sealed class SetSubscriptionBody
+    {
+        public SubscriptionStatus Status { get; init; }
+        public DateTime? ExpiresAt { get; init; }
     }
 }
