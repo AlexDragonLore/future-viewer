@@ -69,14 +69,11 @@ public sealed class TelegramEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
-    public async Task Webhook_without_secret_token_is_rejected_when_secret_configured()
+    public async Task Webhook_rejects_request_when_secret_token_is_not_configured()
     {
         var client = _fixture.CreateClient();
         var response = await client.PostAsJsonAsync("/api/telegram/webhook", new { });
-        response.StatusCode.Should().BeOneOf(
-            HttpStatusCode.OK,
-            HttpStatusCode.Unauthorized,
-            HttpStatusCode.ServiceUnavailable);
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     private async Task<HttpClient> CreateAuthenticatedClient()

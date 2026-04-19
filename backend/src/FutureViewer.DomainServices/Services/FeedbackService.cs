@@ -66,17 +66,10 @@ public sealed class FeedbackService
 
         if (feedback.Status == FeedbackStatus.Answered || feedback.Status == FeedbackStatus.Scored)
             throw new ConflictException("Feedback has already been submitted and cannot be changed");
-        if (feedback.Status == FeedbackStatus.Expired)
-            throw new ConflictException("Feedback link has expired");
 
         var reading = feedback.Reading
             ?? await _readings.GetByIdAsync(feedback.ReadingId, ct)
             ?? throw new NotFoundException("Associated reading not found");
-
-        feedback.SelfReport = selfReport;
-        feedback.AnsweredAt = DateTime.UtcNow;
-        feedback.Status = FeedbackStatus.Answered;
-        await _repo.UpdateAsync(feedback, ct);
 
         var scoring = await _scorer.ScoreAsync(
             reading.Question,
@@ -86,6 +79,8 @@ public sealed class FeedbackService
 
         var finalScore = scoring.IsSincere ? Math.Clamp(scoring.Score, 1, 10) : 1;
 
+        feedback.SelfReport = selfReport;
+        feedback.AnsweredAt = DateTime.UtcNow;
         feedback.AiScore = finalScore;
         feedback.AiScoreReason = scoring.Reason;
         feedback.IsSincere = scoring.IsSincere;
@@ -98,15 +93,10 @@ public sealed class FeedbackService
     public async Task<IReadOnlyList<FeedbackDto>> GetUserFeedbacksAsync(Guid userId, CancellationToken ct = default)
     {
         var feedbacks = await _repo.GetByUserAsync(userId, take: 50, ct);
-        var result = new List<FeedbackDto>(feedbacks.Count);
-        foreach (var feedback in feedbacks)
-        {
-            var reading = feedback.Reading
-                ?? await _readings.GetByIdAsync(feedback.ReadingId, ct);
-            if (reading is null) continue;
-            result.Add(Map(feedback, reading));
-        }
-        return result;
+        return feedbacks
+            .Where(f => f.Reading is not null)
+            .Select(f => Map(f, f.Reading!))
+            .ToList();
     }
 
     private static FeedbackDto Map(ReadingFeedback feedback, Reading reading)

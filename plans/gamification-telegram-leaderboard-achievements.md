@@ -22,7 +22,7 @@ Future Viewer — таро-приложение. Сейчас пользоват
 
 ### 1.1 Enum `FeedbackStatus` → `Domain/Enums/FeedbackStatus.cs`
 ```
-Pending = 0, Notified = 1, Answered = 2, Scored = 3, Expired = 4
+Pending = 0, Notified = 1, Answered = 2, Scored = 3
 ```
 
 ### 1.2 Entity `ReadingFeedback` → `Domain/Entities/ReadingFeedback.cs`

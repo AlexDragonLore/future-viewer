@@ -26,8 +26,6 @@ function statusLabel(status: FeedbackStatus): string {
       return 'Отвечено'
     case FeedbackStatus.Scored:
       return 'Оценено'
-    case FeedbackStatus.Expired:
-      return 'Истекло'
     default:
       return ''
   }

@@ -96,6 +96,7 @@ public sealed class AchievementService
                 UnlockedAt = DateTime.UtcNow
             }, ct);
 
+            if (ua is null) continue;
             newlyGranted.Add(MapAchievement(achievement, ua.UnlockedAt));
         }
 

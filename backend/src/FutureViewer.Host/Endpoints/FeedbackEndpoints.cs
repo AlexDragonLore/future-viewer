@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FluentValidation;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
@@ -17,7 +16,7 @@ public static class FeedbackEndpoints
             HttpContext ctx,
             CancellationToken ct) =>
         {
-            var userId = GetUserId(ctx.User)
+            var userId = ctx.User.GetUserId()
                 ?? throw new UnauthorizedException("Authentication required");
             var feedbacks = await service.GetUserFeedbacksAsync(userId, ct);
             return Results.Ok(feedbacks);
@@ -50,13 +49,6 @@ public static class FeedbackEndpoints
         });
 
         return app;
-    }
-
-    private static Guid? GetUserId(ClaimsPrincipal principal)
-    {
-        var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? principal.FindFirstValue("sub");
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 
     public sealed class SubmitFeedbackBody

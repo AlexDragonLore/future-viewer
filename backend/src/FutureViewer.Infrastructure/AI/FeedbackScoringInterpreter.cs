@@ -102,14 +102,28 @@ public sealed class FeedbackScoringInterpreter : IFeedbackScorer
             ? r.GetString() ?? string.Empty
             : string.Empty;
 
-        var isSincere = root.TryGetProperty("isSincere", out var sincere)
-                        && sincere.ValueKind == JsonValueKind.True;
+        var isSincere = ParseIsSincere(root);
 
         return new FeedbackScoringResult
         {
             Score = Math.Clamp(score, 1, 10),
             Reason = reason,
             IsSincere = isSincere
+        };
+    }
+
+    internal static bool ParseIsSincere(JsonElement root)
+    {
+        if (!root.TryGetProperty("isSincere", out var sincere))
+            return false;
+
+        return sincere.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String => bool.TryParse(sincere.GetString(), out var b) && b,
+            JsonValueKind.Number => sincere.TryGetInt32(out var n) && n != 0,
+            _ => false
         };
     }
 }

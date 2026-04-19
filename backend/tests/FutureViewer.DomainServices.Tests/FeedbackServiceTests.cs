@@ -176,7 +176,6 @@ public sealed class FeedbackServiceTests
         dto.Status.Should().Be(FeedbackStatus.Scored);
         feedback.Status.Should().Be(FeedbackStatus.Scored);
         feedback.AnsweredAt.Should().NotBeNull();
-        repo.Verify(r => r.UpdateAsync(It.IsAny<ReadingFeedback>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
     }
 
     [Fact]
@@ -274,30 +273,6 @@ public sealed class FeedbackServiceTests
             ScheduledAt = DateTime.UtcNow,
             Reading = reading,
             Status = FeedbackStatus.Answered
-        };
-
-        var repo = new Mock<IFeedbackRepository>();
-        repo.Setup(r => r.GetByTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(feedback);
-
-        var sut = BuildService(repo: repo);
-
-        await FluentActions.Awaiting(() => sut.SubmitAsync("tok", "valid answer"))
-            .Should().ThrowAsync<ConflictException>();
-    }
-
-    [Fact]
-    public async Task SubmitAsync_throws_when_expired()
-    {
-        var reading = NewReading();
-        var feedback = new ReadingFeedback
-        {
-            ReadingId = reading.Id,
-            UserId = reading.UserId!.Value,
-            Token = "tok",
-            ScheduledAt = DateTime.UtcNow,
-            Reading = reading,
-            Status = FeedbackStatus.Expired
         };
 
         var repo = new Mock<IFeedbackRepository>();

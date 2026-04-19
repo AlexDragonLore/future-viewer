@@ -82,7 +82,8 @@ public sealed class FeedbackNotificationJob : BackgroundService
             var question = feedback.Reading?.Question ?? string.Empty;
             var url = BuildFeedbackUrl(feedback.Token);
 
-            await notifier.SendFeedbackLinkAsync(chatId.Value, question, url, ct);
+            var sent = await notifier.SendFeedbackLinkAsync(chatId.Value, question, url, ct);
+            if (!sent) continue;
 
             feedback.Status = FeedbackStatus.Notified;
             feedback.NotifiedAt = DateTime.UtcNow;
