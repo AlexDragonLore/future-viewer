@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FluentValidation;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.DomainServices.Services;
@@ -62,10 +63,26 @@ public sealed class LeaderboardServiceTests
             .ReturnsAsync((IReadOnlyList<LeaderboardEntryDto>)Array.Empty<LeaderboardEntryDto>());
 
         var sut = new LeaderboardService(repo.Object);
-        await sut.GetMonthlyAsync(2020, 2);
+        await sut.GetMonthlyAsync(2026, 2);
 
-        y.Should().Be(2020);
+        y.Should().Be(2026);
         m.Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData(2023, 1)]
+    [InlineData(2101, 1)]
+    [InlineData(2026, 0)]
+    [InlineData(2026, 13)]
+    public async Task GetMonthlyAsync_rejects_out_of_range_year_or_month(int year, int month)
+    {
+        var repo = new Mock<ILeaderboardRepository>();
+        var sut = new LeaderboardService(repo.Object);
+
+        await FluentActions.Awaiting(() => sut.GetMonthlyAsync(year, month))
+            .Should().ThrowAsync<ValidationException>();
+
+        repo.Verify(r => r.GetMonthlyAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

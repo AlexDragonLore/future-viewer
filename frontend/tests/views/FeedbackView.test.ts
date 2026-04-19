@@ -106,7 +106,15 @@ describe('FeedbackView', () => {
 
   it('submits the answer and shows the score on success', async () => {
     getByTokenMock.mockResolvedValue(pendingFeedback())
-    submitMock.mockResolvedValue({ score: 9, reason: 'молодец', isSincere: true })
+    submitMock.mockResolvedValue({
+      ...pendingFeedback(),
+      aiScore: 9,
+      aiScoreReason: 'молодец',
+      isSincere: true,
+      selfReport: 'Я старался следовать совету целую неделю',
+      status: FeedbackStatus.Scored,
+      answeredAt: '2026-04-19T10:00:00Z',
+    })
 
     const { wrapper } = await mountFeedback('tok-ok')
     await flushPromises()
@@ -123,7 +131,15 @@ describe('FeedbackView', () => {
 
   it('marks an insincere submission with the dedicated tag', async () => {
     getByTokenMock.mockResolvedValue(pendingFeedback())
-    submitMock.mockResolvedValue({ score: 1, reason: 'неискренне', isSincere: false })
+    submitMock.mockResolvedValue({
+      ...pendingFeedback(),
+      aiScore: 1,
+      aiScoreReason: 'неискренне',
+      isSincere: false,
+      selfReport: 'ответ на десять символов минимум',
+      status: FeedbackStatus.Scored,
+      answeredAt: '2026-04-19T10:00:00Z',
+    })
 
     const { wrapper } = await mountFeedback('tok-bad')
     await flushPromises()
