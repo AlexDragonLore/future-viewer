@@ -327,8 +327,8 @@ LeaderboardEntry, UserScoreSummary, AchievementInfo, FeedbackInfo, TelegramStatu
 
 ### Task 7: Phase 7 - Configuration
 
-- [ ] Add Telegram section to `appsettings.json`
-- [ ] Add Telegram env vars in `docker-compose.yml`
+- [x] Add Telegram section to `appsettings.json`
+- [x] Add Telegram env vars in `docker-compose.yml`
 
 ### appsettings.json
 ```json
