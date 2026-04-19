@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { SpreadType } from '@/types'
+import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
 
 const router = useRouter()
 const store = useReadingStore()
@@ -12,11 +13,57 @@ const auth = useAuthStore()
 const question = ref('')
 const spreadType = ref<SpreadType>(SpreadType.ThreeCard)
 
-onMounted(() => store.loadSpreads())
+onMounted(async () => {
+  await store.loadSpreads()
+  if (auth.isAuthenticated) await auth.refreshSubscription()
+})
+
+const requiresSubscription = computed(() => {
+  if (!auth.isAuthenticated) return false
+  if (auth.isSubscribed) return false
+  return spreadType.value !== SpreadType.SingleCard
+})
+
+const freeQuotaExhausted = computed(() => {
+  if (!auth.isAuthenticated) return false
+  if (auth.isSubscribed) return false
+  if (spreadType.value !== SpreadType.SingleCard) return false
+  return !auth.canCreateReading
+})
+
+const blocked = computed(() => requiresSubscription.value || freeQuotaExhausted.value)
+
+const blockMessage = computed(() => {
+  if (requiresSubscription.value)
+    return 'Бесплатный доступ открыт только к раскладу «Карта дня». Оформи подписку, чтобы продолжить.'
+  if (freeQuotaExhausted.value)
+    return 'Ты использовал бесплатный расклад на сегодня. Возвращайся завтра или оформи подписку.'
+  return ''
+})
+
+const canBegin = computed(() => {
+  if (!question.value.trim()) return false
+  if (!auth.isAuthenticated) return true
+  return !blocked.value
+})
+
+const badgeText = computed(() => {
+  if (!auth.isAuthenticated) return null
+  if (auth.subscriptionLoading) return '…'
+  if (auth.isSubscribed) return 'Подписка активна'
+  const s = auth.subscription
+  if (!s) return null
+  const left = Math.max(0, s.freeReadingsDailyLimit - s.freeReadingsUsedToday)
+  return `Бесплатно сегодня: ${left}/${s.freeReadingsDailyLimit}`
+})
 
 function begin() {
-  if (!question.value.trim()) return
+  if (!canBegin.value) return
   sessionStorage.setItem('fv_pending', JSON.stringify({ spreadType: spreadType.value, question: question.value }))
+  if (!auth.isAuthenticated) {
+    router.push({ name: 'auth', query: { redirect: '/reading' } })
+    return
+  }
   router.push({ name: 'reading' })
 }
 </script>
@@ -32,6 +79,13 @@ function begin() {
     </header>
 
     <section class="mystic-card w-full max-w-xl p-8 space-y-6">
+      <div v-if="badgeText" class="subscription-badge" :class="{ active: auth.isSubscribed }">
+        <span>{{ badgeText }}</span>
+        <RouterLink v-if="!auth.isSubscribed" to="/history" class="ml-auto text-mystic-accent text-xs hover:underline">
+          История
+        </RouterLink>
+      </div>
+
       <div>
         <label class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">Расклад</label>
         <div class="grid grid-cols-3 gap-3">
@@ -63,9 +117,18 @@ function begin() {
         />
       </div>
 
-      <button class="glow-button w-full" :disabled="!question.trim()" @click="begin">
-        Начать расклад
+      <div v-if="blocked" class="block-warning" data-testid="block-warning">
+        {{ blockMessage }}
+      </div>
+
+      <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
+        {{ auth.isAuthenticated ? 'Начать расклад' : 'Войти и начать' }}
       </button>
+
+      <SubscriptionBanner
+        v-if="auth.isAuthenticated && !auth.isSubscribed && blocked"
+        :message="requiresSubscription ? 'Расклад требует подписки' : 'Лимит бесплатных раскладов исчерпан'"
+      />
 
       <div class="flex justify-between text-xs text-mystic-silver/50">
         <RouterLink v-if="!auth.isAuthenticated" to="/auth" class="hover:text-mystic-accent transition">Войти / Регистрация</RouterLink>
@@ -94,5 +157,34 @@ function begin() {
   border-color: #f5c26b;
   background: rgba(245, 194, 107, 0.15);
   box-shadow: 0 0 20px rgba(245, 194, 107, 0.3);
+}
+.subscription-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(245, 194, 107, 0.3);
+  background: rgba(0, 0, 0, 0.25);
+  font-size: 0.75rem;
+  color: rgba(224, 212, 186, 0.9);
+}
+.subscription-badge.active {
+  border-color: rgba(245, 194, 107, 0.7);
+  background: rgba(245, 194, 107, 0.12);
+  color: #f5c26b;
+}
+.block-warning {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.glow-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

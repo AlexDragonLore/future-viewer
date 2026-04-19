@@ -6,4 +6,5 @@ public sealed class CreateReadingRequest
 {
     public required SpreadType SpreadType { get; init; }
     public required string Question { get; init; }
+    public DeckType DeckType { get; init; } = DeckType.RWS;
 }

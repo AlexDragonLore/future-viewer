@@ -17,6 +17,10 @@ public sealed class ReadingConfiguration : IEntityTypeConfiguration<Reading>
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.AiInterpretation).HasColumnName("ai_interpretation");
         b.Property(x => x.AiModel).HasColumnName("ai_model").HasMaxLength(64);
+        b.Property(x => x.DeckType)
+            .HasColumnName("deck_type")
+            .HasConversion<int>()
+            .HasDefaultValue(Domain.Enums.DeckType.RWS);
 
         b.HasMany(x => x.Cards)
             .WithOne(x => x.Reading)

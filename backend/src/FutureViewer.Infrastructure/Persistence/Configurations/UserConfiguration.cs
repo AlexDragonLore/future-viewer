@@ -16,6 +16,14 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.PasswordHash).HasColumnName("password_hash").IsRequired();
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
 
+        b.Property(x => x.SubscriptionStatus)
+            .HasColumnName("subscription_status")
+            .HasConversion<int>();
+        b.Property(x => x.SubscriptionExpiresAt).HasColumnName("subscription_expires_at");
+        b.Property(x => x.YukassaSubscriptionId)
+            .HasColumnName("yukassa_subscription_id")
+            .HasMaxLength(128);
+
         b.HasMany(x => x.Readings)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)

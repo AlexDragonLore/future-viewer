@@ -44,6 +44,21 @@ public sealed class ExceptionHandlerMiddleware
             ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await ctx.Response.WriteAsJsonAsync(new { error = "unauthorized", message = ex.Message });
         }
+        catch (QuotaExceededException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            await ctx.Response.WriteAsJsonAsync(new { error = "quota_exceeded", message = ex.Message });
+        }
+        catch (SubscriptionRequiredException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+            await ctx.Response.WriteAsJsonAsync(new { error = "subscription_required", message = ex.Message });
+        }
+        catch (SubscriptionAlreadyActiveException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+            await ctx.Response.WriteAsJsonAsync(new { error = "subscription_already_active", message = ex.Message });
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unhandled exception");

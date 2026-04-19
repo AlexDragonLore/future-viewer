@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.Domain.ValueObjects;
 using FutureViewer.DomainServices.Interfaces;
 
@@ -19,17 +20,21 @@ public sealed class InterpretationService
         Spread spread,
         string question,
         IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes,
         CancellationToken ct = default)
     {
-        return _interpreter.InterpretAsync(spread, question, cards, ct);
+        return _interpreter.InterpretAsync(spread, question, cards, deckType, variantNotes, ct);
     }
 
     public IAsyncEnumerable<string> InterpretStreamAsync(
         Spread spread,
         string question,
         IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes,
         CancellationToken ct = default)
     {
-        return _interpreter.InterpretStreamAsync(spread, question, cards, ct);
+        return _interpreter.InterpretStreamAsync(spread, question, cards, deckType, variantNotes, ct);
     }
 }

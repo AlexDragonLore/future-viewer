@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.Domain.ValueObjects;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.Extensions.Options;
@@ -34,9 +35,11 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         Spread spread,
         string question,
         IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes,
         CancellationToken ct = default)
     {
-        var messages = BuildMessages(spread, question, cards);
+        var messages = BuildMessages(spread, question, cards, deckType, variantNotes);
         var response = await _chat.CompleteChatAsync(messages, cancellationToken: ct);
         var text = response.Value.Content[0].Text;
 
@@ -52,9 +55,11 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         Spread spread,
         string question,
         IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var messages = BuildMessages(spread, question, cards);
+        var messages = BuildMessages(spread, question, cards, deckType, variantNotes);
         var stream = _chat.CompleteChatStreamingAsync(messages, cancellationToken: ct);
 
         await foreach (var update in stream.WithCancellation(ct))
@@ -68,18 +73,50 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         }
     }
 
-    private static List<ChatMessage> BuildMessages(Spread spread, string question, IReadOnlyList<ReadingCard> cards)
+    private static List<ChatMessage> BuildMessages(
+        Spread spread,
+        string question,
+        IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes)
     {
         return new List<ChatMessage>
         {
-            new SystemChatMessage(SystemPrompt),
-            new UserChatMessage(BuildPrompt(spread, question, cards))
+            new SystemChatMessage(BuildSystemPrompt(deckType)),
+            new UserChatMessage(BuildPrompt(spread, question, cards, deckType, variantNotes))
         };
     }
 
-    private static string BuildPrompt(Spread spread, string question, IReadOnlyList<ReadingCard> cards)
+    private static string BuildSystemPrompt(DeckType deckType)
+    {
+        var deckTone = deckType switch
+        {
+            DeckType.Thoth =>
+                "Работай в традиции колоды Кроули Тота: учитывай каббалистические и астрологические соответствия, " +
+                "подчёркивай символизм стихий и планет.",
+            DeckType.Marseille =>
+                "Работай в традиции колоды Марсель: лаконично, без изобилия образов, опирайся на числовые и геометрические соответствия мастей.",
+            DeckType.ViscontiSforza =>
+                "Работай в ренессансной традиции Висконти-Сфорца: благородный, исторический, придворный тон.",
+            DeckType.ModernWitch =>
+                "Работай в современном ведьмовском ключе (Modern Witch Tarot): тёплый, инклюзивный, повседневный язык, " +
+                "акцент на практических шагах и эмоциональной честности.",
+            _ =>
+                "Работай в классической традиции Райдера–Уэйта–Смит: опирайся на каноничные образы и сюжеты."
+        };
+
+        return SystemPrompt + " " + deckTone;
+    }
+
+    private static string BuildPrompt(
+        Spread spread,
+        string question,
+        IReadOnlyList<ReadingCard> cards,
+        DeckType deckType,
+        IReadOnlyDictionary<int, string> variantNotes)
     {
         var sb = new StringBuilder();
+        sb.Append("Колода: ").AppendLine(deckType.ToString());
         sb.Append("Расклад: ").AppendLine(spread.Name);
         if (!string.IsNullOrWhiteSpace(question))
         {
@@ -95,6 +132,11 @@ public sealed class OpenAIInterpreter : IAIInterpreter
             var meaning = rc.IsReversed ? rc.Card.DescriptionReversed : rc.Card.DescriptionUpright;
             sb.Append("- ").Append(position.Name).Append(" (").Append(position.Meaning).Append("): ")
               .Append(rc.Card.Name).Append(" [").Append(orientation).Append("] — ").AppendLine(meaning);
+
+            if (variantNotes.TryGetValue(rc.CardId, out var note) && !string.IsNullOrWhiteSpace(note))
+            {
+                sb.Append("  Примечание для колоды ").Append(deckType).Append(": ").AppendLine(note);
+            }
         }
 
         sb.AppendLine();

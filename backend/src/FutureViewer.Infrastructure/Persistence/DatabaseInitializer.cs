@@ -12,10 +12,38 @@ public static class DatabaseInitializer
 
     public static async Task SeedAsync(AppDbContext db, CancellationToken ct = default)
     {
-        if (await db.TarotCards.AnyAsync(ct)) return;
-
         var deck = TarotDeckSeed.BuildDeck();
-        await db.TarotCards.AddRangeAsync(deck, ct);
+        var existing = await db.TarotCards.AsTracking().ToDictionaryAsync(c => c.Id, ct);
+
+        foreach (var card in deck)
+        {
+            if (existing.TryGetValue(card.Id, out var tracked))
+            {
+                tracked.Name = card.Name;
+                tracked.NameEn = card.NameEn;
+                tracked.ImagePath = card.ImagePath;
+                tracked.DescriptionUpright = card.DescriptionUpright;
+                tracked.DescriptionReversed = card.DescriptionReversed;
+                tracked.ShortUpright = card.ShortUpright;
+                tracked.ShortReversed = card.ShortReversed;
+                tracked.UprightKeywords = card.UprightKeywords;
+                tracked.ReversedKeywords = card.ReversedKeywords;
+                tracked.SuggestedTone = card.SuggestedTone;
+                tracked.Aliases = card.Aliases;
+            }
+            else
+            {
+                await db.TarotCards.AddAsync(card, ct);
+            }
+        }
+
         await db.SaveChangesAsync(ct);
+
+        if (!await db.DeckVariants.AnyAsync(ct))
+        {
+            var variants = TarotDeckSeed.BuildDeckVariants(deck);
+            await db.DeckVariants.AddRangeAsync(variants, ct);
+            await db.SaveChangesAsync(ct);
+        }
     }
 }

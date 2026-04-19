@@ -12,15 +12,18 @@ public sealed class ReadingService
     private readonly IReadingRepository _repo;
     private readonly CardDeckService _deck;
     private readonly InterpretationService _interpreter;
+    private readonly SubscriptionService _subscription;
 
     public ReadingService(
         IReadingRepository repo,
         CardDeckService deck,
-        InterpretationService interpreter)
+        InterpretationService interpreter,
+        SubscriptionService subscription)
     {
         _repo = repo;
         _deck = deck;
         _interpreter = interpreter;
+        _subscription = subscription;
     }
 
     public async Task<ReadingResult> CreateAsync(
@@ -29,6 +32,8 @@ public sealed class ReadingService
         CancellationToken ct = default)
     {
         var spread = Spread.From(request.SpreadType);
+        if (userId is { } uid)
+            await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -41,7 +46,13 @@ public sealed class ReadingService
             })
             .ToList();
 
-        var interpretation = await _interpreter.InterpretAsync(spread, request.Question, cards, ct);
+        var variantNotes = await _deck.GetVariantNotesAsync(
+            request.DeckType,
+            cards.Select(c => c.CardId).ToList(),
+            ct);
+
+        var interpretation = await _interpreter.InterpretAsync(
+            spread, request.Question, cards, request.DeckType, variantNotes, ct);
 
         var reading = new Reading
         {
@@ -50,6 +61,7 @@ public sealed class ReadingService
             Question = request.Question,
             AiInterpretation = interpretation.Text,
             AiModel = interpretation.Model,
+            DeckType = request.DeckType,
             Cards = cards
         };
 
@@ -64,6 +76,8 @@ public sealed class ReadingService
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var spread = Spread.From(request.SpreadType);
+        if (userId is { } uid)
+            await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -76,6 +90,11 @@ public sealed class ReadingService
             })
             .ToList();
 
+        var variantNotes = await _deck.GetVariantNotesAsync(
+            request.DeckType,
+            cards.Select(c => c.CardId).ToList(),
+            ct);
+
         var reading = new Reading
         {
             UserId = userId,
@@ -83,30 +102,53 @@ public sealed class ReadingService
             Question = request.Question,
             AiInterpretation = null,
             AiModel = _interpreter.Model,
+            DeckType = request.DeckType,
             Cards = cards
         };
-
-        await _repo.AddAsync(reading, ct);
 
         yield return new ReadingStreamEvent.Cards(Map(reading, spread));
 
         var sb = new StringBuilder();
-        await foreach (var delta in _interpreter.InterpretStreamAsync(spread, request.Question, cards, ct))
+        var persisted = false;
+        try
         {
-            sb.Append(delta);
-            yield return new ReadingStreamEvent.Chunk(delta);
+            await foreach (var delta in _interpreter.InterpretStreamAsync(
+                spread, request.Question, cards, request.DeckType, variantNotes, ct))
+            {
+                if (!persisted)
+                {
+                    await _repo.AddAsync(reading, ct);
+                    persisted = true;
+                }
+                sb.Append(delta);
+                yield return new ReadingStreamEvent.Chunk(delta);
+            }
         }
-
-        reading.AiInterpretation = sb.ToString();
-        await _repo.UpdateAsync(reading, ct);
+        finally
+        {
+            if (persisted && sb.Length > 0)
+            {
+                reading.AiInterpretation = sb.ToString();
+                try
+                {
+                    await _repo.UpdateAsync(reading, CancellationToken.None);
+                }
+                catch
+                {
+                    // Best-effort persist; don't mask the original exception.
+                }
+            }
+        }
 
         yield return new ReadingStreamEvent.Done();
     }
 
-    public async Task<ReadingResult> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<ReadingResult> GetAsync(Guid id, Guid userId, CancellationToken ct = default)
     {
         var reading = await _repo.GetByIdAsync(id, ct)
             ?? throw new NotFoundException($"Reading {id} not found");
+        if (reading.UserId != userId)
+            throw new NotFoundException($"Reading {id} not found");
         var spread = Spread.From(reading.SpreadType);
         return Map(reading, spread);
     }
@@ -147,7 +189,8 @@ public sealed class ReadingService
             Question = reading.Question,
             CreatedAt = reading.CreatedAt,
             Cards = cards,
-            Interpretation = reading.AiInterpretation
+            Interpretation = reading.AiInterpretation,
+            DeckType = reading.DeckType
         };
     }
 }

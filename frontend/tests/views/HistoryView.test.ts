@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
-import { SpreadType, type Reading } from '@/types'
+import { DeckType, SpreadType, type Reading } from '@/types'
 
 const historyMock = vi.fn()
 
@@ -24,6 +24,7 @@ async function mountHistory() {
     routes: [
       { path: '/', component: { template: '<div>h</div>' } },
       { path: '/history', name: 'history', component: HistoryView },
+      { path: '/reading/:id', name: 'reading-detail', component: { template: '<div>d</div>' } },
     ],
   })
   router.push('/history')
@@ -39,6 +40,7 @@ const sample: Reading = {
   createdAt: '2026-04-14T12:00:00Z',
   cards: [],
   interpretation: 'The stars align',
+  deckType: DeckType.RWS,
 }
 
 describe('HistoryView', () => {
@@ -66,6 +68,14 @@ describe('HistoryView', () => {
     expect(wrapper.text()).toContain('Three card')
     expect(wrapper.text()).toContain('where to?')
     expect(wrapper.text()).toContain('The stars align')
+  })
+
+  it('each reading item links to its detail page', async () => {
+    historyMock.mockResolvedValue([sample])
+    const wrapper = await mountHistory()
+    await flushPromises()
+    const link = wrapper.find('a[href="/reading/r1"]')
+    expect(link.exists()).toBe(true)
   })
 
   it('shows an error when the request fails', async () => {

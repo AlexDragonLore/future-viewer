@@ -22,6 +22,66 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.DeckVariant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CardId")
+                        .HasColumnType("integer")
+                        .HasColumnName("card_id");
+
+                    b.Property<int>("DeckType")
+                        .HasColumnType("integer")
+                        .HasColumnName("deck_type");
+
+                    b.Property<string>("VariantNote")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("variant_note");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CardId", "DeckType")
+                        .IsUnique();
+
+                    b.ToTable("deck_variants", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.ProcessedPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("PaymentId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("payment_id");
+
+                    b.Property<DateTime>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique();
+
+                    b.ToTable("processed_payments", (string)null);
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.Reading", b =>
                 {
                     b.Property<Guid>("Id")
@@ -41,6 +101,12 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<int>("DeckType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("deck_type");
 
                     b.Property<string>("Question")
                         .IsRequired()
@@ -101,6 +167,10 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("id");
 
+                    b.Property<string>("Aliases")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("aliases");
+
                     b.Property<string>("DescriptionReversed")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -125,13 +195,57 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(128)")
                         .HasColumnName("name");
 
+                    b.Property<string>("NameEn")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasDefaultValue("")
+                        .HasColumnName("name_en");
+
                     b.Property<int>("Number")
                         .HasColumnType("integer")
                         .HasColumnName("number");
 
+                    b.Property<string>("ReversedKeywords")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("reversed_keywords")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<string>("ShortReversed")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasDefaultValue("")
+                        .HasColumnName("short_reversed");
+
+                    b.Property<string>("ShortUpright")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasDefaultValue("")
+                        .HasColumnName("short_upright");
+
+                    b.Property<int>("SuggestedTone")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("suggested_tone");
+
                     b.Property<int>("Suit")
                         .HasColumnType("integer")
                         .HasColumnName("suit");
+
+                    b.Property<string>("UprightKeywords")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("upright_keywords")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.HasKey("Id");
 
@@ -160,12 +274,36 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("password_hash");
 
+                    b.Property<DateTime?>("SubscriptionExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("subscription_expires_at");
+
+                    b.Property<int>("SubscriptionStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("subscription_status");
+
+                    b.Property<string>("YukassaSubscriptionId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("yukassa_subscription_id");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.DeckVariant", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.TarotCard", "Card")
+                        .WithMany("DeckVariants")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Card");
                 });
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.Reading", b =>
@@ -200,6 +338,11 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FutureViewer.Domain.Entities.Reading", b =>
                 {
                     b.Navigation("Cards");
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.TarotCard", b =>
+                {
+                    b.Navigation("DeckVariants");
                 });
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.User", b =>

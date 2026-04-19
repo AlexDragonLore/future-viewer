@@ -13,6 +13,7 @@ public static class DomainServicesExtensions
         services.AddScoped<InterpretationService>();
         services.AddScoped<ReadingService>();
         services.AddScoped<AuthService>();
+        services.AddScoped<SubscriptionService>();
 
         services.AddValidatorsFromAssemblyContaining<CreateReadingRequestValidator>();
         return services;

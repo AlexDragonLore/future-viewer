@@ -9,5 +9,6 @@ public sealed class CreateReadingRequestValidator : AbstractValidator<CreateRead
     {
         RuleFor(x => x.SpreadType).IsInEnum();
         RuleFor(x => x.Question).NotEmpty().MaximumLength(500);
+        RuleFor(x => x.DeckType).IsInEnum();
     }
 }

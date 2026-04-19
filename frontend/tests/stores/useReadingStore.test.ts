@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { SpreadType, type Reading } from '@/types'
+import { DeckType, SpreadType, type Reading } from '@/types'
 
 const spreadsMock = vi.fn()
 const createMock = vi.fn()
@@ -8,13 +8,15 @@ const createMock = vi.fn()
 vi.mock('@/api/readingApi', () => ({
   readingApi: {
     spreads: () => spreadsMock(),
-    create: (type: SpreadType, question: string) => createMock(type, question),
+    create: (type: SpreadType, question: string, deckType: DeckType) =>
+      createMock(type, question, deckType),
     get: vi.fn(),
     history: vi.fn(),
   },
 }))
 
 import { useReadingStore } from '@/stores/useReadingStore'
+import { useDeckStore } from '@/stores/useDeckStore'
 
 const sampleReading: Reading = {
   id: 'r1',
@@ -24,6 +26,7 @@ const sampleReading: Reading = {
   createdAt: '2026-04-14T12:00:00Z',
   cards: [],
   interpretation: 'Stub interpretation',
+  deckType: DeckType.RWS,
 }
 
 describe('useReadingStore', () => {
@@ -31,6 +34,7 @@ describe('useReadingStore', () => {
     setActivePinia(createPinia())
     spreadsMock.mockReset()
     createMock.mockReset()
+    localStorage.clear()
   })
 
   it('loadSpreads caches after first call', async () => {
@@ -51,6 +55,15 @@ describe('useReadingStore', () => {
     expect(store.current).toEqual(sampleReading)
     expect(store.loading).toBe(false)
     expect(store.error).toBeNull()
+  })
+
+  it('create passes selected deck from deck store', async () => {
+    createMock.mockResolvedValue(sampleReading)
+    const deck = useDeckStore()
+    deck.select(DeckType.Thoth)
+    const store = useReadingStore()
+    await store.create(SpreadType.ThreeCard, 'what?')
+    expect(createMock).toHaveBeenCalledWith(SpreadType.ThreeCard, 'what?', DeckType.Thoth)
   })
 
   it('create surfaces validation error details from backend', async () => {
