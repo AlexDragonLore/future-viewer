@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { marked } from 'marked'
-import { feedbackApi, type FeedbackSubmitResult } from '@/api/feedbackApi'
+import { feedbackApi } from '@/api/feedbackApi'
 import { extractApiError } from '@/api/httpClient'
 import FeedbackForm from '@/components/FeedbackForm.vue'
 import ScoreBadge from '@/components/ScoreBadge.vue'
@@ -15,31 +15,16 @@ const loading = ref(true)
 const loadError = ref<string | null>(null)
 const submitting = ref(false)
 const submitError = ref<string | null>(null)
-const justScored = ref<FeedbackSubmitResult | null>(null)
 
 const interpretationHtml = computed(() =>
   feedback.value?.interpretation ? (marked.parse(feedback.value.interpretation) as string) : '',
 )
 
-const isScored = computed(() => {
-  const status = feedback.value?.status
-  return status === FeedbackStatus.Scored || status === FeedbackStatus.Answered
-})
+const isScored = computed(() => feedback.value?.status === FeedbackStatus.Scored)
 
-const displayScore = computed<number | null>(() => {
-  if (justScored.value) return justScored.value.score
-  return feedback.value?.aiScore ?? null
-})
-
-const displayReason = computed<string | null>(() => {
-  if (justScored.value) return justScored.value.reason
-  return feedback.value?.aiScoreReason ?? null
-})
-
-const displaySincere = computed<boolean | null>(() => {
-  if (justScored.value) return justScored.value.isSincere
-  return feedback.value?.isSincere ?? null
-})
+const displayScore = computed<number | null>(() => feedback.value?.aiScore ?? null)
+const displayReason = computed<string | null>(() => feedback.value?.aiScoreReason ?? null)
+const displaySincere = computed<boolean | null>(() => feedback.value?.isSincere ?? null)
 
 async function load(token: string) {
   loading.value = true
@@ -60,17 +45,7 @@ async function onSubmit(selfReport: string) {
   submitError.value = null
   try {
     const token = String(route.params.token)
-    const result = await feedbackApi.submit(token, selfReport)
-    justScored.value = result
-    feedback.value = {
-      ...feedback.value,
-      selfReport,
-      aiScore: result.score,
-      aiScoreReason: result.reason,
-      isSincere: result.isSincere,
-      status: FeedbackStatus.Scored,
-      answeredAt: new Date().toISOString(),
-    }
+    feedback.value = await feedbackApi.submit(token, selfReport)
   } catch (e) {
     submitError.value = extractApiError(e, 'Не удалось отправить отклик')
   } finally {

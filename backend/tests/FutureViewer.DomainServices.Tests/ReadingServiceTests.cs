@@ -5,6 +5,7 @@ using FutureViewer.Domain.ValueObjects;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.DomainServices.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace FutureViewer.DomainServices.Tests;
@@ -49,7 +50,7 @@ public sealed class ReadingServiceTests
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
         var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, NullLogger<ReadingService>.Instance);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "Что меня ждёт?" },
@@ -101,7 +102,7 @@ public sealed class ReadingServiceTests
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
         var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, NullLogger<ReadingService>.Instance);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest

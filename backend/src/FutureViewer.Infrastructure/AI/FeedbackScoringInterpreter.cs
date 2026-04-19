@@ -94,22 +94,39 @@ public sealed class FeedbackScoringInterpreter : IFeedbackScorer
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        var score = root.TryGetProperty("score", out var s) && s.ValueKind == JsonValueKind.Number
-            ? s.GetInt32()
-            : 1;
+        var score = 1;
+        if (root.TryGetProperty("score", out var s) && s.ValueKind == JsonValueKind.Number)
+        {
+            if (s.TryGetInt32(out var i)) score = i;
+            else if (s.TryGetDouble(out var d)) score = (int)Math.Round(d);
+        }
 
         var reason = root.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String
             ? r.GetString() ?? string.Empty
             : string.Empty;
 
-        var isSincere = root.TryGetProperty("isSincere", out var sincere)
-                        && sincere.ValueKind == JsonValueKind.True;
+        var isSincere = ParseIsSincere(root);
 
         return new FeedbackScoringResult
         {
             Score = Math.Clamp(score, 1, 10),
             Reason = reason,
             IsSincere = isSincere
+        };
+    }
+
+    internal static bool ParseIsSincere(JsonElement root)
+    {
+        if (!root.TryGetProperty("isSincere", out var sincere))
+            return false;
+
+        return sincere.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String => bool.TryParse(sincere.GetString(), out var b) && b,
+            JsonValueKind.Number => sincere.TryGetInt32(out var n) && n != 0,
+            _ => false
         };
     }
 }

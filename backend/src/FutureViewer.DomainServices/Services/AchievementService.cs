@@ -27,17 +27,20 @@ public sealed class AchievementService
     private readonly IReadingRepository _readings;
     private readonly IFeedbackRepository _feedbacks;
     private readonly IUserRepository _users;
+    private readonly ITelegramNotifier? _notifier;
 
     public AchievementService(
         IAchievementRepository achievements,
         IReadingRepository readings,
         IFeedbackRepository feedbacks,
-        IUserRepository users)
+        IUserRepository users,
+        ITelegramNotifier? notifier = null)
     {
         _achievements = achievements;
         _readings = readings;
         _feedbacks = feedbacks;
         _users = users;
+        _notifier = notifier;
     }
 
     public async Task<IReadOnlyList<AchievementDto>> CheckAndGrantAsync(Guid userId, CancellationToken ct = default)
@@ -96,7 +99,17 @@ public sealed class AchievementService
                 UnlockedAt = DateTime.UtcNow
             }, ct);
 
+            if (ua is null) continue;
             newlyGranted.Add(MapAchievement(achievement, ua.UnlockedAt));
+
+            if (_notifier is not null && user.TelegramChatId.HasValue)
+            {
+                await _notifier.SendAchievementNotificationAsync(
+                    user.TelegramChatId.Value,
+                    achievement.NameRu,
+                    achievement.DescriptionRu,
+                    ct);
+            }
         }
 
         return newlyGranted;

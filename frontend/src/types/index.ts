@@ -119,7 +119,6 @@ export enum FeedbackStatus {
   Notified = 1,
   Answered = 2,
   Scored = 3,
-  Expired = 4,
 }
 
 export interface FeedbackInfo {

@@ -24,7 +24,7 @@ public sealed class TelegramBotService : ITelegramNotifier
 
     public bool IsEnabled => _provider.IsEnabled && _options.IsEnabled;
 
-    public async Task SendFeedbackLinkAsync(
+    public async Task<bool> SendFeedbackLinkAsync(
         long chatId,
         string question,
         string feedbackUrl,
@@ -34,7 +34,7 @@ public sealed class TelegramBotService : ITelegramNotifier
         if (client is null)
         {
             _logger.LogWarning("Telegram bot disabled; skipping feedback link to {ChatId}", chatId);
-            return;
+            return false;
         }
 
         var trimmedQuestion = string.IsNullOrWhiteSpace(question)
@@ -53,14 +53,20 @@ public sealed class TelegramBotService : ITelegramNotifier
                 text: text,
                 parseMode: ParseMode.None,
                 cancellationToken: ct);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to send feedback link to {ChatId}", chatId);
+            return false;
         }
     }
 
-    public async Task SendAchievementNotificationAsync(
+    public async Task<bool> SendAchievementNotificationAsync(
         long chatId,
         string name,
         string description,
@@ -70,7 +76,7 @@ public sealed class TelegramBotService : ITelegramNotifier
         if (client is null)
         {
             _logger.LogWarning("Telegram bot disabled; skipping achievement to {ChatId}", chatId);
-            return;
+            return false;
         }
 
         var text = $"🏆 Новое достижение: {name}\n{description}";
@@ -82,10 +88,16 @@ public sealed class TelegramBotService : ITelegramNotifier
                 text: text,
                 parseMode: ParseMode.None,
                 cancellationToken: ct);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to send achievement notification to {ChatId}", chatId);
+            return false;
         }
     }
 }

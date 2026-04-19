@@ -20,9 +20,6 @@ public sealed class AchievementRepository : IAchievementRepository
             .ToListAsync(ct);
     }
 
-    public Task<Achievement?> GetByCodeAsync(string code, CancellationToken ct = default) =>
-        _db.Achievements.FirstOrDefaultAsync(a => a.Code == code, ct);
-
     public async Task<IReadOnlyList<UserAchievement>> GetByUserAsync(Guid userId, CancellationToken ct = default)
     {
         return await _db.UserAchievements
@@ -32,14 +29,18 @@ public sealed class AchievementRepository : IAchievementRepository
             .ToListAsync(ct);
     }
 
-    public Task<bool> HasAchievementAsync(Guid userId, string code, CancellationToken ct = default) =>
-        _db.UserAchievements
-            .AnyAsync(ua => ua.UserId == userId && ua.Achievement != null && ua.Achievement.Code == code, ct);
-
-    public async Task<UserAchievement> GrantAsync(UserAchievement userAchievement, CancellationToken ct = default)
+    public async Task<UserAchievement?> GrantAsync(UserAchievement userAchievement, CancellationToken ct = default)
     {
         await _db.UserAchievements.AddAsync(userAchievement, ct);
-        await _db.SaveChangesAsync(ct);
-        return userAchievement;
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return userAchievement;
+        }
+        catch (DbUpdateException)
+        {
+            _db.Entry(userAchievement).State = EntityState.Detached;
+            return null;
+        }
     }
 }

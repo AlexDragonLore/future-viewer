@@ -44,7 +44,10 @@ public sealed class FeedbackRepository : IFeedbackRepository
         return await _db.ReadingFeedbacks
             .Include(f => f.User)
             .Include(f => f.Reading)
-            .Where(f => f.Status == FeedbackStatus.Pending && f.ScheduledAt <= before)
+            .Where(f => f.Status == FeedbackStatus.Pending
+                        && f.ScheduledAt <= before
+                        && f.User != null
+                        && f.User.TelegramChatId != null)
             .OrderBy(f => f.ScheduledAt)
             .Take(batch)
             .ToListAsync(ct);
@@ -77,5 +80,15 @@ public sealed class FeedbackRepository : IFeedbackRepository
         if (_db.Entry(feedback).State == EntityState.Detached)
             _db.ReadingFeedbacks.Update(feedback);
         await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> MarkNotifiedAsync(Guid feedbackId, DateTime notifiedAt, CancellationToken ct = default)
+    {
+        var updated = await _db.ReadingFeedbacks
+            .Where(f => f.Id == feedbackId && f.Status == FeedbackStatus.Pending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(f => f.Status, FeedbackStatus.Notified)
+                .SetProperty(f => f.NotifiedAt, notifiedAt), ct);
+        return updated > 0;
     }
 }

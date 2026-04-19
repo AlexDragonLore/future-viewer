@@ -1,5 +1,3 @@
-using FutureViewer.Domain.Entities;
-using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Infrastructure.Telegram;
 using Microsoft.Extensions.DependencyInjection;
@@ -82,11 +80,10 @@ public sealed class FeedbackNotificationJob : BackgroundService
             var question = feedback.Reading?.Question ?? string.Empty;
             var url = BuildFeedbackUrl(feedback.Token);
 
-            await notifier.SendFeedbackLinkAsync(chatId.Value, question, url, ct);
+            var sent = await notifier.SendFeedbackLinkAsync(chatId.Value, question, url, ct);
+            if (!sent) continue;
 
-            feedback.Status = FeedbackStatus.Notified;
-            feedback.NotifiedAt = DateTime.UtcNow;
-            await feedbacks.UpdateAsync(feedback, ct);
+            await feedbacks.MarkNotifiedAsync(feedback.Id, DateTime.UtcNow, ct);
         }
     }
 

@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.DomainServices.Services;
@@ -35,7 +34,7 @@ public static class AchievementEndpoints
             HttpContext ctx,
             CancellationToken ct) =>
         {
-            var userId = GetUserId(ctx.User)
+            var userId = ctx.User.GetUserId()
                 ?? throw new UnauthorizedException("Authentication required");
             await service.CheckAndGrantAsync(userId, ct);
             var list = await service.GetAllWithUserStatusAsync(userId, ct);
@@ -43,12 +42,5 @@ public static class AchievementEndpoints
         }).RequireAuthorization();
 
         return app;
-    }
-
-    private static Guid? GetUserId(ClaimsPrincipal principal)
-    {
-        var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? principal.FindFirstValue("sub");
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

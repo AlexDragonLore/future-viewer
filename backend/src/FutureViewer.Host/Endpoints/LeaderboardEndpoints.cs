@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Services;
 
@@ -35,19 +34,12 @@ public static class LeaderboardEndpoints
             HttpContext ctx,
             CancellationToken ct) =>
         {
-            var userId = GetUserId(ctx.User)
+            var userId = ctx.User.GetUserId()
                 ?? throw new UnauthorizedException("Authentication required");
             var summary = await service.GetUserSummaryAsync(userId, ct);
             return summary is null ? Results.NoContent() : Results.Ok(summary);
         }).RequireAuthorization();
 
         return app;
-    }
-
-    private static Guid? GetUserId(ClaimsPrincipal principal)
-    {
-        var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? principal.FindFirstValue("sub");
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

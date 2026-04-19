@@ -49,6 +49,10 @@ public sealed class TelegramLinkService
         var user = await _users.GetByLinkTokenAsync(token, ct);
         if (user is null) return false;
 
+        var existing = await _users.GetByTelegramChatIdAsync(chatId, ct);
+        if (existing is not null && existing.Id != user.Id)
+            return false;
+
         user.TelegramChatId = chatId;
         user.TelegramLinkToken = null;
         await _users.UpdateAsync(user, ct);

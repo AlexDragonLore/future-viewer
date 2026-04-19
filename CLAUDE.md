@@ -16,14 +16,16 @@ Future Viewer is a tarot-reading web app with AI-generated interpretations. Two 
 ### Backend — Clean Architecture (`backend/src/`)
 Four projects with a one-way dependency chain: `Host` → `Infrastructure` → `DomainServices` → `Domain`.
 
-- **`FutureViewer.Domain`** — entities (`Reading`, `ReadingCard`, `TarotCard`, `User`, `Spread`), enums, value objects. No dependencies on the rest.
-- **`FutureViewer.DomainServices`** — use cases (`ReadingService`, `InterpretationService`, `CardDeckService`, `AuthService`), DTOs, FluentValidation validators, and **interfaces for infrastructure** (e.g. `IReadingRepository`, the AI interpreter port). Knows nothing about EF Core, OpenAI, or HTTP.
-- **`FutureViewer.Infrastructure`** — EF Core `AppDbContext` + migrations + repositories, `TarotDeckSeed`, JWT token generator, and the OpenAI-backed interpreter implementation. Implements the interfaces declared in DomainServices.
-- **`FutureViewer.Host`** — ASP.NET Core Minimal API entry point. `Program.cs` wires DI via `AddDomainServices()` + `AddInfrastructure(config)`, configures JWT bearer auth, CORS, OpenAPI, the global `ExceptionHandlerMiddleware`, and maps endpoints in `Endpoints/` (`MapReadings`, `MapAuth`, `MapCards`). At startup (outside `Testing` env) it runs EF migrations and seeds the tarot deck via `DatabaseInitializer`.
+- **`FutureViewer.Domain`** — entities (`Reading`, `ReadingCard`, `TarotCard`, `User`, `Spread`, `ReadingFeedback`, `Achievement`, `UserAchievement`), enums (`FeedbackStatus`, `SubscriptionStatus`), value objects. No dependencies on the rest.
+- **`FutureViewer.DomainServices`** — use cases (`ReadingService`, `InterpretationService`, `CardDeckService`, `AuthService`, `SubscriptionService`, `FeedbackService`, `AchievementService`, `LeaderboardService`, `TelegramLinkService`), DTOs, FluentValidation validators, and **interfaces for infrastructure** (e.g. `IReadingRepository`, `IFeedbackRepository`, `IAchievementRepository`, `ILeaderboardRepository`, the AI interpreter port `IAIInterpreter`, the AI scorer port `IFeedbackScorer`, `ITelegramNotifier`, `ITelegramLinkUrlBuilder`). Knows nothing about EF Core, OpenAI, or HTTP.
+- **`FutureViewer.Infrastructure`** — EF Core `AppDbContext` + migrations + repositories, `TarotDeckSeed`, JWT token generator, the OpenAI-backed interpreter (`OpenAIInterpreter`) and feedback scorer (`FeedbackScoringInterpreter`), the Telegram subsystem under `Telegram/` (`TelegramBotClientProvider`, `TelegramBotService : ITelegramNotifier`, `TelegramUpdateHandler` for `/start <token>`, `TelegramPollingHostedService`, `TelegramLinkUrlBuilder`), and `BackgroundServices/FeedbackNotificationJob` (polls pending feedbacks whose `ScheduledAt <= now` and sends `{SiteUrl}/feedback/{token}` via Telegram). Uses the `Telegram.Bot` SDK. Implements the interfaces declared in DomainServices.
+- **`FutureViewer.Host`** — ASP.NET Core Minimal API entry point. `Program.cs` wires DI via `AddDomainServices()` + `AddInfrastructure(config)`, configures JWT bearer auth, CORS, OpenAPI, the global `ExceptionHandlerMiddleware`, and maps endpoints in `Endpoints/` (`MapReadings`, `MapAuth`, `MapCards`, `MapSubscription`, `MapPayments`, `MapFeedbacks`, `MapLeaderboard`, `MapAchievements`, `MapTelegram`). At startup (outside `Testing` env) it runs EF migrations and seeds both the tarot deck and the achievements catalog via `DatabaseInitializer`.
 
-The central flow: `POST /api/readings` → `ReadingService.CreateAsync` → draw from `CardDeckService` → `InterpretationService` (calls `OpenAIInterpreter`) → persist via repository → return `ReadingResult`.
+The central reading flow: `POST /api/readings` → `ReadingService.CreateAsync` → draw from `CardDeckService` → `InterpretationService` (calls `OpenAIInterpreter`) → persist via repository → `FeedbackService.ScheduleAsync` (best-effort, +24h) → return `ReadingResult`.
 
-Configuration is loaded via `IConfiguration` sections (`Jwt`, `OpenAI`, `ConnectionStrings:Default`, `Cors:AllowedOrigins`). Secrets in dev live in user-secrets of `FutureViewer.Host`; in docker-compose they come from env vars `JWT_SECRET` and `OPENAI_API_KEY`.
+The gamification flow: `FeedbackNotificationJob` picks pending feedbacks where `ScheduledAt <= now` and sends the deep link via Telegram (only marks `Notified` on confirmed send) → user opens `/feedback/{token}` (anonymous, token-authenticated) → `POST /api/feedbacks/{token}` → `FeedbackScoringInterpreter` scores sincerity + follow-through → feedback transitions to `Scored`. `AchievementService.CheckAndGrantAsync` runs on `GET /api/achievements/me` and grants any newly-earned codes (unique constraint on `(user_id, achievement_id)`).
+
+Configuration is loaded via `IConfiguration` sections (`Jwt`, `OpenAI`, `Telegram`, `ConnectionStrings:Default`, `Cors:AllowedOrigins`). The Telegram subsystem no-ops when `Telegram:BotToken` is empty; `FeedbackNotificationJob` and `TelegramPollingHostedService` exit early in that case. The webhook endpoint (`POST /api/telegram/webhook`) requires `Telegram:SecretToken` to be configured and matching the `X-Telegram-Bot-Api-Secret-Token` header — otherwise it returns 401. Secrets in dev live in user-secrets of `FutureViewer.Host`; in docker-compose they come from env vars `JWT_SECRET`, `OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_URL`, `TELEGRAM_SECRET_TOKEN`, `TELEGRAM_SITE_URL`.
 
 ### Frontend (`frontend/src/`)
 Vue 3 + TS + Vite 6 SPA. Pinia for state, Vue Router for navigation, Tailwind for styling, **GSAP** for card animations, **marked** for rendering AI markdown, **axios** for HTTP. JWT is stored in `localStorage` as `fv_token` and attached by `httpClient.ts`.
@@ -32,6 +34,8 @@ User journey is a 3-view pipeline mirrored by Pinia state in `stores/useReadingS
 `HomeView` (pick spread + question) → `ReadingView` (shuffle → deal → flip, driven by `composables/useCardAnimation.ts` and `composables/useSpread.ts`) → `ResultView` (interpretation + per-card meanings).
 
 Procedural sound effects live in `composables/useAudio.ts` (Web Audio, no assets).
+
+Gamification views: `FeedbackView` (`/feedback/:token`, anonymous — Telegram deep-link lands here), `LeaderboardView` (`/leaderboard`, anonymous), `AchievementsView` (`/achievements`, auth), `ProfileView` (`/profile`, auth) — backed by `useLeaderboardStore`, `useAchievementStore`, `useProfileStore`, and API modules `feedbackApi`, `leaderboardApi`, `achievementApi`, `telegramApi`.
 
 ### Integration tests
 `backend/tests/FutureViewer.Integration.Tests` uses `WebApplicationFactory` with `ASPNETCORE_ENVIRONMENT=Testing` (which disables the startup migration/seed) and spins up Postgres via **Testcontainers** — a running Docker daemon is required.
@@ -55,6 +59,8 @@ dotnet run --project backend/src/FutureViewer.Host
 # Set dev secrets (run inside backend/src/FutureViewer.Host)
 dotnet user-secrets set "OpenAI:ApiKey" "sk-..."
 dotnet user-secrets set "Jwt:Secret" "$(openssl rand -base64 48)"
+dotnet user-secrets set "Telegram:BotToken" "<token from BotFather>"    # optional — bot features no-op if unset
+dotnet user-secrets set "Telegram:SecretToken" "$(openssl rand -base64 32)"  # required if webhook is used
 
 # EF Core migrations (run inside backend/src/FutureViewer.Host)
 dotnet ef migrations add <Name> --project ../FutureViewer.Infrastructure

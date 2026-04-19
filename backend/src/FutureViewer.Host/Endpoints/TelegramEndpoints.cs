@@ -1,4 +1,5 @@
-using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Services;
@@ -29,7 +30,7 @@ public static class TelegramEndpoints
             HttpContext ctx,
             CancellationToken ct) =>
         {
-            var userId = GetUserId(ctx.User)
+            var userId = ctx.User.GetUserId()
                 ?? throw new UnauthorizedException("Authentication required");
             var response = await service.GenerateLinkAsync(userId, ct);
             return Results.Ok(response);
@@ -40,7 +41,7 @@ public static class TelegramEndpoints
             HttpContext ctx,
             CancellationToken ct) =>
         {
-            var userId = GetUserId(ctx.User)
+            var userId = ctx.User.GetUserId()
                 ?? throw new UnauthorizedException("Authentication required");
             await service.UnlinkAsync(userId, ct);
             return Results.NoContent();
@@ -51,7 +52,7 @@ public static class TelegramEndpoints
             HttpContext ctx,
             CancellationToken ct) =>
         {
-            var userId = GetUserId(ctx.User)
+            var userId = ctx.User.GetUserId()
                 ?? throw new UnauthorizedException("Authentication required");
             var isLinked = await service.IsLinkedAsync(userId, ct);
             return Results.Ok(new { isLinked });
@@ -66,12 +67,14 @@ public static class TelegramEndpoints
         {
             var opts = options.Value;
 
-            if (!string.IsNullOrEmpty(opts.SecretToken))
-            {
-                var header = ctx.Request.Headers[SecretTokenHeader].ToString();
-                if (!string.Equals(header, opts.SecretToken, StringComparison.Ordinal))
-                    return Results.StatusCode(StatusCodes.Status401Unauthorized);
-            }
+            if (string.IsNullOrEmpty(opts.SecretToken))
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
+
+            var header = ctx.Request.Headers[SecretTokenHeader].ToString();
+            var headerBytes = Encoding.UTF8.GetBytes(header);
+            var secretBytes = Encoding.UTF8.GetBytes(opts.SecretToken);
+            if (!CryptographicOperations.FixedTimeEquals(headerBytes, secretBytes))
+                return Results.StatusCode(StatusCodes.Status401Unauthorized);
 
             if (ctx.Request.ContentLength is long cl && cl > WebhookMaxBytes)
                 return Results.StatusCode(StatusCodes.Status413PayloadTooLarge);
@@ -98,12 +101,5 @@ public static class TelegramEndpoints
         });
 
         return app;
-    }
-
-    private static Guid? GetUserId(ClaimsPrincipal principal)
-    {
-        var sub = principal.FindFirstValue(ClaimTypes.NameIdentifier)
-                  ?? principal.FindFirstValue("sub");
-        return Guid.TryParse(sub, out var id) ? id : null;
     }
 }

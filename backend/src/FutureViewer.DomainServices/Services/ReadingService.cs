@@ -4,6 +4,7 @@ using FutureViewer.Domain.Entities;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace FutureViewer.DomainServices.Services;
 
@@ -14,19 +15,22 @@ public sealed class ReadingService
     private readonly InterpretationService _interpreter;
     private readonly SubscriptionService _subscription;
     private readonly FeedbackService _feedback;
+    private readonly ILogger<ReadingService> _logger;
 
     public ReadingService(
         IReadingRepository repo,
         CardDeckService deck,
         InterpretationService interpreter,
         SubscriptionService subscription,
-        FeedbackService feedback)
+        FeedbackService feedback,
+        ILogger<ReadingService> logger)
     {
         _repo = repo;
         _deck = deck;
         _interpreter = interpreter;
         _subscription = subscription;
         _feedback = feedback;
+        _logger = logger;
     }
 
     public async Task<ReadingResult> CreateAsync(
@@ -72,8 +76,18 @@ public sealed class ReadingService
 
         if (reading.UserId is not null)
         {
-            try { await _feedback.ScheduleAsync(reading, ct); }
-            catch { /* best-effort — don't fail the reading creation */ }
+            try
+            {
+                await _feedback.ScheduleAsync(reading, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to schedule feedback for reading {ReadingId}", reading.Id);
+            }
         }
 
         return Map(reading, spread);
@@ -150,8 +164,14 @@ public sealed class ReadingService
 
             if (persisted && reading.UserId is not null)
             {
-                try { await _feedback.ScheduleAsync(reading, CancellationToken.None); }
-                catch { /* best-effort */ }
+                try
+                {
+                    await _feedback.ScheduleAsync(reading, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to schedule feedback for streaming reading {ReadingId}", reading.Id);
+                }
             }
         }
 
