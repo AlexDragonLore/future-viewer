@@ -360,13 +360,13 @@ dotnet user-secrets set "Telegram:SecretToken" "..."
 
 ### Task 8: Phase 8 - Tests
 
-- [ ] Unit tests for FeedbackService (scheduling, submit, no re-answer)
-- [ ] Unit tests for AchievementService (rule checks)
-- [ ] Unit tests for LeaderboardService
-- [ ] Integration tests for new endpoints (feedback submit flow, leaderboard queries)
-- [ ] Frontend tests (FeedbackView, LeaderboardTable, AchievementCard)
-- [ ] Ensure `dotnet test` passes
-- [ ] Ensure `npm test` passes
+- [x] Unit tests for FeedbackService (scheduling, submit, no re-answer)
+- [x] Unit tests for AchievementService (rule checks)
+- [x] Unit tests for LeaderboardService
+- [x] Integration tests for new endpoints (feedback submit flow, leaderboard queries)
+- [x] Frontend tests (FeedbackView, LeaderboardTable, AchievementCard)
+- [x] Ensure `dotnet test` passes
+- [x] Ensure `npm test` passes (new gamification tests pass; 3 pre-existing CardFlip/ResultView failures unrelated to this task)
 
 ---
 
