@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Services;
@@ -69,7 +71,9 @@ public static class TelegramEndpoints
                 return Results.StatusCode(StatusCodes.Status401Unauthorized);
 
             var header = ctx.Request.Headers[SecretTokenHeader].ToString();
-            if (!string.Equals(header, opts.SecretToken, StringComparison.Ordinal))
+            var headerBytes = Encoding.UTF8.GetBytes(header);
+            var secretBytes = Encoding.UTF8.GetBytes(opts.SecretToken);
+            if (!CryptographicOperations.FixedTimeEquals(headerBytes, secretBytes))
                 return Results.StatusCode(StatusCodes.Status401Unauthorized);
 
             if (ctx.Request.ContentLength is long cl && cl > WebhookMaxBytes)

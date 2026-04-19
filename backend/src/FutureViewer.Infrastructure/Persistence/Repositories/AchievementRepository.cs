@@ -40,10 +40,7 @@ public sealed class AchievementRepository : IAchievementRepository
         catch (DbUpdateException)
         {
             _db.Entry(userAchievement).State = EntityState.Detached;
-            return await _db.UserAchievements
-                .FirstOrDefaultAsync(
-                    ua => ua.UserId == userAchievement.UserId && ua.AchievementId == userAchievement.AchievementId,
-                    ct);
+            return null;
         }
     }
 }

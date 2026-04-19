@@ -94,9 +94,12 @@ public sealed class FeedbackScoringInterpreter : IFeedbackScorer
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
-        var score = root.TryGetProperty("score", out var s) && s.ValueKind == JsonValueKind.Number
-            ? s.GetInt32()
-            : 1;
+        var score = 1;
+        if (root.TryGetProperty("score", out var s) && s.ValueKind == JsonValueKind.Number)
+        {
+            if (s.TryGetInt32(out var i)) score = i;
+            else if (s.TryGetDouble(out var d)) score = (int)Math.Round(d);
+        }
 
         var reason = root.TryGetProperty("reason", out var r) && r.ValueKind == JsonValueKind.String
             ? r.GetString() ?? string.Empty
