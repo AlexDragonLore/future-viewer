@@ -13,5 +13,10 @@ public sealed class User
     public DateTime? SubscriptionExpiresAt { get; set; }
     public string? YukassaSubscriptionId { get; set; }
 
+    public long? TelegramChatId { get; set; }
+    public string? TelegramLinkToken { get; set; }
+
     public ICollection<Reading> Readings { get; init; } = new List<Reading>();
+    public ICollection<ReadingFeedback> Feedbacks { get; init; } = new List<ReadingFeedback>();
+    public ICollection<UserAchievement> Achievements { get; init; } = new List<UserAchievement>();
 }

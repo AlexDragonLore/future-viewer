@@ -10,6 +10,16 @@ Future Viewer — таро-приложение. Сейчас пользоват
 
 ## Phase 1: Domain — новые сущности и enum
 
+### Task 1: Phase 1 - Domain entities and enum
+
+- [x] Create `FeedbackStatus` enum
+- [x] Create `ReadingFeedback` entity
+- [x] Create `Achievement` entity
+- [x] Create `UserAchievement` entity
+- [x] Extend `User` with Telegram fields and navigations
+- [x] Extend `Reading` with Feedback navigation
+- [x] Ensure backend builds
+
 ### 1.1 Enum `FeedbackStatus` → `Domain/Enums/FeedbackStatus.cs`
 ```
 Pending = 0, Notified = 1, Answered = 2, Scored = 3, Expired = 4
@@ -68,6 +78,18 @@ Unique constraint на (UserId, AchievementId).
 
 ## Phase 2: Infrastructure — БД
 
+### Task 2: Phase 2 - EF Configurations, Migration, Seed
+
+- [x] Add `ReadingFeedbackConfiguration`
+- [x] Add `AchievementConfiguration`
+- [x] Add `UserAchievementConfiguration`
+- [x] Update `UserConfiguration` (Telegram fields + unique TelegramChatId index)
+- [x] Update `ReadingConfiguration` if needed
+- [x] Add DbSets in `AppDbContext`
+- [x] Create migration `AddGamification`
+- [x] Seed 12 achievements in `DatabaseInitializer`
+- [x] Ensure backend builds
+
 ### 2.1 EF Configurations
 - `ReadingFeedbackConfiguration.cs` — unique index на ReadingId, index на (UserId, Status), index на ScheduledAt, unique index на Token
 - `AchievementConfiguration.cs` — unique index на Code
@@ -99,6 +121,19 @@ Unique constraint на (UserId, AchievementId).
 ---
 
 ## Phase 3: DomainServices — интерфейсы, DTO, сервисы
+
+### Task 3: Phase 3 - Interfaces, DTOs, Services
+
+- [x] Add `IFeedbackRepository`, `IAchievementRepository`, `ILeaderboardRepository`, `ITelegramNotifier`
+- [x] Add DTOs (TelegramLinkResponse, LeaderboardEntryDto, UserScoreSummaryDto, AchievementDto, FeedbackDto, SubmitFeedbackRequest, FeedbackScoringResult)
+- [x] Implement `FeedbackService`
+- [x] Implement `AchievementService`
+- [x] Implement `LeaderboardService`
+- [x] Implement `TelegramLinkService`
+- [x] Integrate FeedbackService.ScheduleAsync into ReadingService
+- [x] Add `SubmitFeedbackValidator`
+- [x] Register services in DomainServicesExtensions
+- [x] Ensure backend builds
 
 ### 3.1 Новые интерфейсы в `DomainServices/Interfaces/`
 - `IFeedbackRepository` — Add, GetById, GetByToken, GetByReadingId, GetPendingToNotify(DateTime before, int batch), Update, GetScoredByUser(userId)
@@ -148,6 +183,18 @@ Unique constraint на (UserId, AchievementId).
 
 ## Phase 4: Infrastructure — реализации
 
+### Task 4: Phase 4 - Infrastructure implementations
+
+- [x] Implement `FeedbackRepository`
+- [x] Implement `AchievementRepository`
+- [x] Implement `LeaderboardRepository`
+- [x] Implement `FeedbackScoringInterpreter`
+- [x] Add `TelegramOptions` + `TelegramBotService` + update handler + polling BackgroundService
+- [x] Implement `FeedbackNotificationJob` (BackgroundService)
+- [x] Register everything in `InfrastructureServiceExtensions`
+- [x] Add `Telegram.Bot` NuGet
+- [x] Ensure backend builds
+
 ### 4.1 Репозитории в `Infrastructure/Persistence/Repositories/`
 - `FeedbackRepository`
 - `AchievementRepository`
@@ -181,6 +228,15 @@ Unique constraint на (UserId, AchievementId).
 
 ## Phase 5: Host — API эндпоинты
 
+### Task 5: Phase 5 - API endpoints
+
+- [x] Add `FeedbackEndpoints` (GET/POST by token, GET my)
+- [x] Add `LeaderboardEndpoints` (monthly, alltime, me)
+- [x] Add `AchievementEndpoints` (catalog, my)
+- [x] Add `TelegramEndpoints` (link, unlink, status, webhook)
+- [x] Register all new endpoint maps in `Program.cs`
+- [x] Ensure backend builds
+
 ### 5.1 `FeedbackEndpoints.cs` → `MapFeedbacks()`
 - `GET /api/feedbacks/{token}` [Anonymous] — данные для формы (вопрос, интерпретация, статус). Анонимный чтобы ссылка из Telegram работала без логина
 - `POST /api/feedbacks/{token}` [Anonymous] — submit ответа. Валидация: минимум 10 символов, статус не Answered/Scored
@@ -212,6 +268,20 @@ app.MapTelegram();
 ---
 
 ## Phase 6: Frontend
+
+### Task 6: Phase 6 - Frontend
+
+- [x] Add TS types
+- [x] Add API modules (feedbackApi, leaderboardApi, achievementApi, telegramApi)
+- [x] Add Pinia stores (useLeaderboardStore, useAchievementStore, useProfileStore)
+- [x] Implement `FeedbackView.vue`
+- [x] Implement `LeaderboardView.vue`
+- [x] Implement `AchievementsView.vue`
+- [x] Implement `ProfileView.vue`
+- [x] Add components (LeaderboardTable, AchievementCard, ScoreBadge, TelegramLinkButton, FeedbackForm)
+- [x] Add router routes
+- [x] Update `SiteHeader.vue` navigation
+- [x] Ensure frontend builds
 
 ### 6.1 Типы в `types/`
 LeaderboardEntry, UserScoreSummary, AchievementInfo, FeedbackInfo, TelegramStatus
@@ -255,6 +325,11 @@ LeaderboardEntry, UserScoreSummary, AchievementInfo, FeedbackInfo, TelegramStatu
 
 ## Phase 7: Конфигурация
 
+### Task 7: Phase 7 - Configuration
+
+- [x] Add Telegram section to `appsettings.json`
+- [x] Add Telegram env vars in `docker-compose.yml`
+
 ### appsettings.json
 ```json
 "Telegram": {
@@ -283,9 +358,15 @@ dotnet user-secrets set "Telegram:SecretToken" "..."
 
 ## Phase 8: Тесты
 
-- Unit: FeedbackService (scheduling, submit, no re-answer), AchievementService (rule checks), LeaderboardService
-- Integration: новые endpoints (feedback submit flow, leaderboard queries)
-- Frontend: FeedbackView (form states), LeaderboardTable, AchievementCard
+### Task 8: Phase 8 - Tests
+
+- [ ] Unit tests for FeedbackService (scheduling, submit, no re-answer)
+- [ ] Unit tests for AchievementService (rule checks)
+- [ ] Unit tests for LeaderboardService
+- [ ] Integration tests for new endpoints (feedback submit flow, leaderboard queries)
+- [ ] Frontend tests (FeedbackView, LeaderboardTable, AchievementCard)
+- [ ] Ensure `dotnet test` passes
+- [ ] Ensure `npm test` passes
 
 ---
 

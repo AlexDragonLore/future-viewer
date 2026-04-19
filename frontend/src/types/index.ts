@@ -113,3 +113,62 @@ export interface CardGlossary {
   aliases: string[]
   deckVariants: DeckVariantInfo[]
 }
+
+export enum FeedbackStatus {
+  Pending = 0,
+  Notified = 1,
+  Answered = 2,
+  Scored = 3,
+  Expired = 4,
+}
+
+export interface FeedbackInfo {
+  id: string
+  readingId: string
+  question: string
+  interpretation: string | null
+  aiScore: number | null
+  aiScoreReason: string | null
+  isSincere: boolean | null
+  selfReport: string | null
+  status: FeedbackStatus
+  createdAt: string
+  answeredAt: string | null
+}
+
+export interface LeaderboardEntry {
+  userId: string
+  displayName: string
+  totalScore: number
+  feedbackCount: number
+  averageScore: number
+  rank: number
+}
+
+export interface UserScoreSummary {
+  totalScore: number
+  monthlyScore: number
+  rank: number | null
+  monthlyRank: number | null
+  feedbackCount: number
+  averageScore: number
+}
+
+export interface AchievementInfo {
+  id: string
+  code: string
+  name: string
+  description: string
+  iconPath: string
+  sortOrder: number
+  unlockedAt: string | null
+}
+
+export interface TelegramStatus {
+  isLinked: boolean
+}
+
+export interface TelegramLinkResponse {
+  deepLinkUrl: string
+  isLinked: boolean
+}

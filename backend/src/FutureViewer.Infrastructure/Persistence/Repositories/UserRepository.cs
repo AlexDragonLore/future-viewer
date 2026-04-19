@@ -19,6 +19,9 @@ public sealed class UserRepository : IUserRepository
     public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
 
+    public Task<User?> GetByLinkTokenAsync(string token, CancellationToken ct = default) =>
+        _db.Users.FirstOrDefaultAsync(u => u.TelegramLinkToken == token, ct);
+
     public async Task<User> AddAsync(User user, CancellationToken ct = default)
     {
         await _db.Users.AddAsync(user, ct);

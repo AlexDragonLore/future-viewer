@@ -47,8 +47,9 @@ public sealed class ReadingServiceTests
                 SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
             });
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "Что меня ждёт?" },
@@ -98,8 +99,9 @@ public sealed class ReadingServiceTests
                 SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
             });
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest

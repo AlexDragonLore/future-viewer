@@ -24,6 +24,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("yukassa_subscription_id")
             .HasMaxLength(128);
 
+        b.Property(x => x.TelegramChatId).HasColumnName("telegram_chat_id");
+        b.Property(x => x.TelegramLinkToken)
+            .HasColumnName("telegram_link_token")
+            .HasMaxLength(64);
+        b.HasIndex(x => x.TelegramChatId).IsUnique();
+
         b.HasMany(x => x.Readings)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)

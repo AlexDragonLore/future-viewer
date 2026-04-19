@@ -33,6 +33,11 @@ services:
       Jwt__Audience: future-viewer
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__Model: gpt-4o
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
+      Telegram__WebhookUrl: ${TELEGRAM_WEBHOOK_URL:-}
+      Telegram__SecretToken: ${TELEGRAM_SECRET_TOKEN:-}
+      Telegram__SiteUrl: ${TELEGRAM_SITE_URL:-http://localhost:5173}
     ports:
       - "5050:8080"
 

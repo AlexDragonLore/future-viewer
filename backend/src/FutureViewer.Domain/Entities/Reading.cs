@@ -15,4 +15,5 @@ public sealed class Reading
     public DeckType DeckType { get; init; } = DeckType.RWS;
 
     public ICollection<ReadingCard> Cards { get; init; } = new List<ReadingCard>();
+    public ReadingFeedback? Feedback { get; set; }
 }
