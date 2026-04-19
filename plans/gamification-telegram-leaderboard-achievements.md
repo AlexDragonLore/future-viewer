@@ -80,15 +80,15 @@ Unique constraint на (UserId, AchievementId).
 
 ### Task 2: Phase 2 - EF Configurations, Migration, Seed
 
-- [ ] Add `ReadingFeedbackConfiguration`
-- [ ] Add `AchievementConfiguration`
-- [ ] Add `UserAchievementConfiguration`
-- [ ] Update `UserConfiguration` (Telegram fields + unique TelegramChatId index)
-- [ ] Update `ReadingConfiguration` if needed
-- [ ] Add DbSets in `AppDbContext`
-- [ ] Create migration `AddGamification`
-- [ ] Seed 12 achievements in `DatabaseInitializer`
-- [ ] Ensure backend builds
+- [x] Add `ReadingFeedbackConfiguration`
+- [x] Add `AchievementConfiguration`
+- [x] Add `UserAchievementConfiguration`
+- [x] Update `UserConfiguration` (Telegram fields + unique TelegramChatId index)
+- [x] Update `ReadingConfiguration` if needed
+- [x] Add DbSets in `AppDbContext`
+- [x] Create migration `AddGamification`
+- [x] Seed 12 achievements in `DatabaseInitializer`
+- [x] Ensure backend builds
 
 ### 2.1 EF Configurations
 - `ReadingFeedbackConfiguration.cs` — unique index на ReadingId, index на (UserId, Status), index на ScheduledAt, unique index на Token

@@ -14,6 +14,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<Reading> Readings => Set<Reading>();
     public DbSet<ReadingCard> ReadingCards => Set<ReadingCard>();
     public DbSet<ProcessedPayment> ProcessedPayments => Set<ProcessedPayment>();
+    public DbSet<ReadingFeedback> ReadingFeedbacks => Set<ReadingFeedback>();
+    public DbSet<Achievement> Achievements => Set<Achievement>();
+    public DbSet<UserAchievement> UserAchievements => Set<UserAchievement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +26,9 @@ public sealed class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new ReadingConfiguration());
         modelBuilder.ApplyConfiguration(new ReadingCardConfiguration());
         modelBuilder.ApplyConfiguration(new ProcessedPaymentConfiguration());
+        modelBuilder.ApplyConfiguration(new ReadingFeedbackConfiguration());
+        modelBuilder.ApplyConfiguration(new AchievementConfiguration());
+        modelBuilder.ApplyConfiguration(new UserAchievementConfiguration());
         base.OnModelCreating(modelBuilder);
     }
 }
