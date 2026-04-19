@@ -13,6 +13,10 @@ export const router = createRouter({
     { path: '/glossary', name: 'glossary', component: () => import('@/views/GlossaryView.vue') },
     { path: '/glossary/:id', name: 'glossary-card', component: () => import('@/views/CardDetailView.vue') },
     { path: '/payment/success', name: 'payment-success', component: () => import('@/views/PaymentSuccessView.vue') },
+    { path: '/feedback/:token', name: 'feedback', component: () => import('@/views/FeedbackView.vue') },
+    { path: '/leaderboard', name: 'leaderboard', component: () => import('@/views/LeaderboardView.vue') },
+    { path: '/achievements', name: 'achievements', component: () => import('@/views/AchievementsView.vue'), meta: { requiresAuth: true } },
+    { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { requiresAuth: true } },
   ],
 })
 

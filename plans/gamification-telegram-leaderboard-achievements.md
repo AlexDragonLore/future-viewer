@@ -271,17 +271,17 @@ app.MapTelegram();
 
 ### Task 6: Phase 6 - Frontend
 
-- [ ] Add TS types
-- [ ] Add API modules (feedbackApi, leaderboardApi, achievementApi, telegramApi)
-- [ ] Add Pinia stores (useLeaderboardStore, useAchievementStore, useProfileStore)
-- [ ] Implement `FeedbackView.vue`
-- [ ] Implement `LeaderboardView.vue`
-- [ ] Implement `AchievementsView.vue`
-- [ ] Implement `ProfileView.vue`
-- [ ] Add components (LeaderboardTable, AchievementCard, ScoreBadge, TelegramLinkButton, FeedbackForm)
-- [ ] Add router routes
-- [ ] Update `SiteHeader.vue` navigation
-- [ ] Ensure frontend builds
+- [x] Add TS types
+- [x] Add API modules (feedbackApi, leaderboardApi, achievementApi, telegramApi)
+- [x] Add Pinia stores (useLeaderboardStore, useAchievementStore, useProfileStore)
+- [x] Implement `FeedbackView.vue`
+- [x] Implement `LeaderboardView.vue`
+- [x] Implement `AchievementsView.vue`
+- [x] Implement `ProfileView.vue`
+- [x] Add components (LeaderboardTable, AchievementCard, ScoreBadge, TelegramLinkButton, FeedbackForm)
+- [x] Add router routes
+- [x] Update `SiteHeader.vue` navigation
+- [x] Ensure frontend builds
 
 ### 6.1 Типы в `types/`
 LeaderboardEntry, UserScoreSummary, AchievementInfo, FeedbackInfo, TelegramStatus

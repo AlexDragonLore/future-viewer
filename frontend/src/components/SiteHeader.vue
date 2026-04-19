@@ -61,8 +61,12 @@ const quotaLabel = computed(() => {
 
       <nav class="links">
         <RouterLink to="/glossary" class="nav-link" data-testid="nav-glossary">Глоссарий</RouterLink>
+        <RouterLink to="/leaderboard" class="nav-link" data-testid="nav-leaderboard">Лидерборд</RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/history" class="nav-link" data-testid="nav-history">
           История
+        </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="nav-link" data-testid="nav-achievements">
+          Ачивки
         </RouterLink>
       </nav>
 
@@ -106,7 +110,13 @@ const quotaLabel = computed(() => {
             </button>
             <ul v-if="menuOpen" class="user-dropdown">
               <li>
+                <RouterLink to="/profile" class="dd-link" @click="menuOpen = false" data-testid="nav-profile">Профиль</RouterLink>
+              </li>
+              <li>
                 <RouterLink to="/history" class="dd-link" @click="menuOpen = false">История раскладов</RouterLink>
+              </li>
+              <li>
+                <RouterLink to="/achievements" class="dd-link" @click="menuOpen = false">Достижения</RouterLink>
               </li>
               <li>
                 <button class="dd-link as-btn" type="button" @click="handleLogout" data-testid="logout-button">
