@@ -15,7 +15,7 @@ public sealed class ProcessedPaymentRepository : IProcessedPaymentRepository
 
     public async Task<bool> TryRecordAsync(string paymentId, Guid userId, CancellationToken ct = default)
     {
-        _db.ProcessedPayments.Add(new ProcessedPayment
+        var entry = _db.ProcessedPayments.Add(new ProcessedPayment
         {
             PaymentId = paymentId,
             UserId = userId
@@ -28,6 +28,7 @@ public sealed class ProcessedPaymentRepository : IProcessedPaymentRepository
         }
         catch (DbUpdateException)
         {
+            entry.State = EntityState.Detached;
             return false;
         }
     }

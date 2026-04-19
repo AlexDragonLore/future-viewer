@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -108,6 +109,17 @@ public sealed class YukassaClient : IPaymentProvider
         var payment = await response.Content.ReadFromJsonAsync<PaymentDetailResponse>(JsonOptions, ct);
         if (payment is null) return null;
 
+        if (payment.Amount is null
+            || !decimal.TryParse(payment.Amount.Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var paidAmount)
+            || paidAmount < _options.MonthlyPriceAmount
+            || !string.Equals(payment.Amount.Currency, _options.Currency, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Yukassa payment {PaymentId} rejected: amount/currency mismatch (got {Amount} {Currency}, expected {ExpectedAmount} {ExpectedCurrency})",
+                payment.Id, payment.Amount?.Value, payment.Amount?.Currency, _options.MonthlyPriceAmount, _options.Currency);
+            return null;
+        }
+
         Guid? userId = null;
         if (payment.Metadata is not null
             && payment.Metadata.TryGetValue("user_id", out var userIdStr)
@@ -212,6 +224,7 @@ public sealed class YukassaClient : IPaymentProvider
         public required string Id { get; init; }
         public required string Status { get; init; }
         public bool Paid { get; init; }
+        public AmountDto? Amount { get; init; }
         public Dictionary<string, string>? Metadata { get; init; }
     }
 }

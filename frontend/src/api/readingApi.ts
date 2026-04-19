@@ -59,6 +59,13 @@ export const readingApi = {
       } catch {
         // body not JSON — keep default message
       }
+      if (response.status === 401 && localStorage.getItem('fv_token')) {
+        localStorage.removeItem('fv_token')
+        localStorage.removeItem('fv_email')
+        if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
+          window.location.assign('/auth')
+        }
+      }
       const error = new Error(message)
       handlers.onError?.(error)
       throw error
