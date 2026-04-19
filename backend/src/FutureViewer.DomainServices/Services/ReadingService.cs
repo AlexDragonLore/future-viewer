@@ -111,15 +111,30 @@ public sealed class ReadingService
         yield return new ReadingStreamEvent.Cards(Map(reading, spread));
 
         var sb = new StringBuilder();
-        await foreach (var delta in _interpreter.InterpretStreamAsync(
-            spread, request.Question, cards, request.DeckType, variantNotes, ct))
+        try
         {
-            sb.Append(delta);
-            yield return new ReadingStreamEvent.Chunk(delta);
+            await foreach (var delta in _interpreter.InterpretStreamAsync(
+                spread, request.Question, cards, request.DeckType, variantNotes, ct))
+            {
+                sb.Append(delta);
+                yield return new ReadingStreamEvent.Chunk(delta);
+            }
         }
-
-        reading.AiInterpretation = sb.ToString();
-        await _repo.UpdateAsync(reading, ct);
+        finally
+        {
+            if (sb.Length > 0)
+            {
+                reading.AiInterpretation = sb.ToString();
+                try
+                {
+                    await _repo.UpdateAsync(reading, CancellationToken.None);
+                }
+                catch
+                {
+                    // Best-effort persist; don't mask the original exception.
+                }
+            }
+        }
 
         yield return new ReadingStreamEvent.Done();
     }

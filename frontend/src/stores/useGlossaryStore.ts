@@ -11,9 +11,9 @@ export const useGlossaryStore = defineStore('glossary', () => {
   const error = ref<string | null>(null)
 
   async function loadAll() {
+    error.value = null
     if (cards.value.length > 0) return
     loading.value = true
-    error.value = null
     try {
       cards.value = await glossaryApi.list()
     } catch (e) {
