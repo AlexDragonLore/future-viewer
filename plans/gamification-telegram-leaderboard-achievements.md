@@ -185,15 +185,15 @@ Unique constraint на (UserId, AchievementId).
 
 ### Task 4: Phase 4 - Infrastructure implementations
 
-- [ ] Implement `FeedbackRepository`
-- [ ] Implement `AchievementRepository`
-- [ ] Implement `LeaderboardRepository`
-- [ ] Implement `FeedbackScoringInterpreter`
-- [ ] Add `TelegramOptions` + `TelegramBotService` + update handler + polling BackgroundService
-- [ ] Implement `FeedbackNotificationJob` (BackgroundService)
-- [ ] Register everything in `InfrastructureServiceExtensions`
-- [ ] Add `Telegram.Bot` NuGet
-- [ ] Ensure backend builds
+- [x] Implement `FeedbackRepository`
+- [x] Implement `AchievementRepository`
+- [x] Implement `LeaderboardRepository`
+- [x] Implement `FeedbackScoringInterpreter`
+- [x] Add `TelegramOptions` + `TelegramBotService` + update handler + polling BackgroundService
+- [x] Implement `FeedbackNotificationJob` (BackgroundService)
+- [x] Register everything in `InfrastructureServiceExtensions`
+- [x] Add `Telegram.Bot` NuGet
+- [x] Ensure backend builds
 
 ### 4.1 Репозитории в `Infrastructure/Persistence/Repositories/`
 - `FeedbackRepository`
