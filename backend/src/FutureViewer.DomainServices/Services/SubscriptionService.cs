@@ -15,17 +15,20 @@ public sealed class SubscriptionService
     private readonly IReadingRepository _readings;
     private readonly IPaymentProvider _payments;
     private readonly IProcessedPaymentRepository _processedPayments;
+    private readonly IUnitOfWork _uow;
 
     public SubscriptionService(
         IUserRepository users,
         IReadingRepository readings,
         IPaymentProvider payments,
-        IProcessedPaymentRepository processedPayments)
+        IProcessedPaymentRepository processedPayments,
+        IUnitOfWork uow)
     {
         _users = users;
         _readings = readings;
         _payments = payments;
         _processedPayments = processedPayments;
+        _uow = uow;
     }
 
     public async Task EnsureReadingAllowedAsync(Guid userId, SpreadType spreadType, CancellationToken ct = default)
@@ -100,17 +103,20 @@ public sealed class SubscriptionService
         var user = await _users.GetByIdAsync(verified.UserId.Value, ct);
         if (user is null) return false;
 
-        if (!await _processedPayments.TryRecordAsync(verified.PaymentId, user.Id, ct))
-            return false;
+        return await _uow.ExecuteInTransactionAsync(async innerCt =>
+        {
+            if (!await _processedPayments.TryRecordAsync(verified.PaymentId, user.Id, innerCt))
+                return false;
 
-        var now = DateTime.UtcNow;
-        var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;
-        user.SubscriptionStatus = SubscriptionStatus.Active;
-        user.SubscriptionExpiresAt = currentExpiry.AddDays(SubscriptionDurationDays);
-        user.YukassaSubscriptionId = verified.PaymentId;
+            var now = DateTime.UtcNow;
+            var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;
+            user.SubscriptionStatus = SubscriptionStatus.Active;
+            user.SubscriptionExpiresAt = currentExpiry.AddDays(SubscriptionDurationDays);
+            user.YukassaSubscriptionId = verified.PaymentId;
 
-        await _users.UpdateAsync(user, ct);
-        return true;
+            await _users.UpdateAsync(user, innerCt);
+            return true;
+        }, ct);
     }
 
     private static bool IsSubscriptionActive(User user)

@@ -46,7 +46,7 @@ public sealed class ReadingServiceTests
                 SubscriptionStatus = SubscriptionStatus.Active,
                 SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
             });
-        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>());
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
 
         var sut = new ReadingService(repo.Object, deck, interpret, subscription);
 
@@ -97,7 +97,7 @@ public sealed class ReadingServiceTests
                 SubscriptionStatus = SubscriptionStatus.Active,
                 SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
             });
-        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>());
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
 
         var sut = new ReadingService(repo.Object, deck, interpret, subscription);
 

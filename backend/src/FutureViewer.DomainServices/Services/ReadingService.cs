@@ -106,23 +106,27 @@ public sealed class ReadingService
             Cards = cards
         };
 
-        await _repo.AddAsync(reading, ct);
-
         yield return new ReadingStreamEvent.Cards(Map(reading, spread));
 
         var sb = new StringBuilder();
+        var persisted = false;
         try
         {
             await foreach (var delta in _interpreter.InterpretStreamAsync(
                 spread, request.Question, cards, request.DeckType, variantNotes, ct))
             {
+                if (!persisted)
+                {
+                    await _repo.AddAsync(reading, ct);
+                    persisted = true;
+                }
                 sb.Append(delta);
                 yield return new ReadingStreamEvent.Chunk(delta);
             }
         }
         finally
         {
-            if (sb.Length > 0)
+            if (persisted && sb.Length > 0)
             {
                 reading.AiInterpretation = sb.ToString();
                 try

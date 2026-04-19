@@ -46,11 +46,19 @@ public sealed class SubscriptionServiceTests
         return repo;
     }
 
+    private sealed class PassThroughUnitOfWork : IUnitOfWork
+    {
+        public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken ct = default) =>
+            work(ct);
+    }
+
+    private static IUnitOfWork Uow() => new PassThroughUnitOfWork();
+
     [Fact]
     public async Task EnsureReadingAllowed_allows_active_subscriber_for_any_spread()
     {
         var user = NewUser(SubscriptionStatus.Active, DateTime.UtcNow.AddDays(3));
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(99).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(99).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.CelticCross))
             .Should().NotThrowAsync();
@@ -60,7 +68,7 @@ public sealed class SubscriptionServiceTests
     public async Task EnsureReadingAllowed_allows_free_single_card_under_limit()
     {
         var user = NewUser();
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.SingleCard))
             .Should().NotThrowAsync();
@@ -70,7 +78,7 @@ public sealed class SubscriptionServiceTests
     public async Task EnsureReadingAllowed_throws_quota_when_single_card_limit_reached()
     {
         var user = NewUser();
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(1).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(1).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.SingleCard))
             .Should().ThrowAsync<QuotaExceededException>();
@@ -80,7 +88,7 @@ public sealed class SubscriptionServiceTests
     public async Task EnsureReadingAllowed_throws_subscription_required_for_non_single_card_free_user()
     {
         var user = NewUser();
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.ThreeCard))
             .Should().ThrowAsync<SubscriptionRequiredException>();
@@ -90,7 +98,7 @@ public sealed class SubscriptionServiceTests
     public async Task EnsureReadingAllowed_treats_expired_subscription_as_inactive()
     {
         var user = NewUser(SubscriptionStatus.Active, DateTime.UtcNow.AddDays(-1));
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.ThreeCard))
             .Should().ThrowAsync<SubscriptionRequiredException>();
@@ -103,7 +111,7 @@ public sealed class SubscriptionServiceTests
         users.Setup(u => u.GetByIdAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(Guid.NewGuid(), SpreadType.SingleCard))
             .Should().ThrowAsync<UnauthorizedException>();
@@ -114,7 +122,7 @@ public sealed class SubscriptionServiceTests
     {
         var expires = DateTime.UtcNow.AddDays(10);
         var user = NewUser(SubscriptionStatus.Active, expires);
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(5).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(5).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         var status = await sut.GetStatusAsync(user.Id);
 
@@ -130,7 +138,7 @@ public sealed class SubscriptionServiceTests
     public async Task GetStatus_reports_free_user_at_limit()
     {
         var user = NewUser();
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(1).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(1).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         var status = await sut.GetStatusAsync(user.Id);
 
@@ -152,7 +160,7 @@ public sealed class SubscriptionServiceTests
                 Status = "pending"
             });
 
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         var result = await sut.CreatePaymentAsync(user.Id);
 
@@ -167,7 +175,7 @@ public sealed class SubscriptionServiceTests
         var user = NewUser(SubscriptionStatus.Active, DateTime.UtcNow.AddDays(5));
         var payments = new Mock<IPaymentProvider>();
 
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.CreatePaymentAsync(user.Id))
             .Should().ThrowAsync<SubscriptionAlreadyActiveException>();
@@ -209,7 +217,7 @@ public sealed class SubscriptionServiceTests
         processedRepo.Setup(r => r.TryRecordAsync("pay-replay", user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, processedRepo.Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, processedRepo.Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("{}");
 
@@ -233,7 +241,7 @@ public sealed class SubscriptionServiceTests
         processedRepo.Setup(r => r.TryRecordAsync("pay-old", user.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, processedRepo.Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, processedRepo.Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("{}");
 
@@ -251,7 +259,7 @@ public sealed class SubscriptionServiceTests
             new PaymentWebhookEvent { Type = PaymentWebhookEventType.PaymentSucceeded, PaymentId = "pay-xyz", UserId = user.Id },
             Verified("pay-xyz", user.Id));
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("{}");
 
@@ -272,7 +280,7 @@ public sealed class SubscriptionServiceTests
             new PaymentWebhookEvent { Type = PaymentWebhookEventType.PaymentSucceeded, PaymentId = "pay-ext", UserId = user.Id },
             Verified("pay-ext", user.Id));
 
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.ProcessWebhookAsync("{}");
 
@@ -287,7 +295,7 @@ public sealed class SubscriptionServiceTests
         var payments = PaymentsWithWebhook(
             new PaymentWebhookEvent { Type = PaymentWebhookEventType.PaymentCanceled, PaymentId = "pay-cancel", UserId = user.Id });
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("{}");
 
@@ -302,7 +310,7 @@ public sealed class SubscriptionServiceTests
         var user = NewUser();
         var payments = PaymentsWithWebhook(null);
 
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("not-json");
 
@@ -318,7 +326,7 @@ public sealed class SubscriptionServiceTests
             new PaymentWebhookEvent { Type = PaymentWebhookEventType.PaymentSucceeded, PaymentId = "fake-id", UserId = user.Id },
             verification: null);
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("{}");
 
@@ -336,7 +344,7 @@ public sealed class SubscriptionServiceTests
             new PaymentWebhookEvent { Type = PaymentWebhookEventType.PaymentSucceeded, PaymentId = "pay-pending", UserId = user.Id },
             Verified("pay-pending", user.Id, status: "pending", paid: false));
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("{}");
 
@@ -355,7 +363,7 @@ public sealed class SubscriptionServiceTests
             new PaymentWebhookEvent { Type = PaymentWebhookEventType.PaymentSucceeded, PaymentId = "pay-real", UserId = victimId },
             Verified("pay-real", realUser.Id));
 
-        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object);
+        var sut = new SubscriptionService(users.Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
         var handled = await sut.ProcessWebhookAsync("{}");
 
