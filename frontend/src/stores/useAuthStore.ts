@@ -7,6 +7,7 @@ import type { SubscriptionStatus } from '@/types'
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('fv_token'))
   const email = ref<string | null>(localStorage.getItem('fv_email'))
+  const isAdmin = ref<boolean>(localStorage.getItem('fv_is_admin') === 'true')
   const subscription = ref<SubscriptionStatus | null>(null)
   const subscriptionLoading = ref(false)
 
@@ -14,29 +15,32 @@ export const useAuthStore = defineStore('auth', () => {
   const isSubscribed = computed(() => subscription.value?.isActive ?? false)
   const canCreateReading = computed(() => subscription.value?.canCreateFreeReading ?? true)
 
-  function persist(newToken: string | null, newEmail: string | null) {
+  function persist(newToken: string | null, newEmail: string | null, newIsAdmin: boolean) {
     token.value = newToken
     email.value = newEmail
+    isAdmin.value = newIsAdmin
     if (newToken) localStorage.setItem('fv_token', newToken)
     else localStorage.removeItem('fv_token')
     if (newEmail) localStorage.setItem('fv_email', newEmail)
     else localStorage.removeItem('fv_email')
+    if (newIsAdmin) localStorage.setItem('fv_is_admin', 'true')
+    else localStorage.removeItem('fv_is_admin')
   }
 
   async function login(e: string, password: string) {
     const response = await authApi.login(e, password)
-    persist(response.accessToken, response.email)
+    persist(response.accessToken, response.email, response.isAdmin)
     void refreshSubscription()
   }
 
   async function register(e: string, password: string) {
     const response = await authApi.register(e, password)
-    persist(response.accessToken, response.email)
+    persist(response.accessToken, response.email, response.isAdmin)
     void refreshSubscription()
   }
 
   function logout() {
-    persist(null, null)
+    persist(null, null, false)
     subscription.value = null
   }
 
@@ -58,6 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token,
     email,
+    isAdmin,
     subscription,
     subscriptionLoading,
     isAuthenticated,

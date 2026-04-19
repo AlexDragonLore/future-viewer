@@ -42,7 +42,10 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret))
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(opt =>
+{
+    opt.AddPolicy("Admin", p => p.RequireRole("Admin"));
+});
 
 // CORS
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
@@ -86,7 +89,8 @@ if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await DatabaseInitializer.InitializeAsync(db);
+    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+    await DatabaseInitializer.InitializeAsync(db, config);
 }
 
 app.Run();

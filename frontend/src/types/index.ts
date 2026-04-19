@@ -44,6 +44,7 @@ export interface AuthResponse {
   expiresAt: string
   userId: string
   email: string
+  isAdmin: boolean
 }
 
 export interface TarotCardInfo {

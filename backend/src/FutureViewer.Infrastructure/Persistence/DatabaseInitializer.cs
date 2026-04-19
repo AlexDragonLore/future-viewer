@@ -1,17 +1,18 @@
 using FutureViewer.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace FutureViewer.Infrastructure.Persistence;
 
 public static class DatabaseInitializer
 {
-    public static async Task InitializeAsync(AppDbContext db, CancellationToken ct = default)
+    public static async Task InitializeAsync(AppDbContext db, IConfiguration? config = null, CancellationToken ct = default)
     {
         await db.Database.MigrateAsync(ct);
-        await SeedAsync(db, ct);
+        await SeedAsync(db, config, ct);
     }
 
-    public static async Task SeedAsync(AppDbContext db, CancellationToken ct = default)
+    public static async Task SeedAsync(AppDbContext db, IConfiguration? config = null, CancellationToken ct = default)
     {
         var deck = TarotDeckSeed.BuildDeck();
         var existing = await db.TarotCards.AsTracking().ToDictionaryAsync(c => c.Id, ct);
@@ -48,6 +49,34 @@ public static class DatabaseInitializer
         }
 
         await SeedAchievementsAsync(db, ct);
+
+        if (config is not null)
+            await SeedAdminsAsync(db, config, ct);
+    }
+
+    public static async Task SeedAdminsAsync(AppDbContext db, IConfiguration config, CancellationToken ct = default)
+    {
+        var emails = config.GetSection("Admin:Emails").Get<string[]>() ?? [];
+        if (emails.Length == 0) return;
+
+        var normalized = emails
+            .Where(e => !string.IsNullOrWhiteSpace(e))
+            .Select(e => e.Trim().ToLowerInvariant())
+            .Distinct()
+            .ToArray();
+        if (normalized.Length == 0) return;
+
+        var users = await db.Users
+            .AsTracking()
+            .Where(u => normalized.Contains(u.Email) && !u.IsAdmin)
+            .ToListAsync(ct);
+
+        if (users.Count == 0) return;
+
+        foreach (var user in users)
+            user.IsAdmin = true;
+
+        await db.SaveChangesAsync(ct);
     }
 
     private static async Task SeedAchievementsAsync(AppDbContext db, CancellationToken ct)

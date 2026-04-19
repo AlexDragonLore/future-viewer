@@ -9,6 +9,8 @@ public sealed class User
     public required string PasswordHash { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
+    public bool IsAdmin { get; set; } = false;
+
     public SubscriptionStatus SubscriptionStatus { get; set; } = SubscriptionStatus.None;
     public DateTime? SubscriptionExpiresAt { get; set; }
     public string? YukassaSubscriptionId { get; set; }

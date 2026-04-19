@@ -16,6 +16,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.PasswordHash).HasColumnName("password_hash").IsRequired();
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
 
+        b.Property(x => x.IsAdmin)
+            .HasColumnName("is_admin")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         b.Property(x => x.SubscriptionStatus)
             .HasColumnName("subscription_status")
             .HasConversion<int>();

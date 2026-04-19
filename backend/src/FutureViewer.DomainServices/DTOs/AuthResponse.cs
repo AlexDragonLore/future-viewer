@@ -6,4 +6,5 @@ public sealed class AuthResponse
     public required DateTime ExpiresAt { get; init; }
     public required Guid UserId { get; init; }
     public required string Email { get; init; }
+    public required bool IsAdmin { get; init; }
 }

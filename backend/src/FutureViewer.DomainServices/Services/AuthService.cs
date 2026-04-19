@@ -39,7 +39,8 @@ public sealed class AuthService
             AccessToken = token,
             ExpiresAt = expires,
             UserId = user.Id,
-            Email = user.Email
+            Email = user.Email,
+            IsAdmin = user.IsAdmin
         };
     }
 
@@ -58,7 +59,8 @@ public sealed class AuthService
             AccessToken = token,
             ExpiresAt = expires,
             UserId = user.Id,
-            Email = user.Email
+            Email = user.Email,
+            IsAdmin = user.IsAdmin
         };
     }
 }

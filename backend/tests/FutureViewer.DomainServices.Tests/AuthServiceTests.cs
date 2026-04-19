@@ -50,6 +50,50 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
+    public async Task Login_returns_isAdmin_true_when_user_is_admin()
+    {
+        var users = new Mock<IUserRepository>();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User { Email = "admin@b.c", PasswordHash = "hash", IsAdmin = true });
+
+        var hasher = new Mock<IPasswordHasher>();
+        hasher.Setup(h => h.Verify("pw", "hash")).Returns(true);
+
+        var jwt = new Mock<IJwtTokenService>();
+        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>()))
+            .Returns(("tok", DateTime.UtcNow.AddHours(1)));
+
+        var sut = new AuthService(users.Object, hasher.Object, jwt.Object);
+
+        var result = await sut.LoginAsync(new LoginRequest { Email = "admin@b.c", Password = "pw" });
+
+        result.IsAdmin.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Register_returns_isAdmin_false_for_regular_user()
+    {
+        var users = new Mock<IUserRepository>();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+        users.Setup(u => u.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User u, CancellationToken _) => u);
+
+        var hasher = new Mock<IPasswordHasher>();
+        hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+
+        var jwt = new Mock<IJwtTokenService>();
+        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>()))
+            .Returns(("tok", DateTime.UtcNow.AddHours(1)));
+
+        var sut = new AuthService(users.Object, hasher.Object, jwt.Object);
+
+        var result = await sut.RegisterAsync(new RegisterRequest { Email = "a@b.c", Password = "password123" });
+
+        result.IsAdmin.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Login_throws_when_password_invalid()
     {
         var users = new Mock<IUserRepository>();
