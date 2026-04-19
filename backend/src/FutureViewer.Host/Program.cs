@@ -76,6 +76,10 @@ app.MapAuth();
 app.MapCards();
 app.MapSubscription();
 app.MapPayments();
+app.MapFeedbacks();
+app.MapLeaderboard();
+app.MapAchievements();
+app.MapTelegram();
 
 // Migrations + seed at startup (skip in Testing env — integration tests manage their own DB)
 if (!app.Environment.IsEnvironment("Testing"))

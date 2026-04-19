@@ -230,12 +230,12 @@ Unique constraint на (UserId, AchievementId).
 
 ### Task 5: Phase 5 - API endpoints
 
-- [ ] Add `FeedbackEndpoints` (GET/POST by token, GET my)
-- [ ] Add `LeaderboardEndpoints` (monthly, alltime, me)
-- [ ] Add `AchievementEndpoints` (catalog, my)
-- [ ] Add `TelegramEndpoints` (link, unlink, status, webhook)
-- [ ] Register all new endpoint maps in `Program.cs`
-- [ ] Ensure backend builds
+- [x] Add `FeedbackEndpoints` (GET/POST by token, GET my)
+- [x] Add `LeaderboardEndpoints` (monthly, alltime, me)
+- [x] Add `AchievementEndpoints` (catalog, my)
+- [x] Add `TelegramEndpoints` (link, unlink, status, webhook)
+- [x] Register all new endpoint maps in `Program.cs`
+- [x] Ensure backend builds
 
 ### 5.1 `FeedbackEndpoints.cs` → `MapFeedbacks()`
 - `GET /api/feedbacks/{token}` [Anonymous] — данные для формы (вопрос, интерпретация, статус). Анонимный чтобы ссылка из Telegram работала без логина
