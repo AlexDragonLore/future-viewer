@@ -1,4 +1,3 @@
-using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Infrastructure.Telegram;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -38,7 +37,9 @@ public sealed class FeedbackNotificationJob : BackgroundService
         {
             try
             {
-                await ProcessBatchAsync(stoppingToken);
+                using var scope = _scopeFactory.CreateScope();
+                var processor = scope.ServiceProvider.GetRequiredService<FeedbackNotificationProcessor>();
+                await processor.ProcessBatchAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -58,40 +59,5 @@ public sealed class FeedbackNotificationJob : BackgroundService
                 break;
             }
         }
-    }
-
-    private async Task ProcessBatchAsync(CancellationToken ct)
-    {
-        using var scope = _scopeFactory.CreateScope();
-        var feedbacks = scope.ServiceProvider.GetRequiredService<IFeedbackRepository>();
-        var notifier = scope.ServiceProvider.GetRequiredService<ITelegramNotifier>();
-
-        var now = DateTime.UtcNow;
-        var pending = await feedbacks.GetPendingToNotifyAsync(now, _options.NotificationBatchSize, ct);
-        if (pending.Count == 0) return;
-
-        foreach (var feedback in pending)
-        {
-            ct.ThrowIfCancellationRequested();
-
-            var chatId = feedback.User?.TelegramChatId;
-            if (chatId is null) continue;
-
-            var question = feedback.Reading?.Question ?? string.Empty;
-            var url = BuildFeedbackUrl(feedback.Token);
-
-            var sent = await notifier.SendFeedbackLinkAsync(chatId.Value, question, url, ct);
-            if (!sent) continue;
-
-            await feedbacks.MarkNotifiedAsync(feedback.Id, DateTime.UtcNow, ct);
-        }
-    }
-
-    private string BuildFeedbackUrl(string token)
-    {
-        var baseUrl = string.IsNullOrWhiteSpace(_options.SiteUrl)
-            ? "http://localhost:5173"
-            : _options.SiteUrl.TrimEnd('/');
-        return $"{baseUrl}/feedback/{Uri.EscapeDataString(token)}";
     }
 }

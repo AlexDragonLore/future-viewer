@@ -170,13 +170,13 @@ Nested under `/admin` with `meta: { requiresAuth: true, requiresAdmin: true }` o
 
 ### Task 2: Feedbacks + Points
 
-- [ ] `AdminService` skeleton + DI registration
-- [ ] `IFeedbackRepository` additions (`DeleteAsync`, `SearchAsync`, `CountAsync`)
-- [ ] `FeedbackNotificationProcessor` extraction from `FeedbackNotificationJob`
-- [ ] `POST/GET/PUT/DELETE /api/admin/feedbacks` + `/synthetic` + `/run-notifications`
-- [ ] Post-save `AchievementService.CheckAndGrantAsync`
-- [ ] Frontend: Feedbacks tab (`AdminFeedbacksView`, `AdminFeedbacksTable`, `AdminCreateFeedbackForm`)
-- [ ] Tests + verification
+- [x] `AdminService` skeleton + DI registration
+- [x] `IFeedbackRepository` additions (`DeleteAsync`, `SearchAsync`, `CountAsync`)
+- [x] `FeedbackNotificationProcessor` extraction from `FeedbackNotificationJob`
+- [x] `POST/GET/PUT/DELETE /api/admin/feedbacks` + `/synthetic` + `/run-notifications`
+- [x] Post-save `AchievementService.CheckAndGrantAsync`
+- [x] Frontend: Feedbacks tab (`AdminFeedbacksView`, `AdminFeedbacksTable`, `AdminCreateFeedbackForm`)
+- [x] Tests + verification
 
 ### Task 3: Subscriptions + Users list
 

@@ -14,7 +14,7 @@ public sealed class ReadingFeedback
     public int? AiScore { get; set; }
     public string? AiScoreReason { get; set; }
     public bool? IsSincere { get; set; }
-    public required DateTime ScheduledAt { get; init; }
+    public required DateTime ScheduledAt { get; set; }
     public DateTime? NotifiedAt { get; set; }
     public DateTime? AnsweredAt { get; set; }
     public FeedbackStatus Status { get; set; } = FeedbackStatus.Pending;

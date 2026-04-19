@@ -18,6 +18,7 @@ public static class DomainServicesExtensions
         services.AddScoped<AchievementService>();
         services.AddScoped<LeaderboardService>();
         services.AddScoped<TelegramLinkService>();
+        services.AddScoped<AdminService>();
 
         services.AddValidatorsFromAssemblyContaining<CreateReadingRequestValidator>();
         return services;
