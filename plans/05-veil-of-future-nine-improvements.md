@@ -60,11 +60,11 @@
 - [x] `SiteHeader.vue` использует `DECKS`
 
 ### Iteration 8: Пункт 4 — Ачивки влияют на рейтинг лидерборда
-- [ ] `Achievement.Points` + EF миграция `AddAchievementPoints`
-- [ ] `DatabaseInitializer` проставляет очки (idempotent)
-- [ ] `LeaderboardRepository.GetMonthlyAsync/GetAllTimeAsync` объединяют фидбек + ачивки
-- [ ] DTO + фронт-типы + `LeaderboardTable.vue`
-- [ ] Интеграционный + фронт-тест
+- [x] `Achievement.Points` + EF миграция `AddAchievementPoints`
+- [x] `DatabaseInitializer` проставляет очки (idempotent)
+- [x] `LeaderboardRepository.GetMonthlyAsync/GetAllTimeAsync` объединяют фидбек + ачивки
+- [x] DTO + фронт-типы + `LeaderboardTable.vue`
+- [x] Интеграционный + фронт-тест
 
 ### Iteration 9: Пункт 9b — Подтверждение email при регистрации
 - [ ] Поля `IsEmailVerified` / `EmailVerificationToken` / `EmailVerificationSentAt`

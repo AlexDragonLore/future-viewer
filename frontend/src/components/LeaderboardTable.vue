@@ -24,7 +24,7 @@ function medal(rank: number): string {
       <tr>
         <th class="rank-col">#</th>
         <th class="name-col">Пользователь</th>
-        <th class="num-col">Сумма</th>
+        <th class="num-col">Итог</th>
         <th class="num-col">Откликов</th>
         <th class="num-col">Средний</th>
       </tr>
@@ -41,7 +41,12 @@ function medal(rank: number): string {
           <span v-else>{{ entry.rank }}</span>
         </td>
         <td class="name-col">{{ entry.displayName }}</td>
-        <td class="num-col">{{ entry.totalScore }}</td>
+        <td class="num-col">
+          <div class="total-score">{{ entry.totalScore }}</div>
+          <div class="score-breakdown" data-testid="score-breakdown">
+            ★ {{ entry.feedbackScore }} / ✦ {{ entry.achievementScore }}
+          </div>
+        </td>
         <td class="num-col">{{ entry.feedbackCount }}</td>
         <td class="num-col">{{ entry.averageScore.toFixed(1) }}</td>
       </tr>
@@ -97,5 +102,15 @@ function medal(rank: number): string {
 }
 .medal {
   font-size: 1.1rem;
+}
+.total-score {
+  font-weight: 600;
+}
+.score-breakdown {
+  font-size: 0.7rem;
+  color: rgba(224, 212, 186, 0.55);
+  margin-top: 0.15rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.02em;
 }
 </style>
