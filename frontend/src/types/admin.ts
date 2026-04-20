@@ -6,7 +6,6 @@ export interface AdminFeedback {
   userId: string
   userEmail: string | null
   question: string | null
-  token: string
   selfReport: string | null
   aiScore: number | null
   aiScoreReason: string | null

@@ -34,14 +34,18 @@ public sealed class AdminFeedbackEndpointTests : IClassFixture<IntegrationTestFi
     public async Task Admin_feedbacks_list_returns_paged_results()
     {
         var (client, _) = await CreateAuthenticatedClient(asAdmin: true);
+        var (userClient, userAuth) = await CreateAuthenticatedSubscribedClient();
+        var readingId = await CreateReading(userClient);
+        var seeded = await GetFeedbackByReading(readingId);
+        seeded.Should().NotBeNull();
 
-        var response = await client.GetAsync("/api/admin/feedbacks?page=1&pageSize=5");
+        var response = await client.GetAsync($"/api/admin/feedbacks?userId={userAuth.UserId}&page=1&pageSize=5");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await response.Content.ReadFromJsonAsync<AdminFeedbackList>();
         payload.Should().NotBeNull();
-        payload!.Items.Should().NotBeNull();
-        payload.Total.Should().BeGreaterThanOrEqualTo(0);
+        payload!.Items.Should().ContainSingle(f => f.Id == seeded!.Id);
+        payload.Total.Should().Be(1);
     }
 
     [Fact]

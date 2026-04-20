@@ -114,7 +114,7 @@ public sealed class AdminAchievementTelegramEndpointTests : IClassFixture<Integr
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var list = await response.Content.ReadFromJsonAsync<List<AchievementDto>>();
-        list.Should().NotBeNull();
+        list.Should().NotBeNull().And.BeEmpty();
     }
 
     [Fact]

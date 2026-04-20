@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/useAdminStore'
 import AdminUsersTable from '@/components/admin/AdminUsersTable.vue'
 import AdminUserDetailDrawer from '@/components/admin/AdminUserDetailDrawer.vue'
 
 const store = useAdminStore()
+const route = useRoute()
+const router = useRouter()
 const searchInput = ref('')
-const openUserId = ref<string | null>(null)
+const openUserId = computed<string | null>(() => {
+  const id = route.params.id
+  return typeof id === 'string' && id.length > 0 ? id : null
+})
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
 onMounted(() => store.loadUsers())
@@ -30,12 +36,12 @@ function prevPage(): void {
 }
 
 function onSelect(id: string): void {
-  openUserId.value = id
+  router.push({ name: 'admin-user-detail', params: { id } })
 }
 
 function onCloseDrawer(): void {
-  openUserId.value = null
   store.clearUserDetail()
+  router.replace({ name: 'admin-users' })
   store.loadUsers()
 }
 </script>

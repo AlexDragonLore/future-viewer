@@ -32,7 +32,6 @@ function buildFeedback(overrides: Partial<AdminFeedback> = {}): AdminFeedback {
     userId: 'u-1',
     userEmail: 'a@b.com',
     question: 'What now?',
-    token: 'tok-abc',
     selfReport: null,
     aiScore: 5,
     aiScoreReason: null,

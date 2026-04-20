@@ -22,10 +22,10 @@ export const router = createRouter({
       component: () => import('@/views/AdminView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true },
       children: [
-        { path: '', name: 'admin', redirect: { name: 'admin-feedbacks' } },
+        { path: '', name: 'admin', redirect: { name: 'admin-users' } },
         { path: 'feedbacks', name: 'admin-feedbacks', component: () => import('@/views/admin/AdminFeedbacksView.vue') },
         { path: 'users', name: 'admin-users', component: () => import('@/views/admin/AdminUsersView.vue') },
-        { path: 'users/:id', name: 'admin-user-detail', component: () => import('@/views/admin/AdminUsersView.vue') },
+        { path: 'users/:id', name: 'admin-user-detail', component: () => import('@/views/admin/AdminUsersView.vue'), props: true },
         { path: 'stats', name: 'admin-stats', component: () => import('@/views/admin/AdminStatsView.vue') },
       ],
     },

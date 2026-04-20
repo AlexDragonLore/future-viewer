@@ -135,6 +135,8 @@ public sealed class FeedbackRepository : IFeedbackRepository
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        // Detach tracked entries so a prior GetByReadingIdAsync in the same scope doesn't
+        // cause EF relationship fixup to re-issue a stale DELETE for this row on the next SaveChanges.
         var tracked = _db.ChangeTracker.Entries<ReadingFeedback>()
             .Where(e => e.Entity.Id == id)
             .ToList();

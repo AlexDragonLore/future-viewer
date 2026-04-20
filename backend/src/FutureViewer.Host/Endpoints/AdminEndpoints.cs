@@ -240,7 +240,7 @@ public static class AdminEndpoints
             if (body is null) return Results.BadRequest();
             var (actorId, actorEmail) = ctx.User.GetActor();
             var result = await service.SetTelegramChatIdAsync(actorId, actorEmail, id, body.ChatId, ct);
-            return Results.Ok(new { linked = result.Linked, chatId = result.ChatId });
+            return Results.Ok(new { linked = true, chatId = result.ChatId });
         });
     }
 

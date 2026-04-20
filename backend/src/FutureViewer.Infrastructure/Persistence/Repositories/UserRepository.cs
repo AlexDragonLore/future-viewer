@@ -80,6 +80,8 @@ public sealed class UserRepository : IUserRepository
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        // Detach tracked entries so a prior lookup in the same scope doesn't conflict
+        // with the Remove + SaveChanges path below.
         var tracked = _db.ChangeTracker.Entries<User>()
             .Where(e => e.Entity.Id == id)
             .ToList();

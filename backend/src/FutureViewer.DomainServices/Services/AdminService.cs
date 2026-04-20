@@ -562,7 +562,6 @@ public sealed class AdminService
             UserId = feedback.UserId,
             UserEmail = user?.Email,
             Question = reading?.Question,
-            Token = feedback.Token,
             SelfReport = feedback.SelfReport,
             AiScore = feedback.AiScore,
             AiScoreReason = feedback.AiScoreReason,
@@ -611,6 +610,5 @@ public sealed class AdminUserListResult
 
 public sealed class AdminTelegramLinkResult
 {
-    public bool Linked { get; init; } = true;
     public required long ChatId { get; init; }
 }
