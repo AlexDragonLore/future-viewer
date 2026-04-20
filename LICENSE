@@ -1,0 +1,207 @@
+Future Viewer / «Вуаль Грядущего» — Source-Available License v1.0
+Copyright (c) 2026 Aleksandr Duntsev <utre43@gmail.com>
+
+================================================================================
+                        РУССКАЯ ВЕРСИЯ (RU)
+================================================================================
+
+Настоящая лицензия является source-available лицензией, составленной на основе
+шаблонов PolyForm Shield 1.0.0 и Commons Clause. Юридической силы перевода
+— см. раздел «Приоритет языков» ниже.
+
+1. ОПРЕДЕЛЕНИЯ
+
+   «Автор» — Александр Дунцев, контакт: utre43@gmail.com.
+   «ПО» — исходный код и артефакты данного репозитория (Future Viewer /
+   «Вуаль Грядущего»), а также любые их производные.
+   «Вы» — физическое или юридическое лицо, использующее ПО.
+   «Коммерческое использование» — любое использование ПО или его производных,
+   целью которого является получение прямой или косвенной коммерческой выгоды,
+   включая (но не ограничиваясь): продажу доступа к ПО, предоставление ПО как
+   услуги (SaaS), интеграцию ПО в коммерческий продукт, а также использование
+   ПО внутри организации в ходе её коммерческой деятельности, если такая
+   организация получила от этого выручку (gross revenue), прямо или косвенно
+   связанную с ПО.
+   «Выручка (gross revenue)» — валовая выручка, полученная Вами в связи с
+   коммерческим использованием ПО, без вычета налогов, скидок и расходов.
+
+2. РАЗРЕШЁННЫЕ ВИДЫ ИСПОЛЬЗОВАНИЯ (БЕЗ ДОПОЛНИТЕЛЬНОГО СОГЛАШЕНИЯ)
+
+   При соблюдении условий раздела 4 Вам разрешается:
+   (a) изучать исходный код ПО;
+   (b) изменять и форкать ПО в личных, учебных, исследовательских и иных
+       некоммерческих целях;
+   (c) запускать ПО локально для личного некоммерческого использования;
+   (d) демонстрировать ПО в образовательных и исследовательских публикациях
+       при сохранении указания авторства.
+
+3. КОММЕРЧЕСКОЕ ИСПОЛЬЗОВАНИЕ ТРЕБУЕТ ОТДЕЛЬНОГО СОГЛАШЕНИЯ
+
+   Коммерческое использование ПО возможно ТОЛЬКО после заключения с Автором
+   отдельного письменного соглашения. Типовые условия такого соглашения:
+
+   (a) Выплата Автору роялти в размере 20% (двадцать процентов) от выручки
+       (gross revenue), полученной Вами в связи с коммерческим использованием
+       ПО, за каждый календарный квартал;
+   (b) ежеквартальная отчётность перед Автором о выручке и основаниях её
+       получения;
+   (c) право Автора запросить независимый аудит отчётности за разумный срок
+       (не чаще раза в год);
+   (d) сохранение указания авторства и ссылки на оригинальный репозиторий
+       во всех производных продуктах.
+
+   Для заключения соглашения свяжитесь с Автором по адресу: utre43@gmail.com.
+   До заключения соглашения коммерческое использование прямо ЗАПРЕЩЕНО.
+
+4. ОГРАНИЧЕНИЯ (COMMONS CLAUSE)
+
+   Без отдельного соглашения по разделу 3 Вам ЗАПРЕЩАЕТСЯ:
+   (a) продавать ПО или производные от него третьим лицам;
+   (b) предоставлять ПО или его существенные функции в качестве платного
+       сервиса (SaaS, hosted service);
+   (c) распространять ПО в составе платных продуктов;
+   (d) получать существенную коммерческую выгоду от ПО любым иным способом.
+
+   Под «продажей» в данном разделе понимается любое действие, основной
+   коммерческой ценностью которого для Вас является предоставление функций
+   ПО третьим лицам за плату.
+
+5. АВТОРСТВО И УВЕДОМЛЕНИЕ
+
+   Во всех копиях, форках и производных ПО должен сохраняться настоящий файл
+   LICENSE и уведомление об авторстве.
+
+6. ПАТЕНТЫ
+
+   Автор предоставляет Вам неисключительную, безвозмездную лицензию на любые
+   патенты Автора, необходимые для использования ПО в рамках разделов 2–3.
+   Если Вы подадите патентный иск (включая встречный иск), утверждающий, что
+   ПО нарушает Ваш патент, все права, предоставленные Вам настоящей лицензией,
+   прекращаются.
+
+7. ОТСУТСТВИЕ ГАРАНТИЙ
+
+   ПО ПРЕДОСТАВЛЯЕТСЯ «КАК ЕСТЬ», БЕЗ КАКИХ-ЛИБО ГАРАНТИЙ, ЯВНЫХ ИЛИ
+   ПОДРАЗУМЕВАЕМЫХ. АВТОР НЕ НЕСЁТ ОТВЕТСТВЕННОСТИ ЗА ЛЮБЫЕ УБЫТКИ,
+   ВОЗНИКШИЕ В СВЯЗИ С ИСПОЛЬЗОВАНИЕМ ПО.
+
+8. ПРЕКРАЩЕНИЕ ДЕЙСТВИЯ
+
+   Права, предоставленные настоящей лицензией, автоматически прекращаются
+   при нарушении любого из её условий. При прекращении Вы обязаны прекратить
+   любое использование ПО и уничтожить все его копии, находящиеся под Вашим
+   контролем.
+
+9. ПРИОРИТЕТ ЯЗЫКОВ
+
+   В случае расхождений между русской и английской версиями настоящей
+   лицензии преимущественную силу имеет русская версия.
+
+10. ДИСКЛЕЙМЕР
+
+   Данный текст не является готовым юридическим документом и требует
+   проверки квалифицированным юристом перед использованием в реальных
+   правовых спорах.
+
+
+================================================================================
+                        ENGLISH VERSION (EN)
+================================================================================
+
+This is a source-available license based on PolyForm Shield 1.0.0 and the
+Commons Clause. The Russian version prevails in case of any conflict — see
+"Language Priority" below.
+
+1. DEFINITIONS
+
+   "Author" means Aleksandr Duntsev, contact: utre43@gmail.com.
+   "Software" means the source code and artifacts of this repository
+   (Future Viewer / "Вуаль Грядущего") and any derivatives thereof.
+   "You" means the individual or legal entity using the Software.
+   "Commercial Use" means any use of the Software or its derivatives whose
+   purpose is direct or indirect commercial advantage, including (but not
+   limited to): selling access to the Software, providing the Software as a
+   service (SaaS), integrating the Software into a commercial product, or
+   using the Software within an organization in the course of its commercial
+   activity where such organization derives gross revenue, directly or
+   indirectly, connected to the Software.
+   "Gross Revenue" means all revenue received by You in connection with
+   Commercial Use of the Software, before deduction of taxes, discounts,
+   or expenses.
+
+2. PERMITTED USE WITHOUT SEPARATE AGREEMENT
+
+   Subject to Section 4, You may:
+   (a) study the source code of the Software;
+   (b) modify and fork the Software for personal, educational, research, or
+       other non-commercial purposes;
+   (c) run the Software locally for personal, non-commercial use;
+   (d) reference the Software in educational and research publications,
+       provided that attribution to the Author is preserved.
+
+3. COMMERCIAL USE REQUIRES A SEPARATE AGREEMENT
+
+   Commercial Use of the Software is permitted ONLY after entering into a
+   separate written agreement with the Author. The standard terms of such
+   an agreement include:
+
+   (a) payment to the Author of a royalty equal to 20% (twenty percent) of
+       Gross Revenue received by You in connection with Commercial Use of
+       the Software, per calendar quarter;
+   (b) quarterly reporting to the Author regarding revenue and its sources;
+   (c) the Author's right to request an independent audit of Your reports
+       at reasonable intervals (not more than once per calendar year);
+   (d) preservation of authorship attribution and a link to the original
+       repository in all derivative products.
+
+   To enter into such an agreement, contact the Author at: utre43@gmail.com.
+   Until such an agreement is in effect, Commercial Use is EXPRESSLY
+   PROHIBITED.
+
+4. RESTRICTIONS (COMMONS CLAUSE)
+
+   Without a separate agreement under Section 3, You MAY NOT:
+   (a) sell the Software or derivatives thereof to third parties;
+   (b) provide the Software or its substantial functionality as a paid
+       service (SaaS, hosted service);
+   (c) distribute the Software as part of a paid product;
+   (d) otherwise derive substantial commercial benefit from the Software.
+
+   "Sell" in this section means any activity whose primary commercial value
+   to You consists of providing the functionality of the Software to third
+   parties for a fee.
+
+5. ATTRIBUTION
+
+   All copies, forks, and derivatives of the Software must preserve this
+   LICENSE file and the copyright notice.
+
+6. PATENTS
+
+   The Author grants You a non-exclusive, royalty-free license to any
+   patents owned by the Author that are necessary to use the Software under
+   Sections 2–3. If You file a patent claim (including a counterclaim)
+   alleging that the Software infringes Your patent, all rights granted to
+   You under this license terminate.
+
+7. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+   OR IMPLIED. THE AUTHOR SHALL NOT BE LIABLE FOR ANY DAMAGES ARISING OUT OF
+   OR IN CONNECTION WITH THE USE OF THE SOFTWARE.
+
+8. TERMINATION
+
+   The rights granted by this license terminate automatically upon any
+   breach of its terms. Upon termination, You must cease all use of the
+   Software and destroy any copies under Your control.
+
+9. LANGUAGE PRIORITY
+
+   In case of any conflict between the Russian and English versions of this
+   license, the Russian version prevails.
+
+10. DISCLAIMER
+
+   This text is not a finalized legal document and should be reviewed by
+   qualified legal counsel before being relied upon in any legal dispute.

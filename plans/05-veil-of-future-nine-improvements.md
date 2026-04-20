@@ -29,8 +29,8 @@
 - [x] `dotnet build` и `dotnet test backend/FutureViewer.slnx` — зелёные
 
 ### Iteration 2: Пункт 1 — Лицензия «20% от оборота»
-- [ ] Создать `LICENSE` в корне (RU + EN)
-- [ ] Добавить секцию «Лицензия» в `README.md`
+- [x] Создать `LICENSE` в корне (RU + EN)
+- [x] Добавить секцию «Лицензия» в `README.md`
 
 ### Iteration 3: Пункт 6 — «Мы учимся на ваших откликах» в «О нас»
 - [ ] Вставить абзац в модалку `SiteFooter.vue`
