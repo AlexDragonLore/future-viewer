@@ -27,7 +27,7 @@ The gamification flow: `FeedbackNotificationJob` picks pending feedbacks where `
 
 The admin panel (`/api/admin/*`, frontend under `/admin`) is gated by `RequireAuthorization("Admin")`. `JwtTokenService` emits a `role=Admin` claim only when `User.IsAdmin=true`; `AuthResponse.IsAdmin` mirrors the flag to the frontend. Admin toggles take effect on next login (JWT staleness accepted — this is a debug tool). `AdminService` orchestrates all admin mutations; each mutation logs at `Information` with `actorUserId`, `actorEmail`, `action`, `targetId`. Admin bootstrap: the `Admin:Emails` config array is consulted on every startup (via `DatabaseInitializer.SeedAdminsAsync`) — existing users matching any listed email (case-insensitive) get promoted to `IsAdmin=true`; unknown emails are silently skipped.
 
-Configuration is loaded via `IConfiguration` sections (`Jwt`, `OpenAI`, `Telegram`, `Admin`, `ConnectionStrings:Default`, `Cors:AllowedOrigins`). The Telegram subsystem no-ops when `Telegram:BotToken` is empty; `FeedbackNotificationJob` and `TelegramPollingHostedService` exit early in that case. The webhook endpoint (`POST /api/telegram/webhook`) requires `Telegram:SecretToken` to be configured and matching the `X-Telegram-Bot-Api-Secret-Token` header — otherwise it returns 401. Secrets in dev live in user-secrets of `FutureViewer.Host`; in docker-compose they come from env vars `JWT_SECRET`, `OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_WEBHOOK_URL`, `TELEGRAM_SECRET_TOKEN`, `TELEGRAM_SITE_URL`.
+Configuration is loaded via `IConfiguration` sections (`Jwt`, `OpenAI`, `Telegram`, `Admin`, `ConnectionStrings:Default`, `Cors:AllowedOrigins`). The Telegram subsystem no-ops when `Telegram:BotToken` is empty; `FeedbackNotificationJob` and `TelegramPollingHostedService` exit early in that case. Telegram updates are consumed via long polling only — `TelegramPollingHostedService` calls `DeleteWebhook` on startup so any pre-existing webhook is cleared before `ReceiveAsync` begins. Secrets in dev live in user-secrets of `FutureViewer.Host`; in docker-compose they come from env vars `JWT_SECRET`, `OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `TELEGRAM_SITE_URL`.
 
 ### Frontend (`frontend/src/`)
 Vue 3 + TS + Vite 6 SPA. Pinia for state, Vue Router for navigation, Tailwind for styling, **GSAP** for card animations, **marked** for rendering AI markdown, **axios** for HTTP. JWT is stored in `localStorage` as `fv_token` and attached by `httpClient.ts`.
@@ -64,7 +64,6 @@ dotnet run --project backend/src/FutureViewer.Host
 dotnet user-secrets set "OpenAI:ApiKey" "sk-..."
 dotnet user-secrets set "Jwt:Secret" "$(openssl rand -base64 48)"
 dotnet user-secrets set "Telegram:BotToken" "<token from BotFather>"    # optional — bot features no-op if unset
-dotnet user-secrets set "Telegram:SecretToken" "$(openssl rand -base64 32)"  # required if webhook is used
 
 # EF Core migrations (run inside backend/src/FutureViewer.Host)
 dotnet ef migrations add <Name> --project ../FutureViewer.Infrastructure

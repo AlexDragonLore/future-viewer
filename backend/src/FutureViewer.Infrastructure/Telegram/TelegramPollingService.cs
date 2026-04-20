@@ -35,17 +35,20 @@ public sealed class TelegramPollingHostedService : BackgroundService
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.WebhookUrl))
-        {
-            _logger.LogInformation("Telegram webhook configured, skipping polling");
-            return;
-        }
-
         var receiverOptions = new ReceiverOptions
         {
             AllowedUpdates = Array.Empty<UpdateType>(),
             DropPendingUpdates = true
         };
+
+        try
+        {
+            await client.DeleteWebhook(dropPendingUpdates: true, cancellationToken: stoppingToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clear Telegram webhook before starting polling");
+        }
 
         _logger.LogInformation("Starting Telegram long polling");
 

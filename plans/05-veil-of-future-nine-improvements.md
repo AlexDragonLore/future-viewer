@@ -15,6 +15,81 @@
 
 Цель — одна серия PR, но каждый пункт самодостаточен и может мержиться отдельно.
 
+## Iteration checklist
+
+Порядок соответствует рекомендованному в разделе «Порядок работы и критические файлы» ниже.
+
+### Iteration 1: Пункт 8 — Telegram webhook → polling only
+- [x] Удалить endpoint `POST /api/telegram/webhook` и связанные usings/константы из `TelegramEndpoints.cs`
+- [x] Убрать `WebhookUrl` и `SecretToken` из `TelegramOptions.cs`
+- [x] В `TelegramPollingHostedService` удалить ветку «если webhook задан — не стартуем»; вызвать `DeleteWebhook` перед `ReceiveAsync`
+- [x] Почистить `appsettings.json` и `docker-compose.yml` от `WebhookUrl`/`SecretToken`
+- [x] Удалить webhook-тест в `TelegramEndpointTests.cs`
+- [x] Обновить `CLAUDE.md` (убрать упоминания webhook endpoint и `SecretToken`/`WebhookUrl`)
+- [x] `dotnet build` и `dotnet test backend/FutureViewer.slnx` — зелёные
+
+### Iteration 2: Пункт 1 — Лицензия «20% от оборота»
+- [ ] Создать `LICENSE` в корне (RU + EN)
+- [ ] Добавить секцию «Лицензия» в `README.md`
+
+### Iteration 3: Пункт 6 — «Мы учимся на ваших откликах» в «О нас»
+- [ ] Вставить абзац в модалку `SiteFooter.vue`
+- [ ] Проверить мобильную верстку модалки
+
+### Iteration 4: Пункт 9a — Саппорт-почта в конфиге + в футере
+- [ ] Секция `Support:Email` в `appsettings.json` + env в `docker-compose.yml`
+- [ ] Endpoint `GET /api/public/config`
+- [ ] `publicApi.ts` + `usePublicConfigStore.ts`
+- [ ] Строка с `mailto:` в `SiteFooter.vue`
+
+### Iteration 5: Пункт 3 — lucide-иконки ачивок
+- [ ] Установить `lucide-vue-next`
+- [ ] Добавить `frontend/src/data/achievementIcons.ts`
+- [ ] Обновить `AchievementCard.vue` на динамический `<component :is>`
+- [ ] Юнит-тест `AchievementCard.spec.ts`
+
+### Iteration 6: Пункт 7 — Русификация на «Вуаль Грядущего»
+- [ ] Заменить «Future Viewer» в UI-файлах (index.html, SiteHeader, HomeView, SiteFooter)
+- [ ] Обновить Yukassa description и TelegramUpdateHandler
+- [ ] Проверить отсутствие английских вкраплений на страницах
+
+### Iteration 7: Пункт 2 — Колоды и расклады в глоссарии и на главной
+- [ ] Источники: `frontend/src/data/decks.ts`, `frontend/src/data/spreads.ts`
+- [ ] Секции `#decks` и `#spreads` в `GlossaryView.vue`
+- [ ] Блоки описаний в `HomeView.vue`
+- [ ] `SiteHeader.vue` использует `DECKS`
+
+### Iteration 8: Пункт 4 — Ачивки влияют на рейтинг лидерборда
+- [ ] `Achievement.Points` + EF миграция `AddAchievementPoints`
+- [ ] `DatabaseInitializer` проставляет очки (idempotent)
+- [ ] `LeaderboardRepository.GetMonthlyAsync/GetAllTimeAsync` объединяют фидбек + ачивки
+- [ ] DTO + фронт-типы + `LeaderboardTable.vue`
+- [ ] Интеграционный + фронт-тест
+
+### Iteration 9: Пункт 9b — Подтверждение email при регистрации
+- [ ] Поля `IsEmailVerified` / `EmailVerificationToken` / `EmailVerificationSentAt`
+- [ ] EF миграция `AddEmailVerification`
+- [ ] `IEmailSender` + `SmtpEmailSender` (MailKit)
+- [ ] `AuthService.Register/VerifyEmail/ResendVerification/Login` обновления
+- [ ] Endpoints `verify-email`, `resend-verification`; `register` → 202 без JWT
+- [ ] Фронт: `RegisterView`, `VerifyEmailView`, `LoginView` (+ роут)
+- [ ] Тесты
+
+### Iteration 10: Пункт 9c — Восстановление пароля
+- [ ] Поля `PasswordResetToken` / `PasswordResetTokenExpiresAt` (можно смерджить миграции)
+- [ ] `AuthService.ForgotPassword/ResetPassword`
+- [ ] Endpoints `forgot-password`, `reset-password`
+- [ ] Фронт: `ForgotPasswordView`, `ResetPasswordView`, ссылка в `LoginView` (+ роуты)
+- [ ] Тесты
+
+### Iteration 11: Пункт 5 — Мобильная адаптация
+- [ ] `HomeView.vue` grid-cols-1 на мобиле
+- [ ] `ReadingView` + композаблы — адаптивная ширина/высота
+- [ ] `ResultView.vue` flex-wrap + clamp gap
+- [ ] Бургер-меню в `SiteHeader.vue`
+- [ ] Таблицы: Admin*/Leaderboard — адаптивы
+- [ ] Ручной проход iPhone SE / Pixel 7 / iPad (обозначить как ручной)
+
 ---
 
 ## 1. Лицензия «20% от оборота» (репозиторий)
