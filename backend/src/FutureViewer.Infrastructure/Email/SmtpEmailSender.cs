@@ -46,8 +46,10 @@ public sealed class SmtpEmailSender : IEmailSender
     private static SecureSocketOptions ResolveSecureSocketOptions(bool useSsl, int port)
     {
         if (!useSsl) return SecureSocketOptions.None;
-        // Port 465 historically uses implicit TLS; 587/25 negotiate via STARTTLS.
-        return port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
+        // Port 465 uses implicit TLS; 587/25 require STARTTLS.
+        // StartTls (not StartTlsWhenAvailable) fails the connection if the server
+        // doesn't advertise STARTTLS, preventing silent downgrade to plaintext.
+        return port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTls;
     }
 }
 

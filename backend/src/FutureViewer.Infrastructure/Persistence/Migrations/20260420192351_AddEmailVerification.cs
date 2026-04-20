@@ -30,6 +30,11 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                 type: "boolean",
                 nullable: false,
                 defaultValue: false);
+
+            // Grandfather existing accounts: anyone who registered before this column
+            // existed has already proven email ownership by using the product, so don't
+            // lock them out of login when this migration lands.
+            migrationBuilder.Sql("UPDATE users SET is_email_verified = true;");
         }
 
         /// <inheritdoc />

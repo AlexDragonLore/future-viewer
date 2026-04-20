@@ -45,9 +45,16 @@ public sealed class TelegramPollingHostedService : BackgroundService
         {
             await client.DeleteWebhook(dropPendingUpdates: true, cancellationToken: stoppingToken);
         }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to clear Telegram webhook before starting polling");
+            // If a webhook is still registered, Telegram returns 409 Conflict on getUpdates
+            // and polling silently fails forever. Abort instead of pretending to be healthy.
+            _logger.LogError(ex, "Failed to clear Telegram webhook; aborting polling so operators notice");
+            return;
         }
 
         _logger.LogInformation("Starting Telegram long polling");
