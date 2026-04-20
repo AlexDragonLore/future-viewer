@@ -60,6 +60,7 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<ITelegramNotifier>(sp => sp.GetRequiredService<TelegramBotService>());
         services.AddSingleton<IUpdateHandler, TelegramUpdateHandler>();
 
+        services.AddScoped<FeedbackNotificationProcessor>();
         services.AddHostedService<TelegramPollingHostedService>();
         services.AddHostedService<FeedbackNotificationJob>();
     }

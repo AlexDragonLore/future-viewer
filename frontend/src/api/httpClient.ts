@@ -19,6 +19,8 @@ httpClient.interceptors.response.use(
     if (error.response?.status === 401 && localStorage.getItem('fv_token')) {
       localStorage.removeItem('fv_token')
       localStorage.removeItem('fv_email')
+      localStorage.removeItem('fv_user_id')
+      localStorage.removeItem('fv_is_admin')
       if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
         window.location.assign('/auth')
       }

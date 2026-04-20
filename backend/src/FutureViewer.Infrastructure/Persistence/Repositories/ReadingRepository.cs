@@ -43,6 +43,15 @@ public sealed class ReadingRepository : IReadingRepository
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Reading>> GetByUserAsync(Guid userId, int take, CancellationToken ct = default)
+    {
+        return await _db.Readings
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
     public async Task UpdateAsync(Reading reading, CancellationToken ct = default)
     {
         if (_db.Entry(reading).State == EntityState.Detached)
@@ -64,6 +73,16 @@ public sealed class ReadingRepository : IReadingRepository
     public Task<int> CountByUserAsync(Guid userId, CancellationToken ct = default)
     {
         return _db.Readings.CountAsync(r => r.UserId == userId, ct);
+    }
+
+    public Task<int> CountAsync(CancellationToken ct = default)
+    {
+        return _db.Readings.CountAsync(ct);
+    }
+
+    public Task<int> CountSinceAsync(DateTime fromUtc, CancellationToken ct = default)
+    {
+        return _db.Readings.CountAsync(r => r.CreatedAt >= fromUtc, ct);
     }
 
     public async Task<IReadOnlyList<DateTime>> GetDistinctReadingDatesAsync(

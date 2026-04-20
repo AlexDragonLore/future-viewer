@@ -153,11 +153,53 @@ Nested under `/admin` with `meta: { requiresAuth: true, requiresAdmin: true }` o
 
 ## Implementation order
 
-1. **Auth plumbing.** `IsAdmin` + migration + JWT claim + `AuthResponse.IsAdmin` + policy + admin-email seeding + frontend `isAdmin` + `requiresAdmin` guard + nav link + `/admin` stub view. Verify: seeded admin sees nav; non-admin redirected.
-2. **Feedbacks + Points.** `AdminService` skeleton, feedback repo additions, `GET/POST/PUT/DELETE /api/admin/feedbacks`, `/synthetic`, `/run-notifications`, `FeedbackNotificationProcessor` refactor, Feedbacks tab UI. Post-save `CheckAndGrantAsync`. Verify: create + edit + run-notifications end-to-end.
-3. **Subscriptions + Users list.** Users search/detail/admin-toggle/delete endpoints, subscription PUT, Users tab + detail drawer. Verify: set subscription, quota badge updates after target user reloads.
-4. **Achievements + Telegram.** Grant/revoke/recheck + set/unlink telegram endpoints; wire buttons in detail drawer. Verify: manual grant shows up on `/achievements`; set own `chatId` + run-notifications sends a real Telegram message.
-5. **Stats.** `GET /api/admin/stats` + Stats tab KPI tiles.
+### Task 1: Auth plumbing
+
+- [x] Add `IsAdmin` to `User` entity + `UserConfiguration`
+- [x] Create `AddIsAdminToUser` EF migration
+- [x] Add `Admin` role claim to `JwtTokenService`
+- [x] Add `IsAdmin` to `AuthResponse` + set in `AuthService` login/register
+- [x] Add `Admin` authorization policy in `Program.cs`
+- [x] Add `Admin:Emails` config + `SeedAdminsAsync` in `DatabaseInitializer`
+- [x] Wire `DatabaseInitializer` to accept `IConfiguration`
+- [x] Frontend: `useAuthStore` persists `fv_is_admin` + exposes `isAdmin` computed
+- [x] Frontend: router `requiresAdmin` meta handling
+- [x] Frontend: `SiteHeader` shows `Админ` link for admins
+- [x] Frontend: `/admin` stub view
+- [x] Tests + verification
+
+### Task 2: Feedbacks + Points
+
+- [x] `AdminService` skeleton + DI registration
+- [x] `IFeedbackRepository` additions (`DeleteAsync`, `SearchAsync`, `CountAsync`)
+- [x] `FeedbackNotificationProcessor` extraction from `FeedbackNotificationJob`
+- [x] `POST/GET/PUT/DELETE /api/admin/feedbacks` + `/synthetic` + `/run-notifications`
+- [x] Post-save `AchievementService.CheckAndGrantAsync`
+- [x] Frontend: Feedbacks tab (`AdminFeedbacksView`, `AdminFeedbacksTable`, `AdminCreateFeedbackForm`)
+- [x] Tests + verification
+
+### Task 3: Subscriptions + Users list
+
+- [x] `IUserRepository` additions (`SearchAsync`, `CountAsync`, `DeleteAsync`)
+- [x] `IReadingRepository` additions (`CountAsync`, `CountSinceAsync`, `GetByUserAsync`)
+- [x] `GET /api/admin/users`, `GET /api/admin/users/{id}`, `PUT /api/admin/users/{id}/admin`, `DELETE /api/admin/users/{id}`
+- [x] `PUT /api/admin/users/{id}/subscription`
+- [x] Frontend: Users tab + detail drawer
+- [x] Tests + verification
+
+### Task 4: Achievements + Telegram
+
+- [x] `IAchievementRepository` additions (`RevokeAsync`, `GetByCodeAsync`)
+- [x] `POST /api/admin/users/{id}/achievements`, `DELETE /api/admin/users/{id}/achievements/{code}`, `POST /api/admin/users/{id}/achievements/recheck`
+- [x] `DELETE /api/admin/users/{id}/telegram`, `PUT /api/admin/users/{id}/telegram`
+- [x] Frontend: wire buttons in detail drawer
+- [x] Tests + verification
+
+### Task 5: Stats
+
+- [x] `GET /api/admin/stats`
+- [x] Frontend: Stats tab with KPI tiles
+- [x] Tests + verification
 
 ## Risks / known limitations
 

@@ -91,4 +91,61 @@ public sealed class FeedbackRepository : IFeedbackRepository
                 .SetProperty(f => f.NotifiedAt, notifiedAt), ct);
         return updated > 0;
     }
+
+    public async Task<IReadOnlyList<ReadingFeedback>> SearchAsync(
+        Guid? userId,
+        FeedbackStatus? status,
+        int skip,
+        int take,
+        CancellationToken ct = default)
+    {
+        var query = _db.ReadingFeedbacks
+            .Include(f => f.Reading)
+            .Include(f => f.User)
+            .AsQueryable();
+        if (userId.HasValue) query = query.Where(f => f.UserId == userId.Value);
+        if (status.HasValue) query = query.Where(f => f.Status == status.Value);
+        return await query
+            .OrderByDescending(f => f.CreatedAt)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct);
+    }
+
+    public Task<int> CountAsync(Guid? userId, FeedbackStatus? status, CancellationToken ct = default)
+    {
+        var query = _db.ReadingFeedbacks.AsQueryable();
+        if (userId.HasValue) query = query.Where(f => f.UserId == userId.Value);
+        if (status.HasValue) query = query.Where(f => f.Status == status.Value);
+        return query.CountAsync(ct);
+    }
+
+    public Task<int> CountPendingToNotifyAsync(DateTime before, CancellationToken ct = default) =>
+        _db.ReadingFeedbacks.CountAsync(
+            f => f.Status == FeedbackStatus.Pending
+                 && f.ScheduledAt <= before
+                 && f.User != null
+                 && f.User.TelegramChatId != null,
+            ct);
+
+    public Task<int> CountScoredSinceAsync(DateTime fromUtc, CancellationToken ct = default) =>
+        _db.ReadingFeedbacks.CountAsync(
+            f => f.Status == FeedbackStatus.Scored && f.AnsweredAt != null && f.AnsweredAt >= fromUtc,
+            ct);
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
+    {
+        // Detach tracked entries so a prior GetByReadingIdAsync in the same scope doesn't
+        // cause EF relationship fixup to re-issue a stale DELETE for this row on the next SaveChanges.
+        var tracked = _db.ChangeTracker.Entries<ReadingFeedback>()
+            .Where(e => e.Entity.Id == id)
+            .ToList();
+        foreach (var entry in tracked)
+            entry.State = EntityState.Detached;
+
+        var deleted = await _db.ReadingFeedbacks
+            .Where(f => f.Id == id)
+            .ExecuteDeleteAsync(ct);
+        return deleted > 0;
+    }
 }
