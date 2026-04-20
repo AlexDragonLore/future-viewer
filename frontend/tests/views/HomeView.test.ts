@@ -158,4 +158,24 @@ describe('HomeView', () => {
     await buttons[0].trigger('click')
     expect(buttons[0].classes()).toContain('active')
   })
+
+  it('renders current deck blurb with link to glossary anchor', async () => {
+    const { wrapper } = await mountHome()
+    const blurb = wrapper.find('[data-testid="home-deck-blurb"]')
+    expect(blurb.exists()).toBe(true)
+    expect(blurb.text()).toContain('Rider–Waite–Smith')
+    expect(blurb.find('a').attributes('href')).toContain('#deck-rws')
+  })
+
+  it('renders spread blurb that updates when spread changes', async () => {
+    const { wrapper } = await mountHome()
+    const blurb = wrapper.find('[data-testid="home-spread-blurb"]')
+    expect(blurb.exists()).toBe(true)
+    expect(blurb.find('a').attributes('href')).toContain('#spread-three-card')
+    const buttons = wrapper.findAll('.spread-option')
+    await buttons[0].trigger('click')
+    expect(wrapper.find('[data-testid="home-spread-blurb"] a').attributes('href')).toContain(
+      '#spread-single-card',
+    )
+  })
 })

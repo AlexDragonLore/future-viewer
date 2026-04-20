@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useDeckStore } from '@/stores/useDeckStore'
 import { DeckType } from '@/types'
+import { DECKS } from '@/data/decks'
 
 const auth = useAuthStore()
 const deck = useDeckStore()
@@ -12,16 +13,8 @@ const router = useRouter()
 const menuOpen = ref(false)
 const deckOpen = ref(false)
 
-const deckOptions: { value: DeckType; label: string }[] = [
-  { value: DeckType.RWS, label: 'Rider–Waite–Smith' },
-  { value: DeckType.Thoth, label: 'Thoth' },
-  { value: DeckType.Marseille, label: 'Marseille' },
-  { value: DeckType.ViscontiSforza, label: 'Visconti–Sforza' },
-  { value: DeckType.ModernWitch, label: 'Modern Witch' },
-]
-
 const currentDeckLabel = computed(
-  () => deckOptions.find((o) => o.value === deck.current)?.label ?? 'RWS',
+  () => DECKS.find((o) => o.value === deck.current)?.label ?? 'RWS',
 )
 
 function selectDeck(value: DeckType) {
@@ -87,7 +80,7 @@ const quotaLabel = computed(() => {
             <span class="chev">▾</span>
           </button>
           <ul v-if="deckOpen" class="deck-menu" role="listbox">
-            <li v-for="opt in deckOptions" :key="opt.value">
+            <li v-for="opt in DECKS" :key="opt.value">
               <button
                 class="deck-option"
                 :class="{ active: opt.value === deck.current }"

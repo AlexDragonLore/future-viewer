@@ -54,10 +54,10 @@
 - [x] Проверить отсутствие английских вкраплений на страницах
 
 ### Iteration 7: Пункт 2 — Колоды и расклады в глоссарии и на главной
-- [ ] Источники: `frontend/src/data/decks.ts`, `frontend/src/data/spreads.ts`
-- [ ] Секции `#decks` и `#spreads` в `GlossaryView.vue`
-- [ ] Блоки описаний в `HomeView.vue`
-- [ ] `SiteHeader.vue` использует `DECKS`
+- [x] Источники: `frontend/src/data/decks.ts`, `frontend/src/data/spreads.ts`
+- [x] Секции `#decks` и `#spreads` в `GlossaryView.vue`
+- [x] Блоки описаний в `HomeView.vue`
+- [x] `SiteHeader.vue` использует `DECKS`
 
 ### Iteration 8: Пункт 4 — Ачивки влияют на рейтинг лидерборда
 - [ ] `Achievement.Points` + EF миграция `AddAchievementPoints`
