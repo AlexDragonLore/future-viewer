@@ -88,7 +88,6 @@ function statusName(s: FeedbackStatus): string {
         </td>
         <td>
           <select v-model="ensureRowState(f).isSincere" class="cell-input">
-            <option :value="null">—</option>
             <option :value="true">Да</option>
             <option :value="false">Нет</option>
           </select>

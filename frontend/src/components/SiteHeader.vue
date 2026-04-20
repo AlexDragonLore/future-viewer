@@ -68,7 +68,7 @@ const quotaLabel = computed(() => {
         <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="nav-link" data-testid="nav-achievements">
           Ачивки
         </RouterLink>
-        <RouterLink v-if="auth.isAdmin" to="/admin" class="nav-link" data-testid="nav-admin">
+        <RouterLink v-if="auth.isAuthenticated && auth.isAdmin" to="/admin" class="nav-link" data-testid="nav-admin">
           Админ
         </RouterLink>
       </nav>
