@@ -9,6 +9,7 @@ public interface IUserRepository
     Task<User?> GetByLinkTokenAsync(string token, CancellationToken ct = default);
     Task<User?> GetByTelegramChatIdAsync(long chatId, CancellationToken ct = default);
     Task<User?> GetByEmailVerificationTokenAsync(string token, CancellationToken ct = default);
+    Task<User?> GetByPasswordResetTokenAsync(string token, CancellationToken ct = default);
     Task<User> AddAsync(User user, CancellationToken ct = default);
     Task UpdateAsync(User user, CancellationToken ct = default);
     Task<IReadOnlyList<User>> SearchAsync(string? email, int skip, int take, CancellationToken ct = default);

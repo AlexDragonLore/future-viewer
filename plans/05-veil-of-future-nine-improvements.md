@@ -76,11 +76,11 @@
 - [x] Тесты
 
 ### Iteration 10: Пункт 9c — Восстановление пароля
-- [ ] Поля `PasswordResetToken` / `PasswordResetTokenExpiresAt` (можно смерджить миграции)
-- [ ] `AuthService.ForgotPassword/ResetPassword`
-- [ ] Endpoints `forgot-password`, `reset-password`
-- [ ] Фронт: `ForgotPasswordView`, `ResetPasswordView`, ссылка в `LoginView` (+ роуты)
-- [ ] Тесты
+- [x] Поля `PasswordResetToken` / `PasswordResetTokenExpiresAt` (можно смерджить миграции)
+- [x] `AuthService.ForgotPassword/ResetPassword`
+- [x] Endpoints `forgot-password`, `reset-password`
+- [x] Фронт: `ForgotPasswordView`, `ResetPasswordView`, ссылка в `LoginView` (+ роуты)
+- [x] Тесты
 
 ### Iteration 11: Пункт 5 — Мобильная адаптация
 - [ ] `HomeView.vue` grid-cols-1 на мобиле

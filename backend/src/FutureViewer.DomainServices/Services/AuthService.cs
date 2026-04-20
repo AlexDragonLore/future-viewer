@@ -10,6 +10,7 @@ public sealed class AuthService
 {
     private static readonly TimeSpan VerificationTokenLifetime = TimeSpan.FromHours(24);
     private static readonly TimeSpan ResendThrottle = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan PasswordResetTokenLifetime = TimeSpan.FromHours(1);
 
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _hasher;
@@ -130,6 +131,52 @@ public sealed class AuthService
         };
     }
 
+    public async Task ForgotPasswordAsync(ForgotPasswordRequest request, CancellationToken ct = default)
+    {
+        var normalized = request.Email.Trim().ToLowerInvariant();
+        var user = await _users.GetByEmailAsync(normalized, ct);
+        if (user is null)
+            return;
+
+        var token = GenerateToken();
+        user.PasswordResetToken = token;
+        user.PasswordResetTokenExpiresAt = DateTime.UtcNow.Add(PasswordResetTokenLifetime);
+        await _users.UpdateAsync(user, ct);
+
+        await SendPasswordResetEmailAsync(normalized, token, ct);
+    }
+
+    public async Task<AuthResponse> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.Token))
+            throw new NotFoundException("Invalid password reset token");
+
+        var user = await _users.GetByPasswordResetTokenAsync(request.Token, ct)
+            ?? throw new NotFoundException("Invalid password reset token");
+
+        if (user.PasswordResetTokenExpiresAt is null
+            || user.PasswordResetTokenExpiresAt.Value < DateTime.UtcNow)
+            throw new UnauthorizedException("Password reset token has expired");
+
+        user.PasswordHash = _hasher.Hash(request.NewPassword);
+        user.PasswordResetToken = null;
+        user.PasswordResetTokenExpiresAt = null;
+        user.IsEmailVerified = true;
+        user.EmailVerificationToken = null;
+        user.EmailVerificationSentAt = null;
+        await _users.UpdateAsync(user, ct);
+
+        var (jwt, expires) = _jwt.CreateAccessToken(user);
+        return new AuthResponse
+        {
+            AccessToken = jwt,
+            ExpiresAt = expires,
+            UserId = user.Id,
+            Email = user.Email,
+            IsAdmin = user.IsAdmin
+        };
+    }
+
     private async Task SendVerificationEmailAsync(string email, string token, CancellationToken ct)
     {
         var link = _links.BuildVerificationLink(token);
@@ -140,6 +187,18 @@ public sealed class AuthService
             <p>Ссылка действительна 24 часа.</p>
             """;
         await _email.SendAsync(email, "Подтверждение регистрации", html, ct);
+    }
+
+    private async Task SendPasswordResetEmailAsync(string email, string token, CancellationToken ct)
+    {
+        var link = _links.BuildPasswordResetLink(token);
+        var html = $"""
+            <p>Здравствуйте!</p>
+            <p>Мы получили запрос на восстановление пароля в «Вуаль Грядущего». Чтобы задать новый пароль, перейдите по ссылке:</p>
+            <p><a href="{link}">{link}</a></p>
+            <p>Ссылка действительна 1 час. Если вы не запрашивали восстановление — просто проигнорируйте это письмо.</p>
+            """;
+        await _email.SendAsync(email, "Восстановление пароля", html, ct);
     }
 
     private static string GenerateToken()

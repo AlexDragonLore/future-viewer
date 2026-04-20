@@ -23,6 +23,14 @@ vi.mock('@/api/authApi', () => ({
       isAdmin: false,
     })),
     resendVerification: vi.fn(async () => undefined),
+    forgotPassword: vi.fn(async () => undefined),
+    resetPassword: vi.fn(async () => ({
+      accessToken: 'jwt-reset',
+      expiresAt: '2030-01-01T00:00:00Z',
+      userId: 'u3',
+      email: 'reset@example.com',
+      isAdmin: false,
+    })),
   },
 }))
 
@@ -121,5 +129,21 @@ describe('useAuthStore', () => {
     auth.logout()
     expect(auth.isAdmin).toBe(false)
     expect(localStorage.getItem('fv_is_admin')).toBeNull()
+  })
+
+  it('forgotPassword does not persist credentials', async () => {
+    const auth = useAuthStore()
+    await auth.forgotPassword('someone@example.com')
+    expect(auth.isAuthenticated).toBe(false)
+    expect(localStorage.getItem('fv_token')).toBeNull()
+  })
+
+  it('resetPassword persists credentials on success', async () => {
+    const auth = useAuthStore()
+    await auth.resetPassword('reset-token', 'newpass12')
+    expect(auth.isAuthenticated).toBe(true)
+    expect(auth.token).toBe('jwt-reset')
+    expect(auth.email).toBe('reset@example.com')
+    expect(localStorage.getItem('fv_token')).toBe('jwt-reset')
   })
 })

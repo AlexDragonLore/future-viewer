@@ -51,6 +51,16 @@ export const useAuthStore = defineStore('auth', () => {
     await authApi.resendVerification(e)
   }
 
+  async function forgotPassword(e: string) {
+    await authApi.forgotPassword(e)
+  }
+
+  async function resetPassword(resetToken: string, newPassword: string) {
+    const response = await authApi.resetPassword(resetToken, newPassword)
+    persist(response.accessToken, response.email, response.userId, response.isAdmin)
+    void refreshSubscription()
+  }
+
   function logout() {
     persist(null, null, null, false)
     subscription.value = null
@@ -85,6 +95,8 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     verifyEmail,
     resendVerification,
+    forgotPassword,
+    resetPassword,
     logout,
     refreshSubscription,
   }

@@ -6,7 +6,7 @@ public sealed class User
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public required string Email { get; init; }
-    public required string PasswordHash { get; init; }
+    public required string PasswordHash { get; set; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
 
     public bool IsAdmin { get; set; } = false;
@@ -14,6 +14,9 @@ public sealed class User
     public bool IsEmailVerified { get; set; } = false;
     public string? EmailVerificationToken { get; set; }
     public DateTime? EmailVerificationSentAt { get; set; }
+
+    public string? PasswordResetToken { get; set; }
+    public DateTime? PasswordResetTokenExpiresAt { get; set; }
 
     public SubscriptionStatus SubscriptionStatus { get; set; } = SubscriptionStatus.None;
     public DateTime? SubscriptionExpiresAt { get; set; }

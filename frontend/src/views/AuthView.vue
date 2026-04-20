@@ -99,10 +99,17 @@ async function resendVerification() {
         </button>
       </form>
 
-      <div class="text-center text-xs text-mystic-silver/60 mt-6">
-        <button class="underline hover:text-mystic-accent" @click="mode = mode === 'login' ? 'register' : 'login'; info = null; error = null; needsVerification = false">
-          {{ mode === 'login' ? 'Создать аккаунт' : 'У меня уже есть аккаунт' }}
-        </button>
+      <div class="text-center text-xs text-mystic-silver/60 mt-6 space-y-2">
+        <div>
+          <button class="underline hover:text-mystic-accent" @click="mode = mode === 'login' ? 'register' : 'login'; info = null; error = null; needsVerification = false">
+            {{ mode === 'login' ? 'Создать аккаунт' : 'У меня уже есть аккаунт' }}
+          </button>
+        </div>
+        <div v-if="mode === 'login'">
+          <router-link to="/forgot-password" class="underline hover:text-mystic-accent">
+            Забыли пароль?
+          </router-link>
+        </div>
       </div>
     </section>
   </main>

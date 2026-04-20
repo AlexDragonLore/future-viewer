@@ -141,4 +141,89 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
+
+    [Fact]
+    public async Task ForgotPassword_then_reset_allows_login_with_new_password()
+    {
+        var client = _fixture.CreateClient();
+        var email = $"reset-{Guid.NewGuid():N}@example.com";
+        await _fixture.RegisterAndLoginAsync(client, email, "oldpassword1");
+
+        var forgot = await client.PostAsJsonAsync("/api/auth/forgot-password",
+            new ForgotPasswordRequest { Email = email });
+        forgot.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        string token;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var user = await users.GetByEmailAsync(email.ToLowerInvariant());
+            token = user!.PasswordResetToken!;
+            token.Should().NotBeNullOrWhiteSpace();
+        }
+
+        var resetEmail = _fixture.EmailSender.LastFor(email);
+        resetEmail.Should().NotBeNull();
+        resetEmail!.Subject.Should().Contain("Восстановление");
+
+        var reset = await client.PostAsJsonAsync("/api/auth/reset-password",
+            new ResetPasswordRequest { Token = token, NewPassword = "newpassword1" });
+        reset.StatusCode.Should().Be(HttpStatusCode.OK);
+        var auth = await reset.Content.ReadFromJsonAsync<AuthResponse>();
+        auth!.AccessToken.Should().NotBeNullOrWhiteSpace();
+
+        var loginOld = await client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest { Email = email, Password = "oldpassword1" });
+        loginOld.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var loginNew = await client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest { Email = email, Password = "newpassword1" });
+        loginNew.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_returns_no_content_for_unknown_email()
+    {
+        var client = _fixture.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/auth/forgot-password",
+            new ForgotPasswordRequest { Email = $"nobody-{Guid.NewGuid():N}@example.com" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task ResetPassword_with_unknown_token_returns_not_found()
+    {
+        var client = _fixture.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/auth/reset-password",
+            new ResetPasswordRequest { Token = "nonexistent", NewPassword = "password123" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task ResetPassword_with_expired_token_returns_unauthorized()
+    {
+        var client = _fixture.CreateClient();
+        var email = $"expired-{Guid.NewGuid():N}@example.com";
+        await _fixture.RegisterAndLoginAsync(client, email, "password123");
+
+        await client.PostAsJsonAsync("/api/auth/forgot-password",
+            new ForgotPasswordRequest { Email = email });
+
+        string token;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var user = await users.GetByEmailAsync(email.ToLowerInvariant());
+            token = user!.PasswordResetToken!;
+            user.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(-1);
+            await users.UpdateAsync(user);
+        }
+
+        var reset = await client.PostAsJsonAsync("/api/auth/reset-password",
+            new ResetPasswordRequest { Token = token, NewPassword = "newpassword1" });
+
+        reset.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
 }

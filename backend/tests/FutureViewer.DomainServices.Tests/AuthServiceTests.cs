@@ -18,6 +18,7 @@ public sealed class AuthServiceTests
         var email = new Mock<IEmailSender>();
         var links = new Mock<IEmailLinkBuilder>();
         links.Setup(l => l.BuildVerificationLink(It.IsAny<string>())).Returns("http://link");
+        links.Setup(l => l.BuildPasswordResetLink(It.IsAny<string>())).Returns("http://reset-link");
         var sut = new AuthService(users.Object, hasher.Object, jwt.Object, email.Object, links.Object);
         return (sut, users, hasher, jwt, email, links);
     }
@@ -202,5 +203,91 @@ public sealed class AuthServiceTests
         await sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" });
 
         email.Verify(e => e.SendAsync("a@b.c", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_is_silent_for_unknown_email()
+    {
+        var (sut, users, _, _, email, _) = CreateSut();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        await sut.ForgotPasswordAsync(new ForgotPasswordRequest { Email = "missing@x.com" });
+
+        email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_saves_token_and_sends_email()
+    {
+        var (sut, users, _, _, email, _) = CreateSut();
+        var user = new User { Email = "a@b.c", PasswordHash = "h", IsEmailVerified = true };
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        await sut.ForgotPasswordAsync(new ForgotPasswordRequest { Email = "A@B.C" });
+
+        user.PasswordResetToken.Should().NotBeNullOrWhiteSpace();
+        user.PasswordResetTokenExpiresAt.Should().NotBeNull();
+        user.PasswordResetTokenExpiresAt!.Value.Should().BeAfter(DateTime.UtcNow);
+        users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("a@b.c", It.Is<string>(s => s.Contains("пароля")), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetPassword_updates_hash_clears_token_and_returns_jwt()
+    {
+        var (sut, users, hasher, jwt, _, _) = CreateSut();
+        var user = new User
+        {
+            Email = "a@b.c",
+            PasswordHash = "old-hash",
+            IsEmailVerified = true,
+            PasswordResetToken = "tok",
+            PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(30)
+        };
+        users.Setup(u => u.GetByPasswordResetTokenAsync("tok", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        hasher.Setup(h => h.Hash("new-password")).Returns("new-hash");
+        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>())).Returns(("jwt", DateTime.UtcNow.AddHours(1)));
+
+        var result = await sut.ResetPasswordAsync(new ResetPasswordRequest { Token = "tok", NewPassword = "new-password" });
+
+        result.AccessToken.Should().Be("jwt");
+        user.PasswordHash.Should().Be("new-hash");
+        user.PasswordResetToken.Should().BeNull();
+        user.PasswordResetTokenExpiresAt.Should().BeNull();
+        users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ResetPassword_throws_when_token_expired()
+    {
+        var (sut, users, _, _, _, _) = CreateSut();
+        var user = new User
+        {
+            Email = "a@b.c",
+            PasswordHash = "h",
+            PasswordResetToken = "tok",
+            PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(-1)
+        };
+        users.Setup(u => u.GetByPasswordResetTokenAsync("tok", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var act = () => sut.ResetPasswordAsync(new ResetPasswordRequest { Token = "tok", NewPassword = "new-password" });
+
+        await act.Should().ThrowAsync<UnauthorizedException>();
+    }
+
+    [Fact]
+    public async Task ResetPassword_throws_not_found_for_unknown_token()
+    {
+        var (sut, users, _, _, _, _) = CreateSut();
+        users.Setup(u => u.GetByPasswordResetTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        var act = () => sut.ResetPasswordAsync(new ResetPasswordRequest { Token = "missing", NewPassword = "new-password" });
+
+        await act.Should().ThrowAsync<NotFoundException>();
     }
 }

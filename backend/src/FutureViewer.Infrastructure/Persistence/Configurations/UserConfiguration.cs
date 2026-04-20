@@ -31,6 +31,12 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.EmailVerificationSentAt)
             .HasColumnName("email_verification_sent_at");
 
+        b.Property(x => x.PasswordResetToken)
+            .HasColumnName("password_reset_token")
+            .HasMaxLength(128);
+        b.Property(x => x.PasswordResetTokenExpiresAt)
+            .HasColumnName("password_reset_token_expires_at");
+
         b.Property(x => x.SubscriptionStatus)
             .HasColumnName("subscription_status")
             .HasConversion<int>();

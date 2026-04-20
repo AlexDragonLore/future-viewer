@@ -52,6 +52,28 @@ public static class AuthEndpoints
             return Results.NoContent();
         });
 
+        group.MapPost("/forgot-password", async (
+            ForgotPasswordRequest request,
+            IValidator<ForgotPasswordRequest> validator,
+            AuthService service,
+            CancellationToken ct) =>
+        {
+            await validator.ValidateAndThrowAsync(request, ct);
+            await service.ForgotPasswordAsync(request, ct);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/reset-password", async (
+            ResetPasswordRequest request,
+            IValidator<ResetPasswordRequest> validator,
+            AuthService service,
+            CancellationToken ct) =>
+        {
+            await validator.ValidateAndThrowAsync(request, ct);
+            var response = await service.ResetPasswordAsync(request, ct);
+            return Results.Ok(response);
+        });
+
         return app;
     }
 }
