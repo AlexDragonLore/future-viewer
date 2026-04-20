@@ -71,7 +71,7 @@ function begin() {
 <template>
   <main class="min-h-screen flex flex-col items-center justify-center px-6 py-16">
     <header class="text-center mb-10">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ FUTURE VIEWER ✦</div>
+      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ВУАЛЬ ГРЯДУЩЕГО ✦</div>
       <h1 class="font-display text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
       <p class="text-mystic-silver/70 max-w-xl mx-auto">
         Задай вопрос Вселенной. Карты Таро раскроют тайные нити судьбы и покажут путь сквозь туман грядущего.

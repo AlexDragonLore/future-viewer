@@ -12,7 +12,7 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
   <footer class="site-footer">
     <button class="about-link" @click="open = true">О нас</button>
     <span class="mx-2 text-mystic-silver/30">·</span>
-    <span class="text-mystic-silver/40">Future Viewer</span>
+    <span class="text-mystic-silver/40">Вуаль Грядущего</span>
     <template v-if="supportEmail">
       <span class="mx-2 text-mystic-silver/30">·</span>
       <span class="text-mystic-silver/40">
@@ -47,7 +47,7 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
           </p>
           <p>
             Но Александр понял: нельзя скрывать такой дар от мира. Он решил открыть людям глаза и выложил это
-            приложение в открытый доступ. Более того — расширил его возможности: теперь Future Viewer помогает
+            приложение в открытый доступ. Более того — расширил его возможности: теперь «Вуаль Грядущего» помогает
             оценивать не только IT-задачи, но и любые вопросы жизни, от сложных решений до простых сомнений.
           </p>
           <p>

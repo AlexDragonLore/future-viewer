@@ -56,7 +56,7 @@ const quotaLabel = computed(() => {
     <div class="header-inner">
       <RouterLink to="/" class="logo" data-testid="site-logo">
         <span class="logo-mark">✦</span>
-        <span class="logo-text gold-text">Future Viewer</span>
+        <span class="logo-text gold-text">Вуаль Грядущего</span>
       </RouterLink>
 
       <nav class="links">

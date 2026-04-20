@@ -49,9 +49,9 @@
 - [x] Юнит-тест `AchievementCard.spec.ts`
 
 ### Iteration 6: Пункт 7 — Русификация на «Вуаль Грядущего»
-- [ ] Заменить «Future Viewer» в UI-файлах (index.html, SiteHeader, HomeView, SiteFooter)
-- [ ] Обновить Yukassa description и TelegramUpdateHandler
-- [ ] Проверить отсутствие английских вкраплений на страницах
+- [x] Заменить «Future Viewer» в UI-файлах (index.html, SiteHeader, HomeView, SiteFooter)
+- [x] Обновить Yukassa description и TelegramUpdateHandler
+- [x] Проверить отсутствие английских вкраплений на страницах
 
 ### Iteration 7: Пункт 2 — Колоды и расклады в глоссарии и на главной
 - [ ] Источники: `frontend/src/data/decks.ts`, `frontend/src/data/spreads.ts`
