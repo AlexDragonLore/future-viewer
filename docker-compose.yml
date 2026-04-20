@@ -36,6 +36,7 @@ services:
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
       Telegram__SiteUrl: ${TELEGRAM_SITE_URL:-http://localhost:5173}
+      Support__Email: ${SUPPORT_EMAIL:-support@vualgryaduschego.ru}
     ports:
       - "5050:8080"
 

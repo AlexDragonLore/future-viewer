@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 
 const open = ref(false)
+
+const { supportEmail } = storeToRefs(usePublicConfigStore())
 </script>
 
 <template>
@@ -9,6 +13,13 @@ const open = ref(false)
     <button class="about-link" @click="open = true">О нас</button>
     <span class="mx-2 text-mystic-silver/30">·</span>
     <span class="text-mystic-silver/40">Future Viewer</span>
+    <template v-if="supportEmail">
+      <span class="mx-2 text-mystic-silver/30">·</span>
+      <span class="text-mystic-silver/40">
+        Связаться с нами:
+        <a class="support-link" :href="`mailto:${supportEmail}`">{{ supportEmail }}</a>
+      </span>
+    </template>
   </footer>
 
   <Transition name="fade">
@@ -84,6 +95,14 @@ const open = ref(false)
 }
 .about-link:hover {
   text-shadow: 0 0 12px rgba(245, 194, 107, 0.8);
+}
+.support-link {
+  color: #f5c26b;
+  text-decoration: none;
+  transition: text-shadow 0.3s ease;
+}
+.support-link:hover {
+  text-shadow: 0 0 10px rgba(245, 194, 107, 0.7);
 }
 .about-overlay {
   position: fixed;

@@ -37,10 +37,10 @@
 - [x] Проверить мобильную верстку модалки
 
 ### Iteration 4: Пункт 9a — Саппорт-почта в конфиге + в футере
-- [ ] Секция `Support:Email` в `appsettings.json` + env в `docker-compose.yml`
-- [ ] Endpoint `GET /api/public/config`
-- [ ] `publicApi.ts` + `usePublicConfigStore.ts`
-- [ ] Строка с `mailto:` в `SiteFooter.vue`
+- [x] Секция `Support:Email` в `appsettings.json` + env в `docker-compose.yml`
+- [x] Endpoint `GET /api/public/config`
+- [x] `publicApi.ts` + `usePublicConfigStore.ts`
+- [x] Строка с `mailto:` в `SiteFooter.vue`
 
 ### Iteration 5: Пункт 3 — lucide-иконки ачивок
 - [ ] Установить `lucide-vue-next`
