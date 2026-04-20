@@ -193,9 +193,7 @@ public sealed class AdminAchievementTelegramEndpointTests : IClassFixture<Integr
     private async Task<(HttpClient Client, AuthResponse Auth)> CreateUser(string email)
     {
         var client = _fixture.CreateClient();
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
         return (client, auth);
     }
@@ -205,9 +203,7 @@ public sealed class AdminAchievementTelegramEndpointTests : IClassFixture<Integr
         var client = _fixture.CreateClient();
         var email = $"admin-ach-tg-test-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
 
         if (asAdmin)
         {

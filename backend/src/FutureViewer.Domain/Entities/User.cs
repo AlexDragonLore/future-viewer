@@ -11,6 +11,10 @@ public sealed class User
 
     public bool IsAdmin { get; set; } = false;
 
+    public bool IsEmailVerified { get; set; } = false;
+    public string? EmailVerificationToken { get; set; }
+    public DateTime? EmailVerificationSentAt { get; set; }
+
     public SubscriptionStatus SubscriptionStatus { get; set; } = SubscriptionStatus.None;
     public DateTime? SubscriptionExpiresAt { get; set; }
     public string? YukassaSubscriptionId { get; set; }

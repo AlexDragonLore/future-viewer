@@ -73,9 +73,7 @@ public sealed class TelegramEndpointTests : IClassFixture<IntegrationTestFixture
         var client = _fixture.CreateClient();
         var email = $"tg-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
         return client;
     }

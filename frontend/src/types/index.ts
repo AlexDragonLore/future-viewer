@@ -47,6 +47,12 @@ export interface AuthResponse {
   isAdmin: boolean
 }
 
+export interface RegisterResponse {
+  userId: string
+  email: string
+  verificationRequired: boolean
+}
+
 export interface TarotCardInfo {
   id: number
   name: string

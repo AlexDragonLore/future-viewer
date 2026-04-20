@@ -10,39 +10,47 @@ namespace FutureViewer.DomainServices.Tests;
 
 public sealed class AuthServiceTests
 {
-    [Fact]
-    public async Task Register_creates_new_user_and_returns_token()
+    private static (AuthService sut, Mock<IUserRepository> users, Mock<IPasswordHasher> hasher, Mock<IJwtTokenService> jwt, Mock<IEmailSender> email, Mock<IEmailLinkBuilder> links) CreateSut()
     {
         var users = new Mock<IUserRepository>();
+        var hasher = new Mock<IPasswordHasher>();
+        var jwt = new Mock<IJwtTokenService>();
+        var email = new Mock<IEmailSender>();
+        var links = new Mock<IEmailLinkBuilder>();
+        links.Setup(l => l.BuildVerificationLink(It.IsAny<string>())).Returns("http://link");
+        var sut = new AuthService(users.Object, hasher.Object, jwt.Object, email.Object, links.Object);
+        return (sut, users, hasher, jwt, email, links);
+    }
+
+    [Fact]
+    public async Task Register_creates_unverified_user_and_sends_email()
+    {
+        var (sut, users, hasher, _, email, _) = CreateSut();
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((User?)null);
         users.Setup(u => u.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((User u, CancellationToken _) => u);
-
-        var hasher = new Mock<IPasswordHasher>();
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
-
-        var jwt = new Mock<IJwtTokenService>();
-        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>()))
-            .Returns(("tok", DateTime.UtcNow.AddHours(1)));
-
-        var sut = new AuthService(users.Object, hasher.Object, jwt.Object);
 
         var result = await sut.RegisterAsync(new RegisterRequest { Email = "Test@Example.com", Password = "password123" });
 
-        result.AccessToken.Should().Be("tok");
         result.Email.Should().Be("test@example.com");
-        users.Verify(u => u.AddAsync(It.Is<User>(x => x.Email == "test@example.com" && x.PasswordHash == "hashed"), It.IsAny<CancellationToken>()), Times.Once);
+        result.VerificationRequired.Should().BeTrue();
+        users.Verify(u => u.AddAsync(It.Is<User>(x =>
+            x.Email == "test@example.com"
+            && x.PasswordHash == "hashed"
+            && !x.IsEmailVerified
+            && x.EmailVerificationToken != null
+            && x.EmailVerificationSentAt != null), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("test@example.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task Register_throws_conflict_when_email_taken()
     {
-        var users = new Mock<IUserRepository>();
+        var (sut, users, _, _, _, _) = CreateSut();
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new User { Email = "a@b.c", PasswordHash = "x" });
-
-        var sut = new AuthService(users.Object, Mock.Of<IPasswordHasher>(), Mock.Of<IJwtTokenService>());
 
         var act = () => sut.RegisterAsync(new RegisterRequest { Email = "a@b.c", Password = "password123" });
 
@@ -50,63 +58,149 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task Login_returns_isAdmin_true_when_user_is_admin()
+    public async Task VerifyEmail_sets_verified_and_returns_jwt()
     {
-        var users = new Mock<IUserRepository>();
-        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User { Email = "admin@b.c", PasswordHash = "hash", IsAdmin = true });
+        var (sut, users, _, jwt, _, _) = CreateSut();
+        var user = new User
+        {
+            Email = "a@b.c",
+            PasswordHash = "h",
+            EmailVerificationToken = "tok",
+            EmailVerificationSentAt = DateTime.UtcNow
+        };
+        users.Setup(u => u.GetByEmailVerificationTokenAsync("tok", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>()))
+            .Returns(("jwt", DateTime.UtcNow.AddHours(1)));
 
-        var hasher = new Mock<IPasswordHasher>();
+        var result = await sut.VerifyEmailAsync("tok");
+
+        result.AccessToken.Should().Be("jwt");
+        user.IsEmailVerified.Should().BeTrue();
+        user.EmailVerificationToken.Should().BeNull();
+        user.EmailVerificationSentAt.Should().BeNull();
+        users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task VerifyEmail_throws_when_token_expired()
+    {
+        var (sut, users, _, _, _, _) = CreateSut();
+        var user = new User
+        {
+            Email = "a@b.c",
+            PasswordHash = "h",
+            EmailVerificationToken = "tok",
+            EmailVerificationSentAt = DateTime.UtcNow.AddDays(-2)
+        };
+        users.Setup(u => u.GetByEmailVerificationTokenAsync("tok", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        var act = () => sut.VerifyEmailAsync("tok");
+
+        await act.Should().ThrowAsync<UnauthorizedException>();
+    }
+
+    [Fact]
+    public async Task VerifyEmail_throws_not_found_for_unknown_token()
+    {
+        var (sut, users, _, _, _, _) = CreateSut();
+        users.Setup(u => u.GetByEmailVerificationTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        var act = () => sut.VerifyEmailAsync("missing");
+
+        await act.Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task Login_throws_EmailNotVerified_when_not_verified()
+    {
+        var (sut, users, hasher, _, _, _) = CreateSut();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User { Email = "a@b.c", PasswordHash = "hash", IsEmailVerified = false });
         hasher.Setup(h => h.Verify("pw", "hash")).Returns(true);
 
-        var jwt = new Mock<IJwtTokenService>();
-        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>()))
-            .Returns(("tok", DateTime.UtcNow.AddHours(1)));
+        var act = () => sut.LoginAsync(new LoginRequest { Email = "a@b.c", Password = "pw" });
 
-        var sut = new AuthService(users.Object, hasher.Object, jwt.Object);
+        await act.Should().ThrowAsync<EmailNotVerifiedException>();
+    }
+
+    [Fact]
+    public async Task Login_succeeds_when_verified()
+    {
+        var (sut, users, hasher, jwt, _, _) = CreateSut();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User { Email = "admin@b.c", PasswordHash = "hash", IsAdmin = true, IsEmailVerified = true });
+        hasher.Setup(h => h.Verify("pw", "hash")).Returns(true);
+        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>())).Returns(("tok", DateTime.UtcNow.AddHours(1)));
 
         var result = await sut.LoginAsync(new LoginRequest { Email = "admin@b.c", Password = "pw" });
 
         result.IsAdmin.Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task Register_returns_isAdmin_false_for_regular_user()
-    {
-        var users = new Mock<IUserRepository>();
-        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User?)null);
-        users.Setup(u => u.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((User u, CancellationToken _) => u);
-
-        var hasher = new Mock<IPasswordHasher>();
-        hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
-
-        var jwt = new Mock<IJwtTokenService>();
-        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>()))
-            .Returns(("tok", DateTime.UtcNow.AddHours(1)));
-
-        var sut = new AuthService(users.Object, hasher.Object, jwt.Object);
-
-        var result = await sut.RegisterAsync(new RegisterRequest { Email = "a@b.c", Password = "password123" });
-
-        result.IsAdmin.Should().BeFalse();
+        result.AccessToken.Should().Be("tok");
     }
 
     [Fact]
     public async Task Login_throws_when_password_invalid()
     {
-        var users = new Mock<IUserRepository>();
+        var (sut, users, hasher, _, _, _) = CreateSut();
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new User { Email = "a@b.c", PasswordHash = "hash" });
-
-        var hasher = new Mock<IPasswordHasher>();
+            .ReturnsAsync(new User { Email = "a@b.c", PasswordHash = "hash", IsEmailVerified = true });
         hasher.Setup(h => h.Verify("pw", "hash")).Returns(false);
-
-        var sut = new AuthService(users.Object, hasher.Object, Mock.Of<IJwtTokenService>());
 
         var act = () => sut.LoginAsync(new LoginRequest { Email = "a@b.c", Password = "pw" });
 
         await act.Should().ThrowAsync<UnauthorizedException>();
+    }
+
+    [Fact]
+    public async Task ResendVerification_is_noop_for_unknown_email()
+    {
+        var (sut, users, _, _, email, _) = CreateSut();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+
+        await sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "missing@x.com" });
+
+        email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ResendVerification_throttles_within_60_seconds()
+    {
+        var (sut, users, _, _, _, _) = CreateSut();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User
+            {
+                Email = "a@b.c",
+                PasswordHash = "h",
+                IsEmailVerified = false,
+                EmailVerificationSentAt = DateTime.UtcNow.AddSeconds(-10),
+                EmailVerificationToken = "t"
+            });
+
+        var act = () => sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" });
+
+        await act.Should().ThrowAsync<ConflictException>();
+    }
+
+    [Fact]
+    public async Task ResendVerification_sends_when_old_enough()
+    {
+        var (sut, users, _, _, email, _) = CreateSut();
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new User
+            {
+                Email = "a@b.c",
+                PasswordHash = "h",
+                IsEmailVerified = false,
+                EmailVerificationSentAt = DateTime.UtcNow.AddMinutes(-5),
+                EmailVerificationToken = "old"
+            });
+
+        await sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" });
+
+        email.Verify(e => e.SendAsync("a@b.c", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }

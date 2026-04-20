@@ -67,13 +67,13 @@
 - [x] Интеграционный + фронт-тест
 
 ### Iteration 9: Пункт 9b — Подтверждение email при регистрации
-- [ ] Поля `IsEmailVerified` / `EmailVerificationToken` / `EmailVerificationSentAt`
-- [ ] EF миграция `AddEmailVerification`
-- [ ] `IEmailSender` + `SmtpEmailSender` (MailKit)
-- [ ] `AuthService.Register/VerifyEmail/ResendVerification/Login` обновления
-- [ ] Endpoints `verify-email`, `resend-verification`; `register` → 202 без JWT
-- [ ] Фронт: `RegisterView`, `VerifyEmailView`, `LoginView` (+ роут)
-- [ ] Тесты
+- [x] Поля `IsEmailVerified` / `EmailVerificationToken` / `EmailVerificationSentAt`
+- [x] EF миграция `AddEmailVerification`
+- [x] `IEmailSender` + `SmtpEmailSender` (MailKit)
+- [x] `AuthService.Register/VerifyEmail/ResendVerification/Login` обновления
+- [x] Endpoints `verify-email`, `resend-verification`; `register` → 202 без JWT
+- [x] Фронт: `RegisterView`, `VerifyEmailView`, `LoginView` (+ роут)
+- [x] Тесты
 
 ### Iteration 10: Пункт 9c — Восстановление пароля
 - [ ] Поля `PasswordResetToken` / `PasswordResetTokenExpiresAt` (можно смерджить миграции)

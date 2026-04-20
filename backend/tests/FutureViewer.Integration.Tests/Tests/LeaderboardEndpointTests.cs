@@ -51,9 +51,7 @@ public sealed class LeaderboardEndpointTests : IClassFixture<IntegrationTestFixt
         var client = _fixture.CreateClient();
         var email = $"lb-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
         var response = await client.GetAsync("/api/leaderboard/me");
@@ -73,9 +71,7 @@ public sealed class LeaderboardEndpointTests : IClassFixture<IntegrationTestFixt
         var client = _fixture.CreateClient();
         var email = $"lb-ach-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         var userId = auth!.UserId;
 
         await GrantAchievementAsync(userId, "first_reading", DateTime.UtcNow);
@@ -99,9 +95,7 @@ public sealed class LeaderboardEndpointTests : IClassFixture<IntegrationTestFixt
         var client = _fixture.CreateClient();
         var email = $"lb-ach-month-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         var userId = auth!.UserId;
 
         // Grant one in current month, one in previous month
@@ -125,9 +119,7 @@ public sealed class LeaderboardEndpointTests : IClassFixture<IntegrationTestFixt
         var client = _fixture.CreateClient();
         var email = $"lb-me-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
         await GrantAchievementAsync(auth.UserId, "first_reading", DateTime.UtcNow);

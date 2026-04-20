@@ -21,6 +21,16 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(false);
 
+        b.Property(x => x.IsEmailVerified)
+            .HasColumnName("is_email_verified")
+            .IsRequired()
+            .HasDefaultValue(false);
+        b.Property(x => x.EmailVerificationToken)
+            .HasColumnName("email_verification_token")
+            .HasMaxLength(128);
+        b.Property(x => x.EmailVerificationSentAt)
+            .HasColumnName("email_verification_sent_at");
+
         b.Property(x => x.SubscriptionStatus)
             .HasColumnName("subscription_status")
             .HasConversion<int>();

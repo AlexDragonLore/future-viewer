@@ -11,12 +11,24 @@ vi.mock('@/api/authApi', () => ({
       isAdmin: email.startsWith('admin'),
     })),
     register: vi.fn(async (email: string) => ({
+      userId: 'u2',
+      email,
+      verificationRequired: true,
+    })),
+    verifyEmail: vi.fn(async () => ({
       accessToken: 'jwt-new',
       expiresAt: '2030-01-01T00:00:00Z',
       userId: 'u2',
-      email,
+      email: 'new@example.com',
       isAdmin: false,
     })),
+    resendVerification: vi.fn(async () => undefined),
+  },
+}))
+
+vi.mock('@/api/subscriptionApi', () => ({
+  subscriptionApi: {
+    status: vi.fn(async () => ({ isActive: false, canCreateFreeReading: true })),
   },
 }))
 
@@ -53,9 +65,18 @@ describe('useAuthStore', () => {
     expect(localStorage.getItem('fv_email')).toBe('user@example.com')
   })
 
-  it('register persists credentials', async () => {
+  it('register does not persist credentials and returns verification response', async () => {
     const auth = useAuthStore()
-    await auth.register('new@example.com', 'password123')
+    const response = await auth.register('new@example.com', 'password123')
+    expect(response.verificationRequired).toBe(true)
+    expect(response.email).toBe('new@example.com')
+    expect(auth.isAuthenticated).toBe(false)
+    expect(localStorage.getItem('fv_token')).toBeNull()
+  })
+
+  it('verifyEmail persists credentials', async () => {
+    const auth = useAuthStore()
+    await auth.verifyEmail('some-token')
     expect(auth.isAuthenticated).toBe(true)
     expect(localStorage.getItem('fv_token')).toBe('jwt-new')
   })

@@ -18,7 +18,7 @@ public static class AuthEndpoints
         {
             await validator.ValidateAndThrowAsync(request, ct);
             var response = await service.RegisterAsync(request, ct);
-            return Results.Created($"/api/users/{response.UserId}", response);
+            return Results.Accepted($"/api/users/{response.UserId}", response);
         });
 
         group.MapPost("/login", async (
@@ -30,6 +30,26 @@ public static class AuthEndpoints
             await validator.ValidateAndThrowAsync(request, ct);
             var response = await service.LoginAsync(request, ct);
             return Results.Ok(response);
+        });
+
+        group.MapPost("/verify-email", async (
+            VerifyEmailRequest request,
+            AuthService service,
+            CancellationToken ct) =>
+        {
+            var response = await service.VerifyEmailAsync(request.Token, ct);
+            return Results.Ok(response);
+        });
+
+        group.MapPost("/resend-verification", async (
+            ResendVerificationRequest request,
+            IValidator<ResendVerificationRequest> validator,
+            AuthService service,
+            CancellationToken ct) =>
+        {
+            await validator.ValidateAndThrowAsync(request, ct);
+            await service.ResendVerificationAsync(request, ct);
+            return Results.NoContent();
         });
 
         return app;
