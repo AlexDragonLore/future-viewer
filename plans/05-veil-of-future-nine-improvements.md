@@ -83,12 +83,12 @@
 - [x] Тесты
 
 ### Iteration 11: Пункт 5 — Мобильная адаптация
-- [ ] `HomeView.vue` grid-cols-1 на мобиле
-- [ ] `ReadingView` + композаблы — адаптивная ширина/высота
-- [ ] `ResultView.vue` flex-wrap + clamp gap
-- [ ] Бургер-меню в `SiteHeader.vue`
-- [ ] Таблицы: Admin*/Leaderboard — адаптивы
-- [ ] Ручной проход iPhone SE / Pixel 7 / iPad (обозначить как ручной)
+- [x] `HomeView.vue` grid-cols-1 на мобиле
+- [x] `ReadingView` + композаблы — адаптивная ширина/высота
+- [x] `ResultView.vue` flex-wrap + clamp gap
+- [x] Бургер-меню в `SiteHeader.vue`
+- [x] Таблицы: Admin*/Leaderboard — адаптивы
+- [x] Ручной проход iPhone SE / Pixel 7 / iPad (skipped — not automatable)
 
 ---
 

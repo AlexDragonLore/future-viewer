@@ -73,16 +73,16 @@ function begin() {
 </script>
 
 <template>
-  <main class="min-h-screen flex flex-col items-center justify-center px-6 py-16">
+  <main class="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16">
     <header class="text-center mb-10">
       <div class="text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ВУАЛЬ ГРЯДУЩЕГО ✦</div>
-      <h1 class="font-display text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
+      <h1 class="font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
       <p class="text-mystic-silver/70 max-w-xl mx-auto">
         Задай вопрос Вселенной. Карты Таро раскроют тайные нити судьбы и покажут путь сквозь туман грядущего.
       </p>
     </header>
 
-    <section class="mystic-card w-full max-w-xl p-8 space-y-6">
+    <section class="mystic-card w-full max-w-xl p-5 sm:p-8 space-y-6">
       <div v-if="badgeText" class="subscription-badge" :class="{ active: auth.isSubscribed }">
         <span>{{ badgeText }}</span>
         <RouterLink v-if="!auth.isSubscribed" to="/history" class="ml-auto text-mystic-accent text-xs hover:underline">
@@ -103,7 +103,7 @@ function begin() {
 
       <div>
         <label class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">Расклад</label>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
             v-for="s in SPREADS_META"
             :key="s.type"

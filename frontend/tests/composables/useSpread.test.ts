@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeSlots } from '@/composables/useSpread'
+import { computeSlots, computeCardWidth } from '@/composables/useSpread'
 import { SpreadType } from '@/types'
 
 describe('computeSlots', () => {
@@ -39,5 +39,37 @@ describe('computeSlots', () => {
   it('falls back to a single slot for unknown spread type', () => {
     const slots = computeSlots(999 as unknown as SpreadType, 800, 600)
     expect(slots).toEqual([{ x: 400, y: 300 }])
+  })
+})
+
+describe('computeCardWidth', () => {
+  it('returns desktop card width on a wide board', () => {
+    expect(computeCardWidth(SpreadType.ThreeCard, 1200)).toBeCloseTo(140)
+    expect(computeCardWidth(SpreadType.CelticCross, 1600)).toBeCloseTo(140)
+  })
+
+  it('shrinks card width on narrow mobile boards', () => {
+    const narrowThree = computeCardWidth(SpreadType.ThreeCard, 360)
+    expect(narrowThree).toBeLessThan(140)
+    expect(narrowThree).toBeGreaterThanOrEqual(72)
+
+    const narrowCross = computeCardWidth(SpreadType.CelticCross, 360)
+    expect(narrowCross).toBeLessThan(80)
+    expect(narrowCross).toBeGreaterThanOrEqual(48)
+  })
+
+  it('uses a larger card for the single-card spread', () => {
+    const single = computeCardWidth(SpreadType.SingleCard, 360)
+    expect(single).toBeGreaterThan(120)
+    expect(single).toBeLessThanOrEqual(200)
+  })
+
+  it('returns sensible default when board width is zero or negative', () => {
+    expect(computeCardWidth(SpreadType.ThreeCard, 0)).toBe(140)
+    expect(computeCardWidth(SpreadType.SingleCard, -100)).toBe(140)
+  })
+
+  it('clamps to lower bound on extremely tiny boards', () => {
+    expect(computeCardWidth(SpreadType.CelticCross, 200)).toBe(48)
   })
 })
