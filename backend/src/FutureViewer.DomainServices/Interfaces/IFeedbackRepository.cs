@@ -14,6 +14,8 @@ public interface IFeedbackRepository
     Task<IReadOnlyList<ReadingFeedback>> GetByUserAsync(Guid userId, int take = 50, CancellationToken ct = default);
     Task<IReadOnlyList<ReadingFeedback>> SearchAsync(Guid? userId, FeedbackStatus? status, int skip, int take, CancellationToken ct = default);
     Task<int> CountAsync(Guid? userId, FeedbackStatus? status, CancellationToken ct = default);
+    Task<int> CountPendingToNotifyAsync(DateTime before, CancellationToken ct = default);
+    Task<int> CountScoredSinceAsync(DateTime fromUtc, CancellationToken ct = default);
     Task UpdateAsync(ReadingFeedback feedback, CancellationToken ct = default);
     Task<bool> MarkNotifiedAsync(Guid feedbackId, DateTime notifiedAt, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);

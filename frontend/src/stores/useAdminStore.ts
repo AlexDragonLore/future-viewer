@@ -5,6 +5,7 @@ import { extractApiError } from '@/api/httpClient'
 import type { FeedbackStatus } from '@/types'
 import type {
   AdminFeedback,
+  AdminStats,
   AdminUserDetail,
   AdminUserListItem,
   CreateAdminFeedbackPayload,
@@ -36,6 +37,10 @@ export const useAdminStore = defineStore('admin', () => {
   const selectedUser = ref<AdminUserDetail | null>(null)
   const selectedUserLoading = ref(false)
   const selectedUserError = ref<string | null>(null)
+
+  const stats = ref<AdminStats | null>(null)
+  const statsLoading = ref(false)
+  const statsError = ref<string | null>(null)
 
   async function loadFeedbacks(): Promise<void> {
     feedbackLoading.value = true
@@ -313,6 +318,18 @@ export const useAdminStore = defineStore('admin', () => {
     userToast.value = null
   }
 
+  async function loadStats(): Promise<void> {
+    statsLoading.value = true
+    statsError.value = null
+    try {
+      stats.value = await adminApi.getStats()
+    } catch (e) {
+      statsError.value = extractApiError(e, 'Не удалось загрузить статистику')
+    } finally {
+      statsLoading.value = false
+    }
+  }
+
   return {
     feedbacks,
     feedbackTotal,
@@ -358,5 +375,9 @@ export const useAdminStore = defineStore('admin', () => {
     setUserTelegram,
     unlinkUserTelegram,
     clearUserToast,
+    stats,
+    statsLoading,
+    statsError,
+    loadStats,
   }
 })

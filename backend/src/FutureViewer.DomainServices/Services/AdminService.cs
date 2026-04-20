@@ -455,6 +455,33 @@ public sealed class AdminService
             actorEmail, actorId, userId);
     }
 
+    public async Task<AdminStatsDto> GetStatsAsync(CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var todayUtc = now.Date;
+        var weekAgoUtc = now.AddDays(-7);
+        var monthAgoUtc = now.AddDays(-30);
+
+        var totalUsers = await _users.CountAsync(null, ct);
+        var adminCount = await _users.CountAdminsAsync(ct);
+        var activeSubs = await _users.CountActiveSubscriptionsAsync(now, ct);
+        var readingsToday = await _readings.CountSinceAsync(todayUtc, ct);
+        var readingsThisWeek = await _readings.CountSinceAsync(weekAgoUtc, ct);
+        var pendingToNotify = await _feedbacks.CountPendingToNotifyAsync(now, ct);
+        var scoredThisMonth = await _feedbacks.CountScoredSinceAsync(monthAgoUtc, ct);
+
+        return new AdminStatsDto
+        {
+            TotalUsers = totalUsers,
+            AdminCount = adminCount,
+            ActiveSubscriptions = activeSubs,
+            ReadingsToday = readingsToday,
+            ReadingsThisWeek = readingsThisWeek,
+            PendingFeedbacksToNotify = pendingToNotify,
+            ScoredFeedbacksThisMonth = scoredThisMonth
+        };
+    }
+
     public async Task<AdminTelegramLinkResult> SetTelegramChatIdAsync(
         Guid actorId,
         string actorEmail,

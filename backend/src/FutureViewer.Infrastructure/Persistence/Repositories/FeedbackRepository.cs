@@ -120,6 +120,19 @@ public sealed class FeedbackRepository : IFeedbackRepository
         return query.CountAsync(ct);
     }
 
+    public Task<int> CountPendingToNotifyAsync(DateTime before, CancellationToken ct = default) =>
+        _db.ReadingFeedbacks.CountAsync(
+            f => f.Status == FeedbackStatus.Pending
+                 && f.ScheduledAt <= before
+                 && f.User != null
+                 && f.User.TelegramChatId != null,
+            ct);
+
+    public Task<int> CountScoredSinceAsync(DateTime fromUtc, CancellationToken ct = default) =>
+        _db.ReadingFeedbacks.CountAsync(
+            f => f.Status == FeedbackStatus.Scored && f.AnsweredAt != null && f.AnsweredAt >= fromUtc,
+            ct);
+
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var tracked = _db.ChangeTracker.Entries<ReadingFeedback>()

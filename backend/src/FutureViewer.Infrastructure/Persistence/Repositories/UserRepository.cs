@@ -69,6 +69,15 @@ public sealed class UserRepository : IUserRepository
         return query.CountAsync(ct);
     }
 
+    public Task<int> CountAdminsAsync(CancellationToken ct = default) =>
+        _db.Users.CountAsync(u => u.IsAdmin, ct);
+
+    public Task<int> CountActiveSubscriptionsAsync(DateTime nowUtc, CancellationToken ct = default) =>
+        _db.Users.CountAsync(
+            u => u.SubscriptionStatus == Domain.Enums.SubscriptionStatus.Active
+                 && (u.SubscriptionExpiresAt == null || u.SubscriptionExpiresAt > nowUtc),
+            ct);
+
     public async Task<bool> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var tracked = _db.ChangeTracker.Entries<User>()

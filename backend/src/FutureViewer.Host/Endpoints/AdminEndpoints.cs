@@ -18,8 +18,18 @@ public static class AdminEndpoints
         MapUserEndpoints(group);
         MapAchievementEndpoints(group);
         MapTelegramEndpoints(group);
+        MapStatsEndpoints(group);
 
         return app;
+    }
+
+    private static void MapStatsEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/stats", async (AdminService service, CancellationToken ct) =>
+        {
+            var stats = await service.GetStatsAsync(ct);
+            return Results.Ok(stats);
+        });
     }
 
     private static void MapFeedbackEndpoints(RouteGroupBuilder group)

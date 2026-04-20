@@ -12,5 +12,7 @@ public interface IUserRepository
     Task UpdateAsync(User user, CancellationToken ct = default);
     Task<IReadOnlyList<User>> SearchAsync(string? email, int skip, int take, CancellationToken ct = default);
     Task<int> CountAsync(string? email, CancellationToken ct = default);
+    Task<int> CountAdminsAsync(CancellationToken ct = default);
+    Task<int> CountActiveSubscriptionsAsync(DateTime nowUtc, CancellationToken ct = default);
     Task<bool> DeleteAsync(Guid id, CancellationToken ct = default);
 }

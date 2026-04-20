@@ -197,9 +197,9 @@ Nested under `/admin` with `meta: { requiresAuth: true, requiresAdmin: true }` o
 
 ### Task 5: Stats
 
-- [ ] `GET /api/admin/stats`
-- [ ] Frontend: Stats tab with KPI tiles
-- [ ] Tests + verification
+- [x] `GET /api/admin/stats`
+- [x] Frontend: Stats tab with KPI tiles
+- [x] Tests + verification
 
 ## Risks / known limitations
 

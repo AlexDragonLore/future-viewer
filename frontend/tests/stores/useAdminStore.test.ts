@@ -9,6 +9,7 @@ const createSyntheticMock = vi.fn()
 const updateMock = vi.fn()
 const deleteMock = vi.fn()
 const runNotificationsMock = vi.fn()
+const getStatsMock = vi.fn()
 
 vi.mock('@/api/adminApi', () => ({
   adminApi: {
@@ -18,6 +19,7 @@ vi.mock('@/api/adminApi', () => ({
     updateFeedback: (...args: unknown[]) => updateMock(...args),
     deleteFeedback: (...args: unknown[]) => deleteMock(...args),
     runNotifications: (...args: unknown[]) => runNotificationsMock(...args),
+    getStats: (...args: unknown[]) => getStatsMock(...args),
   },
 }))
 
@@ -53,6 +55,7 @@ describe('useAdminStore', () => {
     updateMock.mockReset()
     deleteMock.mockReset()
     runNotificationsMock.mockReset()
+    getStatsMock.mockReset()
   })
 
   it('loadFeedbacks populates list and total', async () => {
@@ -108,5 +111,30 @@ describe('useAdminStore', () => {
     const result = await store.runNotifications()
     expect(result).toBe(4)
     expect(store.feedbackToast).toContain('4')
+  })
+
+  it('loadStats populates stats and clears error', async () => {
+    getStatsMock.mockResolvedValue({
+      totalUsers: 10,
+      adminCount: 2,
+      activeSubscriptions: 3,
+      readingsToday: 5,
+      readingsThisWeek: 25,
+      pendingFeedbacksToNotify: 1,
+      scoredFeedbacksThisMonth: 12,
+    })
+    const store = useAdminStore()
+    await store.loadStats()
+    expect(store.stats?.totalUsers).toBe(10)
+    expect(store.stats?.scoredFeedbacksThisMonth).toBe(12)
+    expect(store.statsError).toBeNull()
+  })
+
+  it('loadStats captures errors', async () => {
+    getStatsMock.mockRejectedValue(new Error('boom'))
+    const store = useAdminStore()
+    await store.loadStats()
+    expect(store.stats).toBeNull()
+    expect(store.statsError).toBeTruthy()
   })
 })

@@ -3,6 +3,7 @@ import type {
   AdminFeedback,
   AdminFeedbackListResponse,
   AdminGrantedAchievement,
+  AdminStats,
   AdminTelegramLinkResult,
   AdminUserDetail,
   AdminUserListItem,
@@ -112,5 +113,10 @@ export const adminApi = {
 
   async unlinkUserTelegram(id: string): Promise<void> {
     await httpClient.delete(`/api/admin/users/${id}/telegram`)
+  },
+
+  async getStats(): Promise<AdminStats> {
+    const { data } = await httpClient.get<AdminStats>('/api/admin/stats')
+    return data
   },
 }

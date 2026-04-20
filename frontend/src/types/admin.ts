@@ -136,3 +136,13 @@ export interface AdminTelegramLinkResult {
   linked: boolean
   chatId: number
 }
+
+export interface AdminStats {
+  totalUsers: number
+  adminCount: number
+  activeSubscriptions: number
+  readingsToday: number
+  readingsThisWeek: number
+  pendingFeedbacksToNotify: number
+  scoredFeedbacksThisMonth: number
+}
