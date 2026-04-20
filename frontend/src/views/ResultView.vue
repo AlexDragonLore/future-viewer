@@ -10,6 +10,19 @@ const store = useReadingStore()
 
 const reading = computed(() => store.current)
 
+const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
+function onResize() {
+  viewportWidth.value = window.innerWidth
+}
+onMounted(() => window.addEventListener('resize', onResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onResize))
+
+const cardWidth = computed(() => {
+  if (viewportWidth.value <= 380) return 96
+  if (viewportWidth.value <= 640) return 110
+  return 130
+})
+
 const displayed = ref('')
 let rafId: number | null = null
 let lastTick = 0
@@ -108,7 +121,7 @@ function again() {
         <div class="text-xs text-mystic-accent/80 uppercase tracking-widest mb-2 text-center">
           {{ card.positionName }}
         </div>
-        <CardFlip :card="card" :face-up="true" :width="130" />
+        <CardFlip :card="card" :face-up="true" :width="cardWidth" />
         <div class="text-xs text-mystic-silver/60 mt-2 text-center max-w-[140px]">
           {{ card.meaning }}
         </div>

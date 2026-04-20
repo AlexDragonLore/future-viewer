@@ -35,12 +35,19 @@ public sealed class SmtpEmailSender : IEmailSender
         message.Body = new BodyBuilder { HtmlBody = htmlBody }.ToMessageBody();
 
         using var client = new SmtpClient();
-        var secure = _options.UseSsl ? SecureSocketOptions.StartTlsWhenAvailable : SecureSocketOptions.None;
+        var secure = ResolveSecureSocketOptions(_options.UseSsl, _options.Port);
         await client.ConnectAsync(_options.Host, _options.Port, secure, ct);
         if (!string.IsNullOrEmpty(_options.Username))
             await client.AuthenticateAsync(_options.Username, _options.Password, ct);
         await client.SendAsync(message, ct);
         await client.DisconnectAsync(true, ct);
+    }
+
+    private static SecureSocketOptions ResolveSecureSocketOptions(bool useSsl, int port)
+    {
+        if (!useSsl) return SecureSocketOptions.None;
+        // Port 465 historically uses implicit TLS; 587/25 negotiate via STARTTLS.
+        return port == 465 ? SecureSocketOptions.SslOnConnect : SecureSocketOptions.StartTlsWhenAvailable;
     }
 }
 

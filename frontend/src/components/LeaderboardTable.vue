@@ -48,7 +48,7 @@ function medal(rank: number): string {
           </div>
         </td>
         <td class="num-col mobile-hide">{{ entry.feedbackCount }}</td>
-        <td class="num-col mobile-hide">{{ entry.averageScore.toFixed(1) }}</td>
+        <td class="num-col mobile-hide">{{ entry.feedbackCount > 0 ? entry.averageScore.toFixed(1) : '—' }}</td>
       </tr>
     </tbody>
   </table>

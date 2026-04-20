@@ -168,9 +168,9 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task ResendVerification_throttles_within_60_seconds()
+    public async Task ResendVerification_silently_skips_when_throttled()
     {
-        var (sut, users, _, _, _, _) = CreateSut();
+        var (sut, users, _, _, email, _) = CreateSut();
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new User
             {
@@ -181,9 +181,11 @@ public sealed class AuthServiceTests
                 EmailVerificationToken = "t"
             });
 
-        var act = () => sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" });
+        await sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" });
 
-        await act.Should().ThrowAsync<ConflictException>();
+        email.Verify(
+            e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

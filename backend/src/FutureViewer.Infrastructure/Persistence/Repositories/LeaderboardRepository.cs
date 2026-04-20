@@ -177,6 +177,7 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
             })
             .OrderByDescending(x => x.TotalScore)
             .ThenByDescending(x => x.AverageScore)
+            .ThenBy(x => x.UserId)
             .Take(take)
             .ToList();
 

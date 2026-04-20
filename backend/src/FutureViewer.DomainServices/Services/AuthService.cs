@@ -98,7 +98,7 @@ public sealed class AuthService
 
         if (user.EmailVerificationSentAt is not null
             && DateTime.UtcNow - user.EmailVerificationSentAt.Value < ResendThrottle)
-            throw new ConflictException("Verification email was recently sent; please wait before requesting another");
+            return;
 
         var token = GenerateToken();
         user.EmailVerificationToken = token;
@@ -136,6 +136,10 @@ public sealed class AuthService
         var normalized = request.Email.Trim().ToLowerInvariant();
         var user = await _users.GetByEmailAsync(normalized, ct);
         if (user is null)
+            return;
+
+        if (user.PasswordResetTokenExpiresAt is not null
+            && user.PasswordResetTokenExpiresAt.Value - DateTime.UtcNow > PasswordResetTokenLifetime - ResendThrottle)
             return;
 
         var token = GenerateToken();

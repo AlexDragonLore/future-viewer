@@ -14,10 +14,6 @@ const menuOpen = ref(false)
 const deckOpen = ref(false)
 const burgerOpen = ref(false)
 
-function closeBurger() {
-  burgerOpen.value = false
-}
-
 const currentDeckLabel = computed(
   () => DECKS.find((o) => o.value === deck.current)?.label ?? 'RWS',
 )
@@ -152,25 +148,25 @@ const quotaLabel = computed(() => {
         v-if="burgerOpen"
         class="burger-panel"
         data-testid="burger-panel"
-        @click.self="closeBurger"
+        @click.self="burgerOpen = false"
       >
         <nav class="burger-nav">
-          <RouterLink to="/glossary" class="burger-link" data-testid="burger-glossary" @click="closeBurger">
+          <RouterLink to="/glossary" class="burger-link" data-testid="burger-glossary" @click="burgerOpen = false">
             Глоссарий
           </RouterLink>
-          <RouterLink to="/leaderboard" class="burger-link" data-testid="burger-leaderboard" @click="closeBurger">
+          <RouterLink to="/leaderboard" class="burger-link" data-testid="burger-leaderboard" @click="burgerOpen = false">
             Лидерборд
           </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/history" class="burger-link" data-testid="burger-history" @click="closeBurger">
+          <RouterLink v-if="auth.isAuthenticated" to="/history" class="burger-link" data-testid="burger-history" @click="burgerOpen = false">
             История
           </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="burger-link" data-testid="burger-achievements" @click="closeBurger">
+          <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="burger-link" data-testid="burger-achievements" @click="burgerOpen = false">
             Ачивки
           </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/profile" class="burger-link" data-testid="burger-profile" @click="closeBurger">
+          <RouterLink v-if="auth.isAuthenticated" to="/profile" class="burger-link" data-testid="burger-profile" @click="burgerOpen = false">
             Профиль
           </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated && auth.isAdmin" to="/admin" class="burger-link" data-testid="burger-admin" @click="closeBurger">
+          <RouterLink v-if="auth.isAuthenticated && auth.isAdmin" to="/admin" class="burger-link" data-testid="burger-admin" @click="burgerOpen = false">
             Админ
           </RouterLink>
           <button
@@ -182,7 +178,7 @@ const quotaLabel = computed(() => {
           >
             Выйти
           </button>
-          <RouterLink v-else to="/auth" class="burger-link" data-testid="burger-auth" @click="closeBurger">
+          <RouterLink v-else to="/auth" class="burger-link" data-testid="burger-auth" @click="burgerOpen = false">
             Войти
           </RouterLink>
         </nav>

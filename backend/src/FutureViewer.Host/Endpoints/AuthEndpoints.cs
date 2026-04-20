@@ -18,7 +18,7 @@ public static class AuthEndpoints
         {
             await validator.ValidateAndThrowAsync(request, ct);
             var response = await service.RegisterAsync(request, ct);
-            return Results.Accepted($"/api/users/{response.UserId}", response);
+            return Results.Accepted(value: response);
         });
 
         group.MapPost("/login", async (

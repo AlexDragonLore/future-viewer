@@ -66,42 +66,42 @@ onMounted(() => store.loadAll())
 
     <section id="cards" class="info-section">
       <h2 class="section-title">Карты</h2>
+
+      <nav class="flex flex-wrap gap-2 justify-center mb-8">
+        <button
+          v-for="opt in suitOptions"
+          :key="String(opt.value)"
+          class="suit-chip"
+          :class="{ active: filter === opt.value }"
+          @click="filter = opt.value"
+        >
+          {{ opt.label }}
+        </button>
+      </nav>
+
+      <div v-if="store.loading" class="text-center text-mystic-silver/60">загружаю…</div>
+      <div v-else-if="store.error" class="text-center text-red-300">{{ store.error }}</div>
+      <div v-else-if="filtered.length === 0" class="text-center text-mystic-silver/60">
+        Ничего не найдено.
+      </div>
+
+      <ul v-else class="card-grid">
+        <li v-for="card in filtered" :key="card.id">
+          <RouterLink :to="{ name: 'glossary-card', params: { id: card.id } }" class="card-tile">
+            <img
+              v-if="card.imagePath"
+              :src="card.imagePath"
+              :alt="card.name"
+              loading="lazy"
+              class="card-image"
+            />
+            <div v-else class="card-placeholder">✦</div>
+            <div class="card-title">{{ card.name }}</div>
+            <div class="card-sub">{{ card.nameEn }}</div>
+          </RouterLink>
+        </li>
+      </ul>
     </section>
-
-    <nav class="flex flex-wrap gap-2 justify-center mb-8">
-      <button
-        v-for="opt in suitOptions"
-        :key="String(opt.value)"
-        class="suit-chip"
-        :class="{ active: filter === opt.value }"
-        @click="filter = opt.value"
-      >
-        {{ opt.label }}
-      </button>
-    </nav>
-
-    <div v-if="store.loading" class="text-center text-mystic-silver/60">загружаю…</div>
-    <div v-else-if="store.error" class="text-center text-red-300">{{ store.error }}</div>
-    <div v-else-if="filtered.length === 0" class="text-center text-mystic-silver/60">
-      Ничего не найдено.
-    </div>
-
-    <ul v-else class="card-grid">
-      <li v-for="card in filtered" :key="card.id">
-        <RouterLink :to="{ name: 'glossary-card', params: { id: card.id } }" class="card-tile">
-          <img
-            v-if="card.imagePath"
-            :src="card.imagePath"
-            :alt="card.name"
-            loading="lazy"
-            class="card-image"
-          />
-          <div v-else class="card-placeholder">✦</div>
-          <div class="card-title">{{ card.name }}</div>
-          <div class="card-sub">{{ card.nameEn }}</div>
-        </RouterLink>
-      </li>
-    </ul>
   </main>
 </template>
 

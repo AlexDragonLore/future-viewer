@@ -1,6 +1,6 @@
-# Future Viewer
+# Future Viewer / Вуаль Грядущего
 
-Онлайн ТАРО-расклад с AI-интерпретацией от OpenAI GPT.
+Онлайн ТАРО-расклад с AI-интерпретацией от OpenAI GPT. «Future Viewer» — внутреннее имя репозитория и неймспейсов; пользовательское название — «Вуаль Грядущего».
 
 ## Стек
 
@@ -29,13 +29,27 @@ cd backend/src/FutureViewer.Host
 dotnet user-secrets set "OpenAI:ApiKey" "sk-..."
 dotnet user-secrets set "Jwt:Secret" "$(openssl rand -base64 48)"
 
+# Опционально — SMTP для подтверждения email и восстановления пароля.
+# Если Email:Host пуст, письма пишутся в лог (dev fallback) — токен из лога
+# можно вставить в URL вручную.
+dotnet user-secrets set "Email:Host" "smtp.yandex.ru"
+dotnet user-secrets set "Email:Port" "465"
+dotnet user-secrets set "Email:Username" "no-reply@example.com"
+dotnet user-secrets set "Email:Password" "..."
+dotnet user-secrets set "Email:From" "no-reply@example.com"
+dotnet user-secrets set "Email:UseSsl" "true"
+dotnet user-secrets set "Email:FrontendUrl" "http://localhost:5173"
+
+# Контакт саппорта в футере (по умолчанию — support@vualgryaduschego.ru):
+dotnet user-secrets set "Support:Email" "support@example.com"
+
 # 2. Поднять всё через docker-compose
 cd ../../..
 docker compose up --build
 ```
 
-- API:      http://localhost:5000
-- Swagger:  http://localhost:5000/swagger
+- API:      http://localhost:5050
+- Swagger:  http://localhost:5050/swagger
 - Frontend: http://localhost:5173
 
 ## Тесты
@@ -46,9 +60,9 @@ dotnet test backend/FutureViewer.slnx
 
 Integration-тесты сами поднимают Postgres через Testcontainers — нужен запущенный Docker daemon.
 
-## План реализации
+## Планы реализации
 
-См. [`plans/purring-jumping-hellman.md`](plans/purring-jumping-hellman.md).
+См. директорию [`plans/`](plans/) — каждый план соответствует серии PR.
 
 ## Лицензия
 
