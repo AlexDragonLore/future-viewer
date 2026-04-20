@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AchievementCard from '@/components/AchievementCard.vue'
 import type { AchievementInfo } from '@/types'
+import { ACHIEVEMENT_ICONS } from '@/data/achievementIcons'
 
 function base(overrides: Partial<AchievementInfo> = {}): AchievementInfo {
   return {
@@ -48,5 +49,26 @@ describe('AchievementCard', () => {
     })
     expect(wrapper.text()).toContain('Три дня подряд')
     expect(wrapper.text()).toContain('три дня')
+  })
+
+  it.each(Object.keys(ACHIEVEMENT_ICONS))(
+    'renders a lucide svg icon (not the legacy glyph) for code %s',
+    (code) => {
+      const wrapper = mount(AchievementCard, {
+        props: { achievement: base({ code }) },
+      })
+      const icon = wrapper.get('[data-testid="achievement-icon"]')
+      expect(icon.element.tagName.toLowerCase()).toBe('svg')
+      expect(wrapper.text()).not.toContain('✦')
+      expect(wrapper.text()).not.toContain('✧')
+    },
+  )
+
+  it('falls back to a default lucide icon for an unknown code', () => {
+    const wrapper = mount(AchievementCard, {
+      props: { achievement: base({ code: 'unknown_code' }) },
+    })
+    const icon = wrapper.get('[data-testid="achievement-icon"]')
+    expect(icon.element.tagName.toLowerCase()).toBe('svg')
   })
 })

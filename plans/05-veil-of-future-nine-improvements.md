@@ -43,10 +43,10 @@
 - [x] Строка с `mailto:` в `SiteFooter.vue`
 
 ### Iteration 5: Пункт 3 — lucide-иконки ачивок
-- [ ] Установить `lucide-vue-next`
-- [ ] Добавить `frontend/src/data/achievementIcons.ts`
-- [ ] Обновить `AchievementCard.vue` на динамический `<component :is>`
-- [ ] Юнит-тест `AchievementCard.spec.ts`
+- [x] Установить `lucide-vue-next`
+- [x] Добавить `frontend/src/data/achievementIcons.ts`
+- [x] Обновить `AchievementCard.vue` на динамический `<component :is>`
+- [x] Юнит-тест `AchievementCard.spec.ts`
 
 ### Iteration 6: Пункт 7 — Русификация на «Вуаль Грядущего»
 - [ ] Заменить «Future Viewer» в UI-файлах (index.html, SiteHeader, HomeView, SiteFooter)
