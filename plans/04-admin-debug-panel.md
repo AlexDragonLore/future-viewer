@@ -189,11 +189,11 @@ Nested under `/admin` with `meta: { requiresAuth: true, requiresAdmin: true }` o
 
 ### Task 4: Achievements + Telegram
 
-- [ ] `IAchievementRepository` additions (`RevokeAsync`, `GetByCodeAsync`)
-- [ ] `POST /api/admin/users/{id}/achievements`, `DELETE /api/admin/users/{id}/achievements/{code}`, `POST /api/admin/users/{id}/achievements/recheck`
-- [ ] `DELETE /api/admin/users/{id}/telegram`, `PUT /api/admin/users/{id}/telegram`
-- [ ] Frontend: wire buttons in detail drawer
-- [ ] Tests + verification
+- [x] `IAchievementRepository` additions (`RevokeAsync`, `GetByCodeAsync`)
+- [x] `POST /api/admin/users/{id}/achievements`, `DELETE /api/admin/users/{id}/achievements/{code}`, `POST /api/admin/users/{id}/achievements/recheck`
+- [x] `DELETE /api/admin/users/{id}/telegram`, `PUT /api/admin/users/{id}/telegram`
+- [x] Frontend: wire buttons in detail drawer
+- [x] Tests + verification
 
 ### Task 5: Stats
 

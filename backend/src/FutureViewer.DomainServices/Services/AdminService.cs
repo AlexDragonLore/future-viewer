@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.DTOs.Admin;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
@@ -15,6 +16,7 @@ public sealed class AdminService
     private readonly IUserRepository _users;
     private readonly IAchievementRepository _achievementsRepo;
     private readonly AchievementService _achievements;
+    private readonly TelegramLinkService _telegram;
     private readonly ILogger<AdminService> _logger;
 
     public AdminService(
@@ -23,6 +25,7 @@ public sealed class AdminService
         IUserRepository users,
         IAchievementRepository achievementsRepo,
         AchievementService achievements,
+        TelegramLinkService telegram,
         ILogger<AdminService> logger)
     {
         _feedbacks = feedbacks;
@@ -30,6 +33,7 @@ public sealed class AdminService
         _users = users;
         _achievementsRepo = achievementsRepo;
         _achievements = achievements;
+        _telegram = telegram;
         _logger = logger;
     }
 
@@ -352,6 +356,152 @@ public sealed class AdminService
         return await GetUserDetailAsync(userId, ct);
     }
 
+    public async Task<AchievementDto> GrantAchievementAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        string code,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new DomainException("Achievement code is required");
+
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        var achievement = await _achievementsRepo.GetByCodeAsync(code, ct)
+            ?? throw new NotFoundException($"Achievement '{code}' not found");
+
+        var now = DateTime.UtcNow;
+        var granted = await _achievementsRepo.GrantAsync(new UserAchievement
+        {
+            UserId = user.Id,
+            AchievementId = achievement.Id,
+            UnlockedAt = now
+        }, ct);
+
+        if (granted is null)
+            throw new ConflictException($"User already has achievement '{code}'");
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) granted achievement {Code} to user {UserId}",
+            actorEmail, actorId, code, userId);
+
+        return new AchievementDto
+        {
+            Id = achievement.Id,
+            Code = achievement.Code,
+            Name = achievement.NameRu,
+            Description = achievement.DescriptionRu,
+            IconPath = achievement.IconPath,
+            SortOrder = achievement.SortOrder,
+            UnlockedAt = granted.UnlockedAt
+        };
+    }
+
+    public async Task RevokeAchievementAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        string code,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+            throw new DomainException("Achievement code is required");
+
+        var achievement = await _achievementsRepo.GetByCodeAsync(code, ct)
+            ?? throw new NotFoundException($"Achievement '{code}' not found");
+
+        var removed = await _achievementsRepo.RevokeAsync(userId, achievement.Id, ct);
+        if (!removed)
+            throw new NotFoundException($"User does not have achievement '{code}'");
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) revoked achievement {Code} from user {UserId}",
+            actorEmail, actorId, code, userId);
+    }
+
+    public async Task<IReadOnlyList<AchievementDto>> RecheckAchievementsAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        var granted = await _achievements.CheckAndGrantAsync(user.Id, ct);
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) rechecked achievements for user {UserId}: granted={Count}",
+            actorEmail, actorId, userId, granted.Count);
+
+        return granted;
+    }
+
+    public async Task UnlinkTelegramAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        _ = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        await _telegram.UnlinkAsync(userId, ct);
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) unlinked Telegram for user {UserId}",
+            actorEmail, actorId, userId);
+    }
+
+    public async Task<AdminTelegramLinkResult> SetTelegramChatIdAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        long chatId,
+        CancellationToken ct = default)
+    {
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        var existing = await _users.GetByTelegramChatIdAsync(chatId, ct);
+        if (existing is not null && existing.Id != userId)
+            throw new ConflictException($"Telegram chatId {chatId} is already linked to another user");
+
+        user.TelegramChatId = chatId;
+        user.TelegramLinkToken = null;
+
+        try
+        {
+            await _users.UpdateAsync(user, ct);
+        }
+        catch (Exception ex) when (IsUniqueViolation(ex))
+        {
+            throw new ConflictException($"Telegram chatId {chatId} is already linked to another user");
+        }
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) set Telegram chatId={ChatId} for user {UserId}",
+            actorEmail, actorId, chatId, userId);
+
+        return new AdminTelegramLinkResult { ChatId = chatId };
+    }
+
+    private static bool IsUniqueViolation(Exception ex)
+    {
+        for (var e = ex; e is not null; e = e.InnerException)
+        {
+            var name = e.GetType().Name;
+            if (name.Contains("UniqueConstraint", StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (e.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
+                e.Message.Contains("unique constraint", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
     private async Task<AdminUserListItem> BuildListItemAsync(User user, CancellationToken ct)
     {
         var totalReadings = await _readings.CountByUserAsync(user.Id, ct);
@@ -430,4 +580,10 @@ public sealed class AdminUserListResult
 {
     public required IReadOnlyList<AdminUserListItem> Items { get; init; }
     public required int Total { get; init; }
+}
+
+public sealed class AdminTelegramLinkResult
+{
+    public bool Linked { get; init; } = true;
+    public required long ChatId { get; init; }
 }

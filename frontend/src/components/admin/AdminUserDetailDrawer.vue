@@ -15,6 +15,13 @@ const expiresInput = ref<string>('')
 const savingSub = ref(false)
 const savingAdmin = ref(false)
 const deleting = ref(false)
+const achievementCodeInput = ref<string>('')
+const grantingAchievement = ref(false)
+const revokingCode = ref<string | null>(null)
+const rechecking = ref(false)
+const telegramInput = ref<string>('')
+const savingTelegram = ref(false)
+const unlinkingTelegram = ref(false)
 
 const isSelf = computed(() => store.selectedUser?.id === auth.userId)
 
@@ -69,6 +76,69 @@ async function onDelete(): Promise<void> {
     if (ok) emit('close')
   } finally {
     deleting.value = false
+  }
+}
+
+async function grantAchievement(): Promise<void> {
+  if (!store.selectedUser) return
+  const code = achievementCodeInput.value.trim()
+  if (!code) return
+  grantingAchievement.value = true
+  try {
+    const ok = await store.grantAchievement(store.selectedUser.id, code)
+    if (ok) achievementCodeInput.value = ''
+  } finally {
+    grantingAchievement.value = false
+  }
+}
+
+async function revokeAchievement(code: string): Promise<void> {
+  if (!store.selectedUser) return
+  if (!confirm(`Снять ачивку «${code}» с пользователя?`)) return
+  revokingCode.value = code
+  try {
+    await store.revokeAchievement(store.selectedUser.id, code)
+  } finally {
+    revokingCode.value = null
+  }
+}
+
+async function recheckAchievements(): Promise<void> {
+  if (!store.selectedUser) return
+  rechecking.value = true
+  try {
+    await store.recheckAchievements(store.selectedUser.id)
+  } finally {
+    rechecking.value = false
+  }
+}
+
+async function saveTelegram(): Promise<void> {
+  if (!store.selectedUser) return
+  const raw = telegramInput.value.trim()
+  if (!raw) return
+  const chatId = Number(raw)
+  if (!Number.isInteger(chatId)) {
+    alert('chatId должен быть целым числом')
+    return
+  }
+  savingTelegram.value = true
+  try {
+    const ok = await store.setUserTelegram(store.selectedUser.id, chatId)
+    if (ok) telegramInput.value = ''
+  } finally {
+    savingTelegram.value = false
+  }
+}
+
+async function unlinkTelegram(): Promise<void> {
+  if (!store.selectedUser) return
+  if (!confirm('Отвязать Telegram у пользователя?')) return
+  unlinkingTelegram.value = true
+  try {
+    await store.unlinkUserTelegram(store.selectedUser.id)
+  } finally {
+    unlinkingTelegram.value = false
   }
 }
 </script>
@@ -142,6 +212,32 @@ async function onDelete(): Promise<void> {
           chatId: <span class="mono">{{ store.selectedUser.telegramChatId }}</span>
         </p>
         <p v-else class="text-sm text-mystic-muted">не привязан</p>
+        <div class="flex items-center gap-2 mt-2">
+          <input
+            v-model="telegramInput"
+            type="text"
+            class="admin-input flex-1"
+            placeholder="chatId (целое число)"
+            data-testid="admin-user-telegram-input"
+          />
+          <button
+            class="admin-btn"
+            :disabled="savingTelegram || !telegramInput.trim()"
+            data-testid="admin-user-telegram-save"
+            @click="saveTelegram"
+          >
+            {{ savingTelegram ? '…' : 'Привязать' }}
+          </button>
+          <button
+            v-if="store.selectedUser.telegramChatId"
+            class="admin-btn danger"
+            :disabled="unlinkingTelegram"
+            data-testid="admin-user-telegram-unlink"
+            @click="unlinkTelegram"
+          >
+            {{ unlinkingTelegram ? '…' : 'Отвязать' }}
+          </button>
+        </div>
       </section>
 
       <section class="section">
@@ -179,12 +275,49 @@ async function onDelete(): Promise<void> {
       <section class="section">
         <h4>Ачивки ({{ store.selectedUser.achievements.length }})</h4>
         <ul v-if="store.selectedUser.achievements.length > 0" class="list">
-          <li v-for="a in store.selectedUser.achievements" :key="a.id">
+          <li
+            v-for="a in store.selectedUser.achievements"
+            :key="a.id"
+            class="flex items-center gap-2"
+          >
             <strong>{{ a.name }}</strong>
             <span class="text-mystic-muted"> ({{ a.code }})</span>
+            <button
+              class="admin-btn danger ml-auto"
+              :disabled="revokingCode === a.code"
+              :data-testid="`admin-user-achievement-revoke-${a.code}`"
+              @click="revokeAchievement(a.code)"
+            >
+              {{ revokingCode === a.code ? '…' : 'Снять' }}
+            </button>
           </li>
         </ul>
         <p v-else class="text-mystic-muted text-sm">—</p>
+        <div class="flex items-center gap-2 mt-2">
+          <input
+            v-model="achievementCodeInput"
+            type="text"
+            class="admin-input flex-1"
+            placeholder="код ачивки (например first_reading)"
+            data-testid="admin-user-achievement-input"
+          />
+          <button
+            class="admin-btn"
+            :disabled="grantingAchievement || !achievementCodeInput.trim()"
+            data-testid="admin-user-achievement-grant"
+            @click="grantAchievement"
+          >
+            {{ grantingAchievement ? '…' : 'Выдать' }}
+          </button>
+        </div>
+        <button
+          class="admin-btn mt-2"
+          :disabled="rechecking"
+          data-testid="admin-user-achievement-recheck"
+          @click="recheckAchievements"
+        >
+          {{ rechecking ? '…' : 'Пересчитать' }}
+        </button>
       </section>
 
       <section class="section danger-zone">

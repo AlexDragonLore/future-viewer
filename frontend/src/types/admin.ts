@@ -121,3 +121,18 @@ export interface SetSubscriptionPayload {
   status: SubscriptionStatusValue
   expiresAt?: string | null
 }
+
+export interface AdminGrantedAchievement {
+  id: string
+  code: string
+  name: string
+  description: string
+  iconPath: string
+  sortOrder: number
+  unlockedAt: string | null
+}
+
+export interface AdminTelegramLinkResult {
+  linked: boolean
+  chatId: number
+}

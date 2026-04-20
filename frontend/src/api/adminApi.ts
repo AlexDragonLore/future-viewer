@@ -2,6 +2,8 @@ import { httpClient } from './httpClient'
 import type {
   AdminFeedback,
   AdminFeedbackListResponse,
+  AdminGrantedAchievement,
+  AdminTelegramLinkResult,
   AdminUserDetail,
   AdminUserListItem,
   AdminUserListResponse,
@@ -79,5 +81,36 @@ export const adminApi = {
   async setUserSubscription(id: string, payload: SetSubscriptionPayload): Promise<AdminUserDetail> {
     const { data } = await httpClient.put<AdminUserDetail>(`/api/admin/users/${id}/subscription`, payload)
     return data
+  },
+
+  async grantAchievement(id: string, code: string): Promise<AdminGrantedAchievement> {
+    const { data } = await httpClient.post<AdminGrantedAchievement>(
+      `/api/admin/users/${id}/achievements`,
+      { code },
+    )
+    return data
+  },
+
+  async revokeAchievement(id: string, code: string): Promise<void> {
+    await httpClient.delete(`/api/admin/users/${id}/achievements/${encodeURIComponent(code)}`)
+  },
+
+  async recheckAchievements(id: string): Promise<AdminGrantedAchievement[]> {
+    const { data } = await httpClient.post<AdminGrantedAchievement[]>(
+      `/api/admin/users/${id}/achievements/recheck`,
+    )
+    return data
+  },
+
+  async setUserTelegram(id: string, chatId: number): Promise<AdminTelegramLinkResult> {
+    const { data } = await httpClient.put<AdminTelegramLinkResult>(
+      `/api/admin/users/${id}/telegram`,
+      { chatId },
+    )
+    return data
+  },
+
+  async unlinkUserTelegram(id: string): Promise<void> {
+    await httpClient.delete(`/api/admin/users/${id}/telegram`)
   },
 }

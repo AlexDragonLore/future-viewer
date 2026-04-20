@@ -238,6 +238,77 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
+  async function grantAchievement(id: string, code: string): Promise<boolean> {
+    userError.value = null
+    try {
+      await adminApi.grantAchievement(id, code)
+      userToast.value = `Ачивка ${code} выдана`
+      if (selectedUser.value?.id === id) await loadUserDetail(id)
+      return true
+    } catch (e) {
+      userError.value = extractApiError(e, 'Не удалось выдать ачивку')
+      return false
+    }
+  }
+
+  async function revokeAchievement(id: string, code: string): Promise<boolean> {
+    userError.value = null
+    try {
+      await adminApi.revokeAchievement(id, code)
+      userToast.value = `Ачивка ${code} снята`
+      if (selectedUser.value?.id === id) await loadUserDetail(id)
+      return true
+    } catch (e) {
+      userError.value = extractApiError(e, 'Не удалось снять ачивку')
+      return false
+    }
+  }
+
+  async function recheckAchievements(id: string): Promise<number | null> {
+    userError.value = null
+    try {
+      const granted = await adminApi.recheckAchievements(id)
+      userToast.value = granted.length > 0
+        ? `Выдано новых ачивок: ${granted.length}`
+        : 'Новых ачивок нет'
+      if (selectedUser.value?.id === id) await loadUserDetail(id)
+      return granted.length
+    } catch (e) {
+      userError.value = extractApiError(e, 'Не удалось пересчитать ачивки')
+      return null
+    }
+  }
+
+  async function setUserTelegram(id: string, chatId: number): Promise<boolean> {
+    userError.value = null
+    try {
+      await adminApi.setUserTelegram(id, chatId)
+      userToast.value = 'Telegram chatId установлен'
+      const idx = users.value.findIndex((u) => u.id === id)
+      if (idx >= 0) users.value[idx] = { ...users.value[idx], telegramChatId: chatId }
+      if (selectedUser.value?.id === id) await loadUserDetail(id)
+      return true
+    } catch (e) {
+      userError.value = extractApiError(e, 'Не удалось установить Telegram chatId')
+      return false
+    }
+  }
+
+  async function unlinkUserTelegram(id: string): Promise<boolean> {
+    userError.value = null
+    try {
+      await adminApi.unlinkUserTelegram(id)
+      userToast.value = 'Telegram отвязан'
+      const idx = users.value.findIndex((u) => u.id === id)
+      if (idx >= 0) users.value[idx] = { ...users.value[idx], telegramChatId: null }
+      if (selectedUser.value?.id === id) await loadUserDetail(id)
+      return true
+    } catch (e) {
+      userError.value = extractApiError(e, 'Не удалось отвязать Telegram')
+      return false
+    }
+  }
+
   function clearUserToast(): void {
     userToast.value = null
   }
@@ -281,6 +352,11 @@ export const useAdminStore = defineStore('admin', () => {
     setUserAdmin,
     deleteUser,
     setUserSubscription,
+    grantAchievement,
+    revokeAchievement,
+    recheckAchievements,
+    setUserTelegram,
+    unlinkUserTelegram,
     clearUserToast,
   }
 })

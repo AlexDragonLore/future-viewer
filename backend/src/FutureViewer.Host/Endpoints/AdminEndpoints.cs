@@ -16,6 +16,8 @@ public static class AdminEndpoints
 
         MapFeedbackEndpoints(group);
         MapUserEndpoints(group);
+        MapAchievementEndpoints(group);
+        MapTelegramEndpoints(group);
 
         return app;
     }
@@ -166,6 +168,72 @@ public static class AdminEndpoints
         });
     }
 
+    private static void MapAchievementEndpoints(RouteGroupBuilder group)
+    {
+        group.MapPost("/users/{id:guid}/achievements", async (
+            Guid id,
+            GrantAchievementBody body,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            if (body is null) return Results.BadRequest();
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            var dto = await service.GrantAchievementAsync(actorId, actorEmail, id, body.Code, ct);
+            return Results.Created($"/api/admin/users/{id}/achievements/{dto.Code}", dto);
+        });
+
+        group.MapDelete("/users/{id:guid}/achievements/{code}", async (
+            Guid id,
+            string code,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            await service.RevokeAchievementAsync(actorId, actorEmail, id, code, ct);
+            return Results.NoContent();
+        });
+
+        group.MapPost("/users/{id:guid}/achievements/recheck", async (
+            Guid id,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            var granted = await service.RecheckAchievementsAsync(actorId, actorEmail, id, ct);
+            return Results.Ok(granted);
+        });
+    }
+
+    private static void MapTelegramEndpoints(RouteGroupBuilder group)
+    {
+        group.MapDelete("/users/{id:guid}/telegram", async (
+            Guid id,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            await service.UnlinkTelegramAsync(actorId, actorEmail, id, ct);
+            return Results.NoContent();
+        });
+
+        group.MapPut("/users/{id:guid}/telegram", async (
+            Guid id,
+            SetTelegramBody body,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            if (body is null) return Results.BadRequest();
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            var result = await service.SetTelegramChatIdAsync(actorId, actorEmail, id, body.ChatId, ct);
+            return Results.Ok(new { linked = result.Linked, chatId = result.ChatId });
+        });
+    }
+
     private static (Guid Id, string Email) GetActor(this ClaimsPrincipal principal)
     {
         var id = principal.GetUserId() ?? throw new UnauthorizedException("Authentication required");
@@ -213,5 +281,15 @@ public static class AdminEndpoints
     {
         public SubscriptionStatus Status { get; init; }
         public DateTime? ExpiresAt { get; init; }
+    }
+
+    public sealed class GrantAchievementBody
+    {
+        public string Code { get; init; } = string.Empty;
+    }
+
+    public sealed class SetTelegramBody
+    {
+        public long ChatId { get; init; }
     }
 }
