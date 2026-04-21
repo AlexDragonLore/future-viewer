@@ -35,17 +35,27 @@ public sealed class TelegramPollingHostedService : BackgroundService
             return;
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.WebhookUrl))
-        {
-            _logger.LogInformation("Telegram webhook configured, skipping polling");
-            return;
-        }
-
         var receiverOptions = new ReceiverOptions
         {
             AllowedUpdates = Array.Empty<UpdateType>(),
             DropPendingUpdates = true
         };
+
+        try
+        {
+            await client.DeleteWebhook(dropPendingUpdates: true, cancellationToken: stoppingToken);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            // If a webhook is still registered, Telegram returns 409 Conflict on getUpdates
+            // and polling silently fails forever. Abort instead of pretending to be healthy.
+            _logger.LogError(ex, "Failed to clear Telegram webhook; aborting polling so operators notice");
+            return;
+        }
 
         _logger.LogInformation("Starting Telegram long polling");
 

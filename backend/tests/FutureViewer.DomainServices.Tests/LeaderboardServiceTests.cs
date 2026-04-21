@@ -110,6 +110,8 @@ public sealed class LeaderboardServiceTests
         var summary = new UserScoreSummaryDto
         {
             TotalScore = 42,
+            FeedbackScore = 32,
+            AchievementScore = 10,
             MonthlyScore = 10,
             Rank = 3,
             MonthlyRank = 2,

@@ -47,6 +47,12 @@ export interface AuthResponse {
   isAdmin: boolean
 }
 
+export interface RegisterResponse {
+  userId: string
+  email: string
+  verificationRequired: boolean
+}
+
 export interface TarotCardInfo {
   id: number
   name: string
@@ -140,6 +146,8 @@ export interface LeaderboardEntry {
   userId: string
   displayName: string
   totalScore: number
+  feedbackScore: number
+  achievementScore: number
   feedbackCount: number
   averageScore: number
   rank: number
@@ -147,6 +155,8 @@ export interface LeaderboardEntry {
 
 export interface UserScoreSummary {
   totalScore: number
+  feedbackScore: number
+  achievementScore: number
   monthlyScore: number
   rank: number | null
   monthlyRank: number | null

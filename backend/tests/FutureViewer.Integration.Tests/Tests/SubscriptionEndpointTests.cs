@@ -35,9 +35,7 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         var client = _fixture.CreateClient();
         var email = $"sub-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
         var response = await client.GetAsync("/api/subscription/status");
@@ -58,9 +56,7 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         var client = _fixture.CreateClient();
         var email = $"sub-active-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
         using (var scope = _fixture.Services.CreateScope())
@@ -87,9 +83,7 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         var client = _fixture.CreateClient();
         var email = $"sub-limit-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
         var response = await client.PostAsJsonAsync("/api/readings",
@@ -104,9 +98,7 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         var client = _fixture.CreateClient();
         var email = $"sub-quota-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
         var first = await client.PostAsJsonAsync("/api/readings",

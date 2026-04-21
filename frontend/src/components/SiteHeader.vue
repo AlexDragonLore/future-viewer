@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useDeckStore } from '@/stores/useDeckStore'
 import { DeckType } from '@/types'
+import { DECKS } from '@/data/decks'
 
 const auth = useAuthStore()
 const deck = useDeckStore()
@@ -11,17 +12,10 @@ const router = useRouter()
 
 const menuOpen = ref(false)
 const deckOpen = ref(false)
-
-const deckOptions: { value: DeckType; label: string }[] = [
-  { value: DeckType.RWS, label: 'Rider–Waite–Smith' },
-  { value: DeckType.Thoth, label: 'Thoth' },
-  { value: DeckType.Marseille, label: 'Marseille' },
-  { value: DeckType.ViscontiSforza, label: 'Visconti–Sforza' },
-  { value: DeckType.ModernWitch, label: 'Modern Witch' },
-]
+const burgerOpen = ref(false)
 
 const currentDeckLabel = computed(
-  () => deckOptions.find((o) => o.value === deck.current)?.label ?? 'RWS',
+  () => DECKS.find((o) => o.value === deck.current)?.label ?? 'RWS',
 )
 
 function selectDeck(value: DeckType) {
@@ -38,6 +32,7 @@ onMounted(async () => {
 function handleLogout() {
   auth.logout()
   menuOpen.value = false
+  burgerOpen.value = false
   router.push({ name: 'home' })
 }
 
@@ -54,9 +49,22 @@ const quotaLabel = computed(() => {
 <template>
   <header class="site-header" data-testid="site-header">
     <div class="header-inner">
+      <button
+        class="burger"
+        type="button"
+        :aria-expanded="burgerOpen"
+        aria-label="Меню"
+        data-testid="burger-button"
+        @click="burgerOpen = !burgerOpen"
+      >
+        <span class="burger-bar" :class="{ open: burgerOpen }" />
+        <span class="burger-bar middle" :class="{ open: burgerOpen }" />
+        <span class="burger-bar" :class="{ open: burgerOpen }" />
+      </button>
+
       <RouterLink to="/" class="logo" data-testid="site-logo">
         <span class="logo-mark">✦</span>
-        <span class="logo-text gold-text">Future Viewer</span>
+        <span class="logo-text gold-text">Вуаль Грядущего</span>
       </RouterLink>
 
       <nav class="links">
@@ -87,7 +95,7 @@ const quotaLabel = computed(() => {
             <span class="chev">▾</span>
           </button>
           <ul v-if="deckOpen" class="deck-menu" role="listbox">
-            <li v-for="opt in deckOptions" :key="opt.value">
+            <li v-for="opt in DECKS" :key="opt.value">
               <button
                 class="deck-option"
                 :class="{ active: opt.value === deck.current }"
@@ -134,6 +142,48 @@ const quotaLabel = computed(() => {
         </template>
       </div>
     </div>
+
+    <transition name="burger-panel">
+      <div
+        v-if="burgerOpen"
+        class="burger-panel"
+        data-testid="burger-panel"
+        @click.self="burgerOpen = false"
+      >
+        <nav class="burger-nav">
+          <RouterLink to="/glossary" class="burger-link" data-testid="burger-glossary" @click="burgerOpen = false">
+            Глоссарий
+          </RouterLink>
+          <RouterLink to="/leaderboard" class="burger-link" data-testid="burger-leaderboard" @click="burgerOpen = false">
+            Лидерборд
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/history" class="burger-link" data-testid="burger-history" @click="burgerOpen = false">
+            История
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="burger-link" data-testid="burger-achievements" @click="burgerOpen = false">
+            Ачивки
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/profile" class="burger-link" data-testid="burger-profile" @click="burgerOpen = false">
+            Профиль
+          </RouterLink>
+          <RouterLink v-if="auth.isAuthenticated && auth.isAdmin" to="/admin" class="burger-link" data-testid="burger-admin" @click="burgerOpen = false">
+            Админ
+          </RouterLink>
+          <button
+            v-if="auth.isAuthenticated"
+            class="burger-link as-btn"
+            type="button"
+            data-testid="burger-logout"
+            @click="handleLogout"
+          >
+            Выйти
+          </button>
+          <RouterLink v-else to="/auth" class="burger-link" data-testid="burger-auth" @click="burgerOpen = false">
+            Войти
+          </RouterLink>
+        </nav>
+      </div>
+    </transition>
   </header>
 </template>
 
@@ -316,15 +366,114 @@ const quotaLabel = computed(() => {
   box-shadow: 0 0 20px rgba(245, 194, 107, 0.3);
 }
 
+.burger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(245, 194, 107, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.burger:hover {
+  border-color: rgba(245, 194, 107, 0.7);
+  background: rgba(245, 194, 107, 0.08);
+}
+.burger-bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  margin: 0 auto;
+  background: #f5c26b;
+  border-radius: 2px;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+.burger-bar.open:first-child {
+  transform: translateY(6px) rotate(45deg);
+}
+.burger-bar.open.middle {
+  opacity: 0;
+}
+.burger-bar.open:last-child {
+  transform: translateY(-6px) rotate(-45deg);
+}
+.burger-panel {
+  position: fixed;
+  inset: 0;
+  top: 60px;
+  z-index: 25;
+  background: rgba(11, 6, 24, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.burger-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem 2rem;
+  border-top: 1px solid rgba(245, 194, 107, 0.18);
+}
+.burger-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 0.75rem 0.5rem;
+  border-radius: 8px;
+  color: rgba(224, 212, 186, 0.9);
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.burger-link:hover,
+.burger-link.router-link-active {
+  background: rgba(245, 194, 107, 0.1);
+  color: #f5c26b;
+}
+.burger-link.as-btn {
+  color: rgba(252, 165, 165, 0.9);
+}
+.burger-panel-enter-active,
+.burger-panel-leave-active {
+  transition: opacity 0.2s ease;
+}
+.burger-panel-enter-from,
+.burger-panel-leave-to {
+  opacity: 0;
+}
+
 @media (max-width: 640px) {
   .links {
     display: none;
   }
   .user-email {
-    max-width: 6rem;
+    max-width: 5rem;
   }
   .deck-label {
     display: none;
+  }
+  .burger {
+    display: flex;
+  }
+  .header-inner {
+    padding: 0.6rem 0.85rem;
+    gap: 0.6rem;
+  }
+  .logo-text {
+    font-size: 0.85rem;
+  }
+  .right {
+    gap: 0.4rem;
   }
 }
 </style>

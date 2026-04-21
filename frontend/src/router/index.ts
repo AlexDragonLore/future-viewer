@@ -3,6 +3,11 @@ import { useAuthStore } from '@/stores/useAuthStore'
 
 export const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, behavior: 'smooth', top: 80 }
+    return { top: 0 }
+  },
   routes: [
     { path: '/', name: 'home', component: () => import('@/views/HomeView.vue') },
     { path: '/reading', name: 'reading', component: () => import('@/views/ReadingView.vue') },
@@ -10,6 +15,9 @@ export const router = createRouter({
     { path: '/history', name: 'history', component: () => import('@/views/HistoryView.vue'), meta: { requiresAuth: true } },
     { path: '/reading/:id', name: 'reading-detail', component: () => import('@/views/ReadingDetailView.vue'), meta: { requiresAuth: true } },
     { path: '/auth', name: 'auth', component: () => import('@/views/AuthView.vue') },
+    { path: '/verify-email', name: 'verify-email', component: () => import('@/views/VerifyEmailView.vue') },
+    { path: '/forgot-password', name: 'forgot-password', component: () => import('@/views/ForgotPasswordView.vue') },
+    { path: '/reset-password', name: 'reset-password', component: () => import('@/views/ResetPasswordView.vue') },
     { path: '/glossary', name: 'glossary', component: () => import('@/views/GlossaryView.vue') },
     { path: '/glossary/:id', name: 'glossary-card', component: () => import('@/views/CardDetailView.vue') },
     { path: '/payment/success', name: 'payment-success', component: () => import('@/views/PaymentSuccessView.vue') },

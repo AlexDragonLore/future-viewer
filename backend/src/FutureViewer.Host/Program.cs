@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Services
 builder.Services.AddDomainServices();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.Configure<SupportOptions>(builder.Configuration.GetSection(SupportOptions.SectionName));
 
 // JWT auth
 var jwtSection = builder.Configuration.GetSection(JwtOptions.SectionName);
@@ -74,6 +75,7 @@ app.UseAuthorization();
 
 // Endpoints
 app.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }));
+app.MapPublic();
 app.MapReadings();
 app.MapAuth();
 app.MapCards();

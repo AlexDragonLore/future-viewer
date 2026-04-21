@@ -59,7 +59,7 @@ public sealed class YukassaClient : IPaymentProvider
                 Type = "redirect",
                 ReturnUrl = _options.ReturnUrl
             },
-            Description = $"Future Viewer subscription for {userEmail}",
+            Description = $"Подписка «Вуаль Грядущего» для {userEmail}",
             Metadata = new Dictionary<string, string>
             {
                 ["user_id"] = userId.ToString()

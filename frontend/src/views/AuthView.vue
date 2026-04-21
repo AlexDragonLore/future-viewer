@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import axios from 'axios'
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
@@ -13,19 +14,47 @@ const email = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
 const busy = ref(false)
+const info = ref<string | null>(null)
+const needsVerification = ref(false)
+const resendBusy = ref(false)
 
 async function submit() {
   busy.value = true
   error.value = null
+  info.value = null
+  needsVerification.value = false
   try {
-    if (mode.value === 'login') await auth.login(email.value, password.value)
-    else await auth.register(email.value, password.value)
-    const redirect = (route.query.redirect as string) || '/'
-    router.replace(redirect)
+    if (mode.value === 'login') {
+      await auth.login(email.value, password.value)
+      const redirect = (route.query.redirect as string) || '/'
+      router.replace(redirect)
+    } else {
+      const result = await auth.register(email.value, password.value)
+      if (result.verificationRequired) {
+        info.value = `Мы отправили письмо на ${result.email}. Перейдите по ссылке, чтобы подтвердить почту.`
+      }
+    }
+  } catch (e) {
+    error.value = extractApiError(e)
+    if (axios.isAxiosError(e) && e.response?.status === 403 && e.response?.data?.error === 'email_not_verified') {
+      needsVerification.value = true
+    }
+  } finally {
+    busy.value = false
+  }
+}
+
+async function resendVerification() {
+  resendBusy.value = true
+  error.value = null
+  info.value = null
+  try {
+    await auth.resendVerification(email.value)
+    info.value = 'Письмо отправлено повторно. Проверьте ящик.'
   } catch (e) {
     error.value = extractApiError(e)
   } finally {
-    busy.value = false
+    resendBusy.value = false
   }
 }
 </script>
@@ -55,15 +84,32 @@ async function submit() {
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 focus:outline-none focus:border-mystic-accent"
         />
         <div v-if="error" class="text-sm text-red-300">{{ error }}</div>
+        <div v-if="info" class="text-sm text-mystic-accent">{{ info }}</div>
+        <button
+          v-if="needsVerification"
+          type="button"
+          class="w-full text-sm underline text-mystic-accent"
+          :disabled="resendBusy"
+          @click="resendVerification"
+        >
+          {{ resendBusy ? '...' : 'Отправить письмо повторно' }}
+        </button>
         <button type="submit" class="glow-button w-full" :disabled="busy">
           {{ busy ? '...' : mode === 'login' ? 'Войти' : 'Создать' }}
         </button>
       </form>
 
-      <div class="text-center text-xs text-mystic-silver/60 mt-6">
-        <button class="underline hover:text-mystic-accent" @click="mode = mode === 'login' ? 'register' : 'login'">
-          {{ mode === 'login' ? 'Создать аккаунт' : 'У меня уже есть аккаунт' }}
-        </button>
+      <div class="text-center text-xs text-mystic-silver/60 mt-6 space-y-2">
+        <div>
+          <button class="underline hover:text-mystic-accent" @click="mode = mode === 'login' ? 'register' : 'login'; info = null; error = null; needsVerification = false">
+            {{ mode === 'login' ? 'Создать аккаунт' : 'У меня уже есть аккаунт' }}
+          </button>
+        </div>
+        <div v-if="mode === 'login'">
+          <router-link to="/forgot-password" class="underline hover:text-mystic-accent">
+            Забыли пароль?
+          </router-link>
+        </div>
       </div>
     </section>
   </main>

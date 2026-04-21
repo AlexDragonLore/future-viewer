@@ -18,6 +18,8 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         .WithPassword("test")
         .Build();
 
+    public CapturingEmailSender EmailSender { get; } = new();
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -59,6 +61,14 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             var scorerDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IFeedbackScorer));
             if (scorerDescriptor is not null) services.Remove(scorerDescriptor);
             services.AddSingleton<IFeedbackScorer, StubFeedbackScorer>();
+
+            var emailDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IEmailSender));
+            if (emailDescriptor is not null) services.Remove(emailDescriptor);
+            services.AddSingleton<IEmailSender>(EmailSender);
+
+            var linkDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IEmailLinkBuilder));
+            if (linkDescriptor is not null) services.Remove(linkDescriptor);
+            services.AddSingleton<IEmailLinkBuilder, FakeEmailLinkBuilder>();
         });
     }
 }

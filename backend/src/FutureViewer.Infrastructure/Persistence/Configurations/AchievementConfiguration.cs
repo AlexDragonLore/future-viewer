@@ -16,6 +16,7 @@ public sealed class AchievementConfiguration : IEntityTypeConfiguration<Achievem
         b.Property(x => x.DescriptionRu).HasColumnName("description_ru").IsRequired().HasMaxLength(512);
         b.Property(x => x.IconPath).HasColumnName("icon_path").IsRequired().HasMaxLength(256);
         b.Property(x => x.SortOrder).HasColumnName("sort_order");
+        b.Property(x => x.Points).HasColumnName("points").HasDefaultValue(0);
 
         b.HasIndex(x => x.Code).IsUnique();
     }
