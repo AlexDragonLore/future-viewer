@@ -23,6 +23,10 @@ future-viewer/
 
 ## Локальный запуск
 
+Локальный `docker-compose.yml` предназначен для разработки: backend работает в
+`Development`, frontend запускается через Vite dev server, Postgres открыт на
+`localhost:5432`.
+
 ```bash
 # 1. Секреты бэкенда
 cd backend/src/FutureViewer.Host
@@ -51,6 +55,52 @@ docker compose up --build
 - API:      http://localhost:5050
 - Swagger:  http://localhost:5050/swagger
 - Frontend: http://localhost:5173
+
+> Важно: если реальный `OPENAI_API_KEY` когда-либо попадал в локальный `.env`,
+> shell history, логи или чат, считайте его скомпрометированным и перевыпустите
+> ключ в кабинете OpenAI. Реальные секреты не должны коммититься.
+
+## Production: один сервер
+
+Production-запуск рассчитан на чистый Ubuntu/Debian-сервер с Docker,
+Docker Compose и доменом. До запуска убедитесь, что A-запись домена указывает на
+IP сервера: Caddy автоматически получит HTTPS-сертификат для этого домена.
+
+```bash
+apt update && apt install docker.io docker-compose git -y
+mkdir -p /opt/fv-app
+git clone <repo-url> /opt/fv-app/current
+cd /opt/fv-app/current
+bash init.sh
+```
+
+`init.sh`:
+
+- создает `/opt/fv-app/.env.production` с правами `600`, если файла еще нет;
+- спрашивает домен, OpenAI key, email админа, support email и опциональные
+  Telegram/SMTP/YooKassa настройки;
+- генерирует `JWT_SECRET` и пароль Postgres;
+- запускает `docker-compose.prod.yml` с Postgres, backend, production frontend и
+  Caddy reverse proxy на `80/443`.
+
+Production-секреты живут только в `/opt/fv-app/.env.production`. В репозитории
+есть только шаблон [`.env.production.example`](.env.production.example).
+
+Обновление уже поднятого сервера:
+
+```bash
+cd /opt/fv-app/current
+git pull
+bash init.sh
+```
+
+Полезные команды диагностики:
+
+```bash
+docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps
+docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer logs -f backend
+curl -I https://<your-domain>/health
+```
 
 ## Тесты
 
