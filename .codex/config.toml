@@ -1,0 +1,3 @@
+[mcp_servers.playwright]
+args = ["@anthropic-ai/claude-code-playwright-mcp"]
+command = "npx"

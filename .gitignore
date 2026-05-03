@@ -3,6 +3,14 @@
 # Based on https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 # ============================================================
 
+# Environment files with secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+!frontend/.env.production
+!frontend/.env.staging
+
 # User-specific files
 *.rsuser
 *.suo

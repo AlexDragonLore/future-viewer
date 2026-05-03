@@ -1,3 +1,4 @@
+# Local development compose. Production server deployment uses docker-compose.prod.yml.
 services:
   postgres:
     image: postgres:17-alpine
