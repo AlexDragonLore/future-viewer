@@ -87,7 +87,7 @@ describe('AuthView', () => {
   })
 
   it('calls register in register mode', async () => {
-    registerMock.mockResolvedValue({ accessToken: 't', email: 'new@x.com', expiresAt: '', userId: 'u' })
+    registerMock.mockResolvedValue({ email: 'new@x.com', userId: 'u', verificationRequired: true })
     const { wrapper } = await mountAuth()
     await wrapper.find('button.underline').trigger('click')
     await wrapper.find('input[type="email"]').setValue('new@x.com')
@@ -95,5 +95,18 @@ describe('AuthView', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
     expect(registerMock).toHaveBeenCalledWith('new@x.com', 'password1')
+  })
+
+  it('logs in and redirects after registration when verification is not required', async () => {
+    registerMock.mockResolvedValue({ email: 'new@x.com', userId: 'u', verificationRequired: false })
+    loginMock.mockResolvedValue({ accessToken: 't', email: 'new@x.com', expiresAt: '', userId: 'u', isAdmin: false })
+    const { wrapper, router } = await mountAuth()
+    await wrapper.find('button.underline').trigger('click')
+    await wrapper.find('input[type="email"]').setValue('new@x.com')
+    await wrapper.find('input[type="password"]').setValue('password1')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(loginMock).toHaveBeenCalledWith('new@x.com', 'password1')
+    expect(router.currentRoute.value.path).toBe('/')
   })
 })

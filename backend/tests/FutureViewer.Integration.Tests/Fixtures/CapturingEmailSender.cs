@@ -9,6 +9,8 @@ public sealed class CapturingEmailSender : IEmailSender
 {
     public ConcurrentQueue<CapturedEmail> Sent { get; } = new();
 
+    public bool IsConfigured { get; set; } = true;
+
     public Task SendAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
     {
         Sent.Enqueue(new CapturedEmail(to, subject, htmlBody));

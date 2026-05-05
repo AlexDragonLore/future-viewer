@@ -20,6 +20,7 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task Register_returns_accepted_without_token_and_sends_email()
     {
+        _fixture.EmailSender.IsConfigured = true;
         var client = _fixture.CreateClient();
         var email = $"user-{Guid.NewGuid():N}@example.com";
 
@@ -37,8 +38,38 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
+    public async Task Register_allows_login_without_verification_when_email_is_not_configured()
+    {
+        _fixture.EmailSender.IsConfigured = false;
+        try
+        {
+            var client = _fixture.CreateClient();
+            var email = $"no-mail-{Guid.NewGuid():N}@example.com";
+
+            var registerResponse = await client.PostAsJsonAsync("/api/auth/register",
+                new RegisterRequest { Email = email, Password = "password123" });
+            registerResponse.StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+            var body = await registerResponse.Content.ReadFromJsonAsync<RegisterResponse>();
+            body!.VerificationRequired.Should().BeFalse();
+
+            var loginResponse = await client.PostAsJsonAsync("/api/auth/login",
+                new LoginRequest { Email = email, Password = "password123" });
+            loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
+            auth!.AccessToken.Should().NotBeNullOrWhiteSpace();
+        }
+        finally
+        {
+            _fixture.EmailSender.IsConfigured = true;
+        }
+    }
+
+    [Fact]
     public async Task Login_before_verification_returns_forbidden()
     {
+        _fixture.EmailSender.IsConfigured = true;
         var client = _fixture.CreateClient();
         var email = $"unv-{Guid.NewGuid():N}@example.com";
 

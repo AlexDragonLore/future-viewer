@@ -18,6 +18,8 @@ public sealed class SmtpEmailSender : IEmailSender
         _logger = logger;
     }
 
+    public bool IsConfigured => _options.IsConfigured;
+
     public async Task SendAsync(string to, string subject, string htmlBody, CancellationToken ct = default)
     {
         if (!_options.IsConfigured)

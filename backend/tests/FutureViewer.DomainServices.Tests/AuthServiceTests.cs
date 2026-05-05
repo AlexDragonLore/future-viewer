@@ -10,12 +10,13 @@ namespace FutureViewer.DomainServices.Tests;
 
 public sealed class AuthServiceTests
 {
-    private static (AuthService sut, Mock<IUserRepository> users, Mock<IPasswordHasher> hasher, Mock<IJwtTokenService> jwt, Mock<IEmailSender> email, Mock<IEmailLinkBuilder> links) CreateSut()
+    private static (AuthService sut, Mock<IUserRepository> users, Mock<IPasswordHasher> hasher, Mock<IJwtTokenService> jwt, Mock<IEmailSender> email, Mock<IEmailLinkBuilder> links) CreateSut(bool emailConfigured = true)
     {
         var users = new Mock<IUserRepository>();
         var hasher = new Mock<IPasswordHasher>();
         var jwt = new Mock<IJwtTokenService>();
         var email = new Mock<IEmailSender>();
+        email.SetupGet(e => e.IsConfigured).Returns(emailConfigured);
         var links = new Mock<IEmailLinkBuilder>();
         links.Setup(l => l.BuildVerificationLink(It.IsAny<string>())).Returns("http://link");
         links.Setup(l => l.BuildPasswordResetLink(It.IsAny<string>())).Returns("http://reset-link");
@@ -44,6 +45,29 @@ public sealed class AuthServiceTests
             && x.EmailVerificationToken != null
             && x.EmailVerificationSentAt != null), It.IsAny<CancellationToken>()), Times.Once);
         email.Verify(e => e.SendAsync("test@example.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Register_creates_verified_user_without_email_when_email_is_not_configured()
+    {
+        var (sut, users, hasher, _, email, _) = CreateSut(emailConfigured: false);
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User?)null);
+        users.Setup(u => u.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((User u, CancellationToken _) => u);
+        hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
+
+        var result = await sut.RegisterAsync(new RegisterRequest { Email = "Test@Example.com", Password = "password123" });
+
+        result.Email.Should().Be("test@example.com");
+        result.VerificationRequired.Should().BeFalse();
+        users.Verify(u => u.AddAsync(It.Is<User>(x =>
+            x.Email == "test@example.com"
+            && x.PasswordHash == "hashed"
+            && x.IsEmailVerified
+            && x.EmailVerificationToken == null
+            && x.EmailVerificationSentAt == null), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -140,6 +164,32 @@ public sealed class AuthServiceTests
 
         result.IsAdmin.Should().BeTrue();
         result.AccessToken.Should().Be("tok");
+    }
+
+    [Fact]
+    public async Task Login_marks_existing_unverified_user_verified_when_email_is_not_configured()
+    {
+        var (sut, users, hasher, jwt, _, _) = CreateSut(emailConfigured: false);
+        var user = new User
+        {
+            Email = "a@b.c",
+            PasswordHash = "hash",
+            IsEmailVerified = false,
+            EmailVerificationToken = "old",
+            EmailVerificationSentAt = DateTime.UtcNow
+        };
+        users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+        hasher.Setup(h => h.Verify("pw", "hash")).Returns(true);
+        jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>())).Returns(("tok", DateTime.UtcNow.AddHours(1)));
+
+        var result = await sut.LoginAsync(new LoginRequest { Email = "a@b.c", Password = "pw" });
+
+        result.AccessToken.Should().Be("tok");
+        user.IsEmailVerified.Should().BeTrue();
+        user.EmailVerificationToken.Should().BeNull();
+        user.EmailVerificationSentAt.Should().BeNull();
+        users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
