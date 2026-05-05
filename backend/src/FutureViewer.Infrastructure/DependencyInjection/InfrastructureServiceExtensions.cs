@@ -21,7 +21,9 @@ public static class InfrastructureServiceExtensions
         IConfiguration configuration)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<AIOptions>(configuration.GetSection(AIOptions.SectionName));
         services.Configure<OpenAIOptions>(configuration.GetSection(OpenAIOptions.SectionName));
+        services.Configure<DeepSeekOptions>(configuration.GetSection(DeepSeekOptions.SectionName));
         services.Configure<YukassaOptions>(configuration.GetSection(YukassaOptions.SectionName));
         services.Configure<TelegramOptions>(configuration.GetSection(TelegramOptions.SectionName));
 
@@ -42,6 +44,7 @@ public static class InfrastructureServiceExtensions
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddSingleton<AIChatClientFactory>();
         services.AddSingleton<IAIInterpreter, OpenAIInterpreter>();
         services.AddSingleton<IFeedbackScorer, FeedbackScoringInterpreter>();
 

@@ -4,27 +4,22 @@ using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.Domain.ValueObjects;
 using FutureViewer.DomainServices.Interfaces;
-using Microsoft.Extensions.Options;
-using OpenAI;
 using OpenAI.Chat;
 
 namespace FutureViewer.Infrastructure.AI;
 
 public sealed class OpenAIInterpreter : IAIInterpreter
 {
-    private readonly OpenAIOptions _options;
+    private readonly AIChatClientFactory _chatClientFactory;
     private readonly ChatClient _chat;
 
-    public OpenAIInterpreter(IOptions<OpenAIOptions> options)
+    public OpenAIInterpreter(AIChatClientFactory chatClientFactory)
     {
-        _options = options.Value;
-        if (string.IsNullOrWhiteSpace(_options.ApiKey))
-            throw new InvalidOperationException("OpenAI:ApiKey is not configured");
-
-        _chat = new OpenAIClient(_options.ApiKey).GetChatClient(_options.Model);
+        _chatClientFactory = chatClientFactory;
+        _chat = chatClientFactory.CreateChatClient();
     }
 
-    public string Model => _options.Model;
+    public string Model => _chatClientFactory.Model;
 
     private const string SystemPrompt =
         "Ты — опытный таролог. Отвечай на русском языке, стиль мистический, но не перегруженный. " +
@@ -46,7 +41,7 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         return new InterpretationResult
         {
             Text = text,
-            Model = _options.Model,
+            Model = Model,
             GeneratedAt = DateTime.UtcNow
         };
     }
