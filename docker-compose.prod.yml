@@ -32,8 +32,13 @@ services:
       Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in /opt/fv-app/.env.production}
       Jwt__Issuer: ${JWT_ISSUER:-future-viewer}
       Jwt__Audience: ${JWT_AUDIENCE:-future-viewer}
-      OpenAI__ApiKey: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in /opt/fv-app/.env.production}
+      AI__Provider: ${AI_PROVIDER:-OpenAI}
+      OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__Model: ${OPENAI_MODEL:-gpt-4o}
+      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-}
+      DeepSeek__ApiKey: ${DEEPSEEK_API_KEY:-}
+      DeepSeek__Model: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DeepSeek__BaseUrl: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
       Telegram__SiteUrl: https://${APP_DOMAIN}

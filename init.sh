@@ -89,7 +89,13 @@ create_env_file() {
   mkdir -p "$APP_DIR"
 
   local app_domain
-  local openai_api_key
+  local ai_provider
+  local openai_api_key=""
+  local openai_model="gpt-4o"
+  local openai_base_url=""
+  local deepseek_api_key=""
+  local deepseek_model="deepseek-v4-flash"
+  local deepseek_base_url="https://api.deepseek.com"
   local admin_emails
   local support_email
   local jwt_secret
@@ -97,7 +103,24 @@ create_env_file() {
 
   echo "Creating production env file at $ENV_FILE"
   app_domain="$(prompt_required "Domain pointed to this server, without https://")"
-  openai_api_key="$(prompt_required "OpenAI API key")"
+  ai_provider="$(prompt_optional "AI provider (OpenAI or DeepSeek)" "OpenAI")"
+  case "$ai_provider" in
+    OpenAI|openai|ChatGPT|chatgpt|GPT|gpt)
+      ai_provider="OpenAI"
+      openai_api_key="$(prompt_required "OpenAI API key")"
+      openai_model="$(prompt_optional "OpenAI model" "gpt-4o")"
+      openai_base_url="$(prompt_optional "OpenAI base URL override (optional)")"
+      ;;
+    DeepSeek|deepseek)
+      ai_provider="DeepSeek"
+      deepseek_api_key="$(prompt_required "DeepSeek API key")"
+      deepseek_model="$(prompt_optional "DeepSeek model" "deepseek-v4-flash")"
+      deepseek_base_url="$(prompt_optional "DeepSeek base URL" "https://api.deepseek.com")"
+      ;;
+    *)
+      fail "Unsupported AI provider '$ai_provider'. Use OpenAI or DeepSeek."
+      ;;
+  esac
   admin_emails="$(prompt_required "Admin email(s), comma-separated")"
   support_email="$(prompt_required "Support email shown in the footer")"
   jwt_secret="$(random_secret)"
@@ -119,8 +142,13 @@ EOF
   write_env_line JWT_SECRET "$jwt_secret"
   write_env_line JWT_ISSUER "future-viewer"
   write_env_line JWT_AUDIENCE "future-viewer"
+  write_env_line AI_PROVIDER "$ai_provider"
   write_env_line OPENAI_API_KEY "$openai_api_key"
-  write_env_line OPENAI_MODEL "gpt-4o"
+  write_env_line OPENAI_MODEL "$openai_model"
+  write_env_line OPENAI_BASE_URL "$openai_base_url"
+  write_env_line DEEPSEEK_API_KEY "$deepseek_api_key"
+  write_env_line DEEPSEEK_MODEL "$deepseek_model"
+  write_env_line DEEPSEEK_BASE_URL "$deepseek_base_url"
   write_env_line VITE_API_URL ""
   write_admin_emails "$admin_emails"
   write_env_line SUPPORT_EMAIL "$support_email"
@@ -163,11 +191,23 @@ validate_env() {
 
   [[ -n "${APP_DOMAIN:-}" ]] || fail "APP_DOMAIN is required"
   [[ "$APP_DOMAIN" != http://* && "$APP_DOMAIN" != https://* ]] || fail "APP_DOMAIN must not include http:// or https://"
-  [[ -n "${OPENAI_API_KEY:-}" ]] || fail "OPENAI_API_KEY is required"
   [[ -n "${POSTGRES_PASSWORD:-}" ]] || fail "POSTGRES_PASSWORD is required"
   [[ -n "${JWT_SECRET:-}" ]] || fail "JWT_SECRET is required"
   [[ "$JWT_SECRET" != "$DEV_JWT_SECRET" ]] || fail "JWT_SECRET still uses the development default"
   [[ "${#JWT_SECRET}" -ge 32 ]] || fail "JWT_SECRET must be at least 32 characters"
+
+  local ai_provider="${AI_PROVIDER:-OpenAI}"
+  case "$ai_provider" in
+    OpenAI|openai|ChatGPT|chatgpt|GPT|gpt)
+      [[ -n "${OPENAI_API_KEY:-}" ]] || fail "OPENAI_API_KEY is required when AI_PROVIDER=$ai_provider"
+      ;;
+    DeepSeek|deepseek)
+      [[ -n "${DEEPSEEK_API_KEY:-}" ]] || fail "DEEPSEEK_API_KEY is required when AI_PROVIDER=$ai_provider"
+      ;;
+    *)
+      fail "AI_PROVIDER '$ai_provider' is not supported. Use OpenAI or DeepSeek."
+      ;;
+  esac
 
   local admin_found=0
   local env_name
