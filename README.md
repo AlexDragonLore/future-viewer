@@ -79,7 +79,7 @@ bash init.sh
 `init.sh`:
 
 - создает `/opt/fv-app/.env.production` с правами `600`, если файла еще нет;
-- спрашивает домен, OpenAI key, email админа, support email и опциональные
+- спрашивает домен, AI provider, provider API key, email админа, support email и опциональные
   Telegram/SMTP/YooKassa настройки;
 - генерирует `JWT_SECRET` и пароль Postgres;
 - запускает `docker-compose.prod.yml` с Postgres, backend, production frontend и
