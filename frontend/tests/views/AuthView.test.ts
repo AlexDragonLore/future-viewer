@@ -23,6 +23,7 @@ async function mountAuth(initialPath = '/auth'): Promise<{ wrapper: ReturnType<t
       { path: '/', component: { template: '<div>home</div>' } },
       { path: '/auth', name: 'auth', component: AuthView },
       { path: '/history', component: { template: '<div>h</div>' } },
+      { path: '/forgot-password', name: 'forgot-password', component: { template: '<div>fp</div>' } },
     ],
   })
   router.push(initialPath)

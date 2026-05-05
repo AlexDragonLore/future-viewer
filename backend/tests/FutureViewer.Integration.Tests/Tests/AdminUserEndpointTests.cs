@@ -161,9 +161,7 @@ public sealed class AdminUserEndpointTests : IClassFixture<IntegrationTestFixtur
     private async Task<(HttpClient Client, AuthResponse Auth)> CreateUser(string email)
     {
         var client = _fixture.CreateClient();
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
         return (client, auth);
     }
@@ -173,9 +171,7 @@ public sealed class AdminUserEndpointTests : IClassFixture<IntegrationTestFixtur
         var client = _fixture.CreateClient();
         var email = $"admin-user-test-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
 
         if (asAdmin)
         {
@@ -199,9 +195,7 @@ public sealed class AdminUserEndpointTests : IClassFixture<IntegrationTestFixtur
         var client = _fixture.CreateClient();
         var email = $"user-{Guid.NewGuid():N}@example.com";
 
-        var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
-        var auth = await register.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
 
         using var scope = _fixture.Services.CreateScope();

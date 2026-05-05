@@ -50,55 +50,57 @@ function statusName(s: FeedbackStatus): string {
   <div v-else-if="store.feedbacks.length === 0" class="empty" data-testid="admin-feedbacks-empty">
     Нет фидбеков по фильтру
   </div>
-  <table v-else class="admin-table" data-testid="admin-feedbacks-table">
-    <thead>
-      <tr>
-        <th>Создан</th>
-        <th>Email</th>
-        <th>Reading</th>
-        <th>Статус</th>
-        <th>Score</th>
-        <th>Sincere</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-for="f in store.feedbacks" :key="f.id" data-testid="admin-feedback-row">
-        <td class="mono">{{ new Date(f.createdAt).toLocaleString() }}</td>
-        <td>{{ f.userEmail || f.userId.slice(0, 8) }}</td>
-        <td class="mono">{{ f.readingId.slice(0, 8) }}</td>
-        <td>
-          <select v-model="ensureRowState(f).status" class="cell-input">
-            <option :value="0">Pending</option>
-            <option :value="1">Notified</option>
-            <option :value="2">Answered</option>
-            <option :value="3">Scored</option>
-          </select>
-          <span class="status-label">{{ statusName(f.status) }}</span>
-        </td>
-        <td>
-          <input
-            v-model.number="ensureRowState(f).aiScore"
-            type="number"
-            min="1"
-            max="10"
-            class="cell-input score-input"
-            data-testid="admin-feedback-score-input"
-          />
-        </td>
-        <td>
-          <select v-model="ensureRowState(f).isSincere" class="cell-input">
-            <option :value="true">Да</option>
-            <option :value="false">Нет</option>
-          </select>
-        </td>
-        <td class="actions">
-          <button class="row-btn" data-testid="admin-feedback-save" @click="saveRow(f)">💾</button>
-          <button class="row-btn danger" data-testid="admin-feedback-delete" @click="deleteRow(f)">🗑</button>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <div v-else class="table-scroll">
+    <table class="admin-table" data-testid="admin-feedbacks-table">
+      <thead>
+        <tr>
+          <th class="mobile-hide">Создан</th>
+          <th>Email</th>
+          <th class="mobile-hide">Reading</th>
+          <th>Статус</th>
+          <th>Score</th>
+          <th class="mobile-hide">Sincere</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="f in store.feedbacks" :key="f.id" data-testid="admin-feedback-row">
+          <td class="mono mobile-hide">{{ new Date(f.createdAt).toLocaleString() }}</td>
+          <td>{{ f.userEmail || f.userId.slice(0, 8) }}</td>
+          <td class="mono mobile-hide">{{ f.readingId.slice(0, 8) }}</td>
+          <td>
+            <select v-model="ensureRowState(f).status" class="cell-input">
+              <option :value="0">Pending</option>
+              <option :value="1">Notified</option>
+              <option :value="2">Answered</option>
+              <option :value="3">Scored</option>
+            </select>
+            <span class="status-label">{{ statusName(f.status) }}</span>
+          </td>
+          <td>
+            <input
+              v-model.number="ensureRowState(f).aiScore"
+              type="number"
+              min="1"
+              max="10"
+              class="cell-input score-input"
+              data-testid="admin-feedback-score-input"
+            />
+          </td>
+          <td class="mobile-hide">
+            <select v-model="ensureRowState(f).isSincere" class="cell-input">
+              <option :value="true">Да</option>
+              <option :value="false">Нет</option>
+            </select>
+          </td>
+          <td class="actions">
+            <button class="row-btn" data-testid="admin-feedback-save" @click="saveRow(f)">💾</button>
+            <button class="row-btn danger" data-testid="admin-feedback-delete" @click="deleteRow(f)">🗑</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </template>
 
 <style scoped>
@@ -171,5 +173,23 @@ function statusName(s: FeedbackStatus): string {
 .row-btn.danger:hover {
   background: rgba(255, 80, 80, 0.15);
   border-color: rgba(255, 80, 80, 0.6);
+}
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 768px) {
+  .mobile-hide {
+    display: none;
+  }
+  .admin-table td,
+  .admin-table thead th {
+    padding: 0.45rem 0.35rem;
+    font-size: 0.8rem;
+  }
+  .score-input {
+    width: 3rem;
+  }
 }
 </style>

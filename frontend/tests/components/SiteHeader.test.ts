@@ -20,6 +20,9 @@ function buildRouter(): Router {
       { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/glossary', name: 'glossary', component: { template: '<div>glossary</div>' } },
       { path: '/history', name: 'history', component: { template: '<div>history</div>' } },
+      { path: '/leaderboard', name: 'leaderboard', component: { template: '<div>leaderboard</div>' } },
+      { path: '/achievements', name: 'achievements', component: { template: '<div>achievements</div>' } },
+      { path: '/profile', name: 'profile', component: { template: '<div>profile</div>' } },
       { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
     ],
   })
@@ -110,6 +113,33 @@ describe('SiteHeader', () => {
     await options[1].trigger('click')
     expect(picker.find('.deck-menu').exists()).toBe(false)
     expect(picker.get('.deck-button').text()).toContain('Thoth')
+  })
+
+  it('burger button toggles the mobile navigation panel', async () => {
+    const { wrapper } = await mountHeader()
+    const burger = wrapper.find('[data-testid="burger-button"]')
+    expect(burger.exists()).toBe(true)
+    expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(false)
+    await burger.trigger('click')
+    expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="burger-glossary"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="burger-leaderboard"]').exists()).toBe(true)
+    await burger.trigger('click')
+    expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(false)
+  })
+
+  it('burger panel shows authenticated links and closes on navigation', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'm@x.com')
+    const { wrapper } = await mountHeader()
+    await wrapper.find('[data-testid="burger-button"]').trigger('click')
+    expect(wrapper.find('[data-testid="burger-history"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="burger-achievements"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="burger-profile"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="burger-logout"]').exists()).toBe(true)
+    await wrapper.find('[data-testid="burger-history"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(false)
   })
 
   it('logout clears auth state and routes home', async () => {

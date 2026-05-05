@@ -1,20 +1,24 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { useDeckStore } from '@/stores/useDeckStore'
 import { SpreadType } from '@/types'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
+import { findDeckMeta } from '@/data/decks'
+import { SPREADS_META, findSpreadMeta } from '@/data/spreads'
 
 const router = useRouter()
-const store = useReadingStore()
 const auth = useAuthStore()
+const deck = useDeckStore()
 
 const question = ref('')
 const spreadType = ref<SpreadType>(SpreadType.ThreeCard)
 
+const currentDeckMeta = computed(() => findDeckMeta(deck.current))
+const currentSpreadMeta = computed(() => findSpreadMeta(spreadType.value))
+
 onMounted(async () => {
-  await store.loadSpreads()
   if (auth.isAuthenticated) await auth.refreshSubscription()
 })
 
@@ -69,16 +73,16 @@ function begin() {
 </script>
 
 <template>
-  <main class="min-h-screen flex flex-col items-center justify-center px-6 py-16">
+  <main class="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16">
     <header class="text-center mb-10">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ FUTURE VIEWER ✦</div>
-      <h1 class="font-display text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
+      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ВУАЛЬ ГРЯДУЩЕГО ✦</div>
+      <h1 class="font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
       <p class="text-mystic-silver/70 max-w-xl mx-auto">
         Задай вопрос Вселенной. Карты Таро раскроют тайные нити судьбы и покажут путь сквозь туман грядущего.
       </p>
     </header>
 
-    <section class="mystic-card w-full max-w-xl p-8 space-y-6">
+    <section class="mystic-card w-full max-w-xl p-5 sm:p-8 space-y-6">
       <div v-if="badgeText" class="subscription-badge" :class="{ active: auth.isSubscribed }">
         <span>{{ badgeText }}</span>
         <RouterLink v-if="!auth.isSubscribed" to="/history" class="ml-auto text-mystic-accent text-xs hover:underline">
@@ -86,23 +90,39 @@ function begin() {
         </RouterLink>
       </div>
 
+      <div v-if="currentDeckMeta" class="deck-blurb" data-testid="home-deck-blurb">
+        <div class="deck-blurb-head">
+          <span class="deck-blurb-label">Колода:</span>
+          <strong>{{ currentDeckMeta.label }}</strong>
+        </div>
+        <p>{{ currentDeckMeta.shortDescription }}</p>
+        <RouterLink :to="`/glossary#deck-${currentDeckMeta.anchorId}`" class="blurb-link">
+          Подробнее в глоссарии →
+        </RouterLink>
+      </div>
+
       <div>
         <label class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">Расклад</label>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
-            v-for="s in store.spreads.length ? store.spreads : [
-              { type: 1, name: 'Карта дня', cardCount: 1 },
-              { type: 3, name: 'Три карты', cardCount: 3 },
-              { type: 10, name: 'Кельтский крест', cardCount: 10 }
-            ]"
+            v-for="s in SPREADS_META"
             :key="s.type"
             class="spread-option"
             :class="{ active: spreadType === s.type }"
-            @click="spreadType = s.type as SpreadType"
+            @click="spreadType = s.type"
           >
-            <div class="text-sm font-display">{{ s.name }}</div>
+            <div class="text-sm font-display">{{ s.label }}</div>
             <div class="text-xs text-mystic-silver/60 mt-1">{{ s.cardCount }} карт(ы)</div>
           </button>
+        </div>
+        <div v-if="currentSpreadMeta" class="spread-blurb" data-testid="home-spread-blurb">
+          <p>{{ currentSpreadMeta.shortDescription }}</p>
+          <RouterLink
+            :to="`/glossary#spread-${currentSpreadMeta.anchorId}`"
+            class="blurb-link"
+          >
+            Подробнее в глоссарии →
+          </RouterLink>
         </div>
       </div>
 
@@ -157,6 +177,46 @@ function begin() {
   border-color: #f5c26b;
   background: rgba(245, 194, 107, 0.15);
   box-shadow: 0 0 20px rgba(245, 194, 107, 0.3);
+}
+.deck-blurb,
+.spread-blurb {
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(245, 194, 107, 0.2);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 0.8rem;
+  color: rgba(224, 212, 186, 0.8);
+  line-height: 1.5;
+}
+.spread-blurb {
+  margin-top: 0.75rem;
+}
+.deck-blurb-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.08em;
+  color: #f5c26b;
+  font-size: 0.8rem;
+}
+.deck-blurb-label {
+  color: rgba(224, 212, 186, 0.6);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+.blurb-link {
+  display: inline-block;
+  margin-top: 0.4rem;
+  color: #f5c26b;
+  text-decoration: none;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+.blurb-link:hover {
+  text-decoration: underline;
 }
 .subscription-badge {
   display: flex;

@@ -44,6 +44,11 @@ public sealed class ExceptionHandlerMiddleware
             ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
             await ctx.Response.WriteAsJsonAsync(new { error = "unauthorized", message = ex.Message });
         }
+        catch (EmailNotVerifiedException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+            await ctx.Response.WriteAsJsonAsync(new { error = "email_not_verified", message = ex.Message });
+        }
         catch (QuotaExceededException ex)
         {
             ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;

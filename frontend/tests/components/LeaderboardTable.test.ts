@@ -5,10 +5,10 @@ import type { LeaderboardEntry } from '@/types'
 
 function makeEntries(): LeaderboardEntry[] {
   return [
-    { userId: 'u1', displayName: 'a***@mail.com', totalScore: 58, feedbackCount: 8, averageScore: 7.25, rank: 1 },
-    { userId: 'u2', displayName: 'b***@mail.com', totalScore: 40, feedbackCount: 5, averageScore: 8, rank: 2 },
-    { userId: 'u3', displayName: 'c***@mail.com', totalScore: 30, feedbackCount: 5, averageScore: 6, rank: 3 },
-    { userId: 'u4', displayName: 'd***@mail.com', totalScore: 20, feedbackCount: 4, averageScore: 5, rank: 4 },
+    { userId: 'u1', displayName: 'a***@mail.com', totalScore: 58, feedbackScore: 48, achievementScore: 10, feedbackCount: 8, averageScore: 7.25, rank: 1 },
+    { userId: 'u2', displayName: 'b***@mail.com', totalScore: 40, feedbackScore: 40, achievementScore: 0, feedbackCount: 5, averageScore: 8, rank: 2 },
+    { userId: 'u3', displayName: 'c***@mail.com', totalScore: 30, feedbackScore: 10, achievementScore: 20, feedbackCount: 5, averageScore: 6, rank: 3 },
+    { userId: 'u4', displayName: 'd***@mail.com', totalScore: 20, feedbackScore: 0, achievementScore: 20, feedbackCount: 4, averageScore: 5, rank: 4 },
   ]
 }
 
@@ -59,10 +59,25 @@ describe('LeaderboardTable', () => {
     const wrapper = mount(LeaderboardTable, {
       props: {
         entries: [
-          { userId: 'u1', displayName: 'x', totalScore: 10, feedbackCount: 2, averageScore: 7, rank: 1 },
+          { userId: 'u1', displayName: 'x', totalScore: 10, feedbackScore: 10, achievementScore: 0, feedbackCount: 2, averageScore: 7, rank: 1 },
         ],
       },
     })
     expect(wrapper.text()).toContain('7.0')
+  })
+
+  it('shows the feedback/achievement score breakdown under the total', () => {
+    const wrapper = mount(LeaderboardTable, { props: { entries: makeEntries() } })
+    const rows = wrapper.findAll('[data-testid="leaderboard-row"]')
+    const breakdowns = rows[0].findAll('[data-testid="score-breakdown"]')
+    expect(breakdowns).toHaveLength(1)
+    expect(breakdowns[0].text()).toContain('★ 48')
+    expect(breakdowns[0].text()).toContain('✦ 10')
+  })
+
+  it('renders «Итог» column header', () => {
+    const wrapper = mount(LeaderboardTable, { props: { entries: makeEntries() } })
+    expect(wrapper.text()).toContain('Итог')
+    expect(wrapper.text()).not.toContain('Сумма')
   })
 })

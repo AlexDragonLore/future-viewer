@@ -12,6 +12,7 @@ const w = computed(() => props.width ?? 140)
 const h = computed(() => Math.round((props.width ?? 140) * 1.65))
 
 const rotation = computed(() => (props.card?.isReversed ? 180 : 0))
+const orientation = computed(() => (props.card?.isReversed ? 'перевёрнутая' : 'прямая'))
 </script>
 
 <template>
@@ -34,6 +35,7 @@ const rotation = computed(() => (props.card?.isReversed ? 180 : 0))
             draggable="false"
           />
           <div v-else class="card-image" aria-hidden="true">✵</div>
+          <div class="card-orientation">{{ orientation }}</div>
           <div class="card-name-overlay font-display">{{ card.cardName }}</div>
         </div>
       </div>
@@ -134,6 +136,22 @@ const rotation = computed(() => (props.card?.isReversed ? 180 : 0))
   text-transform: uppercase;
   letter-spacing: 0.08em;
   line-height: 1.2;
+}
+
+.card-orientation {
+  position: absolute;
+  top: 0.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(10, 4, 20, 0.76);
+  border: 1px solid rgba(245, 194, 107, 0.35);
+  color: #e8d5a3;
+  font-size: 0.52rem;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .card-image {

@@ -1,8 +1,15 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import Starfield from '@/components/fx/Starfield.vue'
 import MistLayer from '@/components/fx/MistLayer.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
+
+const publicConfig = usePublicConfigStore()
+onMounted(() => {
+  publicConfig.load()
+})
 </script>
 
 <template>

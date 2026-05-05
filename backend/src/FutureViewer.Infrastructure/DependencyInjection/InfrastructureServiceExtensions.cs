@@ -2,6 +2,7 @@ using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Infrastructure.AI;
 using FutureViewer.Infrastructure.Auth;
 using FutureViewer.Infrastructure.BackgroundServices;
+using FutureViewer.Infrastructure.Email;
 using FutureViewer.Infrastructure.Payment;
 using FutureViewer.Infrastructure.Persistence;
 using FutureViewer.Infrastructure.Persistence.Repositories;
@@ -26,6 +27,7 @@ public static class InfrastructureServiceExtensions
         services.Configure<DeepSeekOptions>(configuration.GetSection(DeepSeekOptions.SectionName));
         services.Configure<YukassaOptions>(configuration.GetSection(YukassaOptions.SectionName));
         services.Configure<TelegramOptions>(configuration.GetSection(TelegramOptions.SectionName));
+        services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
 
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured");
@@ -47,6 +49,8 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<AIChatClientFactory>();
         services.AddSingleton<IAIInterpreter, OpenAIInterpreter>();
         services.AddSingleton<IFeedbackScorer, FeedbackScoringInterpreter>();
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddSingleton<IEmailLinkBuilder, EmailLinkBuilder>();
 
         services.AddHttpClient<IPaymentProvider, YukassaClient>();
 

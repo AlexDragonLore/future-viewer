@@ -40,7 +40,7 @@ public sealed class TelegramUpdateHandler : IUpdateHandler
         {
             await botClient.SendMessage(
                 chatId: chatId,
-                text: "Привет! Чтобы привязать аккаунт, откройте приложение Future Viewer и нажмите «Привязать Telegram».",
+                text: "Привет! Чтобы привязать аккаунт, откройте приложение «Вуаль Грядущего» и нажмите «Привязать Telegram».",
                 cancellationToken: cancellationToken);
             return;
         }

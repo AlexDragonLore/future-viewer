@@ -25,51 +25,53 @@ function onRow(u: AdminUserListItem): void {
   <div v-else-if="store.users.length === 0" class="empty" data-testid="admin-users-empty">
     Нет пользователей
   </div>
-  <table v-else class="admin-table" data-testid="admin-users-table">
-    <thead>
-      <tr>
-        <th>Email</th>
-        <th>Создан</th>
-        <th>Админ</th>
-        <th>Подписка</th>
-        <th>Читок</th>
-        <th>Фидбеков</th>
-        <th>Баллов</th>
-        <th>TG</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr
-        v-for="u in store.users"
-        :key="u.id"
-        data-testid="admin-user-row"
-        class="cursor-pointer"
-        @click="onRow(u)"
-      >
-        <td>{{ u.email }}</td>
-        <td class="mono">{{ new Date(u.createdAt).toLocaleDateString() }}</td>
-        <td>
-          <span v-if="u.isAdmin" class="badge admin">admin</span>
-          <span v-else class="badge muted">—</span>
-        </td>
-        <td>
-          <span class="badge" :class="{ active: u.subscriptionStatus === SubscriptionStatusValue.Active }">
-            {{ statusLabel(u.subscriptionStatus) }}
-          </span>
-          <span v-if="u.subscriptionExpiresAt" class="expiry">
-            → {{ new Date(u.subscriptionExpiresAt).toLocaleDateString() }}
-          </span>
-        </td>
-        <td class="num">{{ u.totalReadings }}</td>
-        <td class="num">{{ u.totalFeedbacks }}</td>
-        <td class="num">{{ u.totalScore }}</td>
-        <td>
-          <span v-if="u.telegramChatId" class="badge active">✓</span>
-          <span v-else class="badge muted">—</span>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+  <div v-else class="table-scroll">
+    <table class="admin-table" data-testid="admin-users-table">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th class="mobile-hide">Создан</th>
+          <th class="mobile-hide">Админ</th>
+          <th>Подписка</th>
+          <th class="num">Читок</th>
+          <th class="num mobile-hide">Фидбеков</th>
+          <th class="num">Баллов</th>
+          <th class="mobile-hide">TG</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr
+          v-for="u in store.users"
+          :key="u.id"
+          data-testid="admin-user-row"
+          class="cursor-pointer"
+          @click="onRow(u)"
+        >
+          <td>{{ u.email }}</td>
+          <td class="mono mobile-hide">{{ new Date(u.createdAt).toLocaleDateString() }}</td>
+          <td class="mobile-hide">
+            <span v-if="u.isAdmin" class="badge admin">admin</span>
+            <span v-else class="badge muted">—</span>
+          </td>
+          <td>
+            <span class="badge" :class="{ active: u.subscriptionStatus === SubscriptionStatusValue.Active }">
+              {{ statusLabel(u.subscriptionStatus) }}
+            </span>
+            <span v-if="u.subscriptionExpiresAt" class="expiry">
+              → {{ new Date(u.subscriptionExpiresAt).toLocaleDateString() }}
+            </span>
+          </td>
+          <td class="num">{{ u.totalReadings }}</td>
+          <td class="num mobile-hide">{{ u.totalFeedbacks }}</td>
+          <td class="num">{{ u.totalScore }}</td>
+          <td class="mobile-hide">
+            <span v-if="u.telegramChatId" class="badge active">✓</span>
+            <span v-else class="badge muted">—</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </template>
 
 <style scoped>
@@ -140,5 +142,20 @@ function onRow(u: AdminUserListItem): void {
   margin-left: 0.5rem;
   font-size: 0.75rem;
   color: rgba(224, 212, 186, 0.6);
+}
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 768px) {
+  .mobile-hide {
+    display: none;
+  }
+  .admin-table td,
+  .admin-table thead th {
+    padding: 0.45rem 0.35rem;
+    font-size: 0.8rem;
+  }
 }
 </style>
