@@ -1,12 +1,12 @@
 # Future Viewer / Вуаль Грядущего
 
-Онлайн ТАРО-расклад с AI-интерпретацией от OpenAI GPT. «Future Viewer» — внутреннее имя репозитория и неймспейсов; пользовательское название — «Вуаль Грядущего».
+Онлайн ТАРО-расклад с AI-интерпретацией через OpenAI-compatible провайдера (OpenAI/ChatGPT или DeepSeek). «Future Viewer» — внутреннее имя репозитория и неймспейсов; пользовательское название — «Вуаль Грядущего».
 
 ## Стек
 
 - **Backend**: .NET 10, ASP.NET Core Minimal API, EF Core + Npgsql, PostgreSQL 17
 - **Frontend**: Vue 3 + TypeScript + Vite, Pinia, GSAP, Tailwind CSS
-- **AI**: OpenAI GPT-4o
+- **AI**: OpenAI/ChatGPT или DeepSeek
 - **Tests**: xUnit + FluentAssertions + Moq, Testcontainers.PostgreSQL
 - **CI**: GitHub Actions
 
@@ -30,7 +30,9 @@ future-viewer/
 ```bash
 # 1. Секреты бэкенда
 cd backend/src/FutureViewer.Host
-dotnet user-secrets set "OpenAI:ApiKey" "sk-..."
+dotnet user-secrets set "AI:Provider" "OpenAI"       # или "DeepSeek"
+dotnet user-secrets set "OpenAI:ApiKey" "sk-..."     # если AI:Provider=OpenAI
+dotnet user-secrets set "DeepSeek:ApiKey" "<key>"    # если AI:Provider=DeepSeek
 dotnet user-secrets set "Jwt:Secret" "$(openssl rand -base64 48)"
 
 # Опционально — SMTP для подтверждения email и восстановления пароля.

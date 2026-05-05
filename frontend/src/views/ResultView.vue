@@ -27,12 +27,15 @@ const displayed = ref('')
 let rafId: number | null = null
 let lastTick = 0
 
+const hasActiveStream = computed(() => store.streamingText.length > 0 || store.loading || store.cardsReady)
+const targetText = computed(() => store.streamingText || reading.value?.interpretation || '')
+
 function tick(now: number) {
   rafId = null
-  const target = store.streamingText
+  const target = targetText.value
   if (displayed.value.length >= target.length) {
     lastTick = now
-    if (!store.streamingDone) scheduleTick()
+    if (hasActiveStream.value && !store.streamingDone) scheduleTick()
     return
   }
 
@@ -43,7 +46,7 @@ function tick(now: number) {
   const baseRate = 55
   const catchUp = behind * 0.12
   const charsPerSec = baseRate + catchUp
-  const step = Math.max(1, Math.round((charsPerSec * dt) / 1000))
+  const step = hasActiveStream.value ? Math.max(1, Math.round((charsPerSec * dt) / 1000)) : Math.max(1, Math.ceil(target.length / 3))
   const next = Math.min(target.length, displayed.value.length + step)
   displayed.value = target.slice(0, next)
 
@@ -65,7 +68,7 @@ function cancelTick() {
 }
 
 watch(
-  () => store.streamingText,
+  targetText,
   (text) => {
     if (text.length < displayed.value.length) {
       displayed.value = ''
@@ -84,7 +87,7 @@ watch(
 )
 
 const typedHtml = computed(() => marked.parse(displayed.value) as string)
-const streaming = computed(() => !store.streamingDone || displayed.value.length < store.streamingText.length)
+const streaming = computed(() => (hasActiveStream.value && !store.streamingDone) || displayed.value.length < targetText.value.length)
 
 watch(displayed, async () => {
   if (!streaming.value) return
