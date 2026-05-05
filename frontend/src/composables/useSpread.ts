@@ -5,6 +5,20 @@ export interface SlotLayout {
   y: number
 }
 
+export function computeCardWidth(type: SpreadType, boardWidth: number): number {
+  if (!boardWidth || boardWidth <= 0) return 140
+  switch (type) {
+    case SpreadType.SingleCard:
+      return Math.max(96, Math.min(200, boardWidth * 0.55))
+    case SpreadType.ThreeCard:
+      return Math.max(72, Math.min(140, boardWidth / 3.6))
+    case SpreadType.CelticCross:
+      return Math.max(48, Math.min(140, boardWidth / 7.5))
+    default:
+      return 140
+  }
+}
+
 export function computeSlots(type: SpreadType, boardWidth: number, boardHeight: number): SlotLayout[] {
   const cx = boardWidth / 2
   const cy = boardHeight / 2

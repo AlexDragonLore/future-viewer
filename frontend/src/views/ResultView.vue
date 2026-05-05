@@ -10,6 +10,19 @@ const store = useReadingStore()
 
 const reading = computed(() => store.current)
 
+const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
+function onResize() {
+  viewportWidth.value = window.innerWidth
+}
+onMounted(() => window.addEventListener('resize', onResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onResize))
+
+const cardWidth = computed(() => {
+  if (viewportWidth.value <= 380) return 96
+  if (viewportWidth.value <= 640) return 110
+  return 130
+})
+
 const displayed = ref('')
 let rafId: number | null = null
 let lastTick = 0
@@ -96,10 +109,10 @@ function again() {
 </script>
 
 <template>
-  <main v-if="reading" class="min-h-screen px-6 py-16 flex flex-col items-center">
+  <main v-if="reading" class="min-h-screen px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center">
     <header class="text-center mb-10">
       <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
-      <h1 class="font-display text-4xl md:text-5xl gold-text">Расклад раскрыт</h1>
+      <h1 class="font-display text-3xl sm:text-4xl md:text-5xl gold-text">Расклад раскрыт</h1>
       <p class="text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
     </header>
 
@@ -108,14 +121,14 @@ function again() {
         <div class="text-xs text-mystic-accent/80 uppercase tracking-widest mb-2 text-center">
           {{ card.positionName }}
         </div>
-        <CardFlip :card="card" :face-up="true" :width="130" />
+        <CardFlip :card="card" :face-up="true" :width="cardWidth" />
         <div class="text-xs text-mystic-silver/60 mt-2 text-center max-w-[140px]">
           {{ card.meaning }}
         </div>
       </div>
     </section>
 
-    <section class="mystic-card max-w-2xl w-full p-8 mb-8">
+    <section class="mystic-card max-w-2xl w-full p-5 sm:p-8 mb-8">
       <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Интерпретация</div>
       <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="typedHtml" /><span v-if="streaming" class="caret">▮</span>
     </section>
@@ -129,8 +142,9 @@ function again() {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 2rem;
+  gap: clamp(0.5rem, 2vw, 2rem);
   max-width: 1000px;
+  width: 100%;
 }
 .card-entry {
   display: flex;

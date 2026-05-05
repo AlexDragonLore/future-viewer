@@ -20,8 +20,10 @@ export function dealCards(targets: DealTarget[], onComplete?: () => void): gsap.
       willChange: 'transform, opacity',
     })
 
-    const midX = (t.from.x + t.to.x) / 2 + (Math.random() - 0.5) * 100
-    const midY = Math.min(t.from.y, t.to.y) - 160 - Math.random() * 60
+    const horizontalSpread = Math.min(100, Math.abs(t.to.x - t.from.x) * 0.4 + 24)
+    const midX = (t.from.x + t.to.x) / 2 + (Math.random() - 0.5) * horizontalSpread
+    const arc = Math.max(60, Math.min(160, Math.abs(t.to.y - t.from.y) * 0.6 + 80))
+    const midY = Math.min(t.from.y, t.to.y) - arc - Math.random() * 40
 
     tl.to(
       t.el,

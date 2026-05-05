@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { AchievementInfo } from '@/types'
+import { iconForAchievement } from '@/data/achievementIcons'
 
 const props = defineProps<{
   achievement: AchievementInfo
@@ -12,6 +13,8 @@ const unlockedDate = computed(() => {
   if (!props.achievement.unlockedAt) return null
   return new Date(props.achievement.unlockedAt).toLocaleDateString()
 })
+
+const iconComponent = computed(() => iconForAchievement(props.achievement.code))
 </script>
 
 <template>
@@ -21,7 +24,13 @@ const unlockedDate = computed(() => {
     data-testid="achievement-card"
   >
     <div class="icon">
-      <span class="icon-glyph">{{ unlocked ? '✦' : '✧' }}</span>
+      <component
+        :is="iconComponent"
+        class="icon-svg"
+        :size="32"
+        :stroke-width="1.5"
+        data-testid="achievement-icon"
+      />
     </div>
     <div class="title">{{ achievement.name }}</div>
     <div class="desc">{{ achievement.description }}</div>
@@ -70,9 +79,12 @@ const unlockedDate = computed(() => {
   border-color: #f5c26b;
   box-shadow: 0 0 16px rgba(245, 194, 107, 0.5);
 }
-.icon-glyph {
-  font-size: 1.5rem;
+.icon-svg {
+  color: rgba(224, 212, 186, 0.55);
+}
+.unlocked .icon-svg {
   color: #f5c26b;
+  filter: drop-shadow(0 0 6px rgba(245, 194, 107, 0.45));
 }
 .title {
   font-family: 'Cinzel', serif;

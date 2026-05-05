@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
 import CardDeck from '@/components/cards/CardDeck.vue'
 import CardFlip from '@/components/cards/CardFlip.vue'
-import { computeSlots } from '@/composables/useSpread'
+import { computeSlots, computeCardWidth } from '@/composables/useSpread'
 import { dealCards, shuffleDeck } from '@/composables/useCardAnimation'
 import type { ReadingCard, SpreadType } from '@/types'
 import { playShuffle, playDeal, playCardFlip, playReveal } from '@/composables/useAudio'
@@ -21,6 +21,17 @@ const flippedFlags = ref<boolean[]>([])
 const placeholders = ref<ReadingCard[]>([])
 const pendingSpread = ref<SpreadType | null>(null)
 const pendingQuestion = ref('')
+const boardWidth = ref(0)
+const cardWidth = computed(() =>
+  pendingSpread.value !== null ? computeCardWidth(pendingSpread.value, boardWidth.value) : 140,
+)
+const cardHeight = computed(() => Math.round(cardWidth.value * (230 / 140)))
+
+let resizeObserver: ResizeObserver | null = null
+
+function updateBoardWidth() {
+  if (board.value) boardWidth.value = board.value.getBoundingClientRect().width
+}
 
 onMounted(async () => {
   const saved = sessionStorage.getItem('fv_pending')
@@ -46,7 +57,17 @@ onMounted(async () => {
   flippedFlags.value = Array.from({ length: count }, () => false)
 
   await nextTick()
+  updateBoardWidth()
+  if (typeof ResizeObserver !== 'undefined' && board.value) {
+    resizeObserver = new ResizeObserver(() => updateBoardWidth())
+    resizeObserver.observe(board.value)
+  }
   startReading()
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
 })
 
 async function startReading() {
@@ -74,6 +95,8 @@ async function startReading() {
   const boardRect = board.value.getBoundingClientRect()
   const deckRect = deckEl.getBoundingClientRect()
   const slots = computeSlots(pendingSpread.value, boardRect.width, boardRect.height)
+  const halfW = cardWidth.value / 2
+  const halfH = cardHeight.value / 2
 
   const from = {
     x: deckRect.left - boardRect.left + deckRect.width / 2,
@@ -85,8 +108,8 @@ async function startReading() {
 
   const targets = cardRefs.value.map((el, i) => ({
     el,
-    from: { x: from.x - 70, y: from.y - 115 },
-    to: { x: slots[i].x - 70, y: slots[i].y - 115 },
+    from: { x: from.x - halfW, y: from.y - halfH },
+    to: { x: slots[i].x - halfW, y: slots[i].y - halfH },
   }))
 
   dealCards(targets, async () => {
@@ -122,10 +145,10 @@ function setCardRef(el: Element | null, idx: number) {
 </script>
 
 <template>
-  <main ref="board" class="reading-board min-h-screen relative px-6 py-12">
-    <div class="text-center mb-8 relative z-10">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ pendingQuestion }}</div>
-      <h2 class="font-display text-3xl gold-text">
+  <main ref="board" class="reading-board min-h-screen relative px-3 sm:px-6 py-8 sm:py-12">
+    <div class="text-center mb-6 sm:mb-8 relative z-10">
+      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2 break-words px-2">✦ {{ pendingQuestion }}</div>
+      <h2 class="font-display text-2xl sm:text-3xl gold-text">
         {{
           stage === 'idle' ? 'Коснись колоды' :
           stage === 'shuffling' ? 'Перемешиваю судьбу…' :
@@ -144,7 +167,7 @@ function setCardRef(el: Element | null, idx: number) {
         class="card-slot"
         style="position: absolute; top: 0; left: 0;"
       >
-        <CardFlip :card="card" :face-up="flippedFlags[i]" :width="140" />
+        <CardFlip :card="card" :face-up="flippedFlags[i]" :width="cardWidth" />
       </div>
     </div>
 
@@ -152,7 +175,7 @@ function setCardRef(el: Element | null, idx: number) {
       <CardDeck
         v-if="stage === 'idle' || stage === 'shuffling'"
         ref="deckRef"
-        :size="140"
+        :size="cardWidth"
         :disabled="stage !== 'idle'"
         @shuffle="startReading"
       />

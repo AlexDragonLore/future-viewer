@@ -1,14 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { storeToRefs } from 'pinia'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 
 const open = ref(false)
+
+const { supportEmail } = storeToRefs(usePublicConfigStore())
 </script>
 
 <template>
   <footer class="site-footer">
     <button class="about-link" @click="open = true">О нас</button>
     <span class="mx-2 text-mystic-silver/30">·</span>
-    <span class="text-mystic-silver/40">Future Viewer</span>
+    <span class="text-mystic-silver/40">Вуаль Грядущего</span>
+    <template v-if="supportEmail">
+      <span class="mx-2 text-mystic-silver/30">·</span>
+      <span class="text-mystic-silver/40">
+        Связаться с нами:
+        <a class="support-link" :href="`mailto:${supportEmail}`">{{ supportEmail }}</a>
+      </span>
+    </template>
   </footer>
 
   <Transition name="fade">
@@ -36,8 +47,13 @@ const open = ref(false)
           </p>
           <p>
             Но Александр понял: нельзя скрывать такой дар от мира. Он решил открыть людям глаза и выложил это
-            приложение в открытый доступ. Более того — расширил его возможности: теперь Future Viewer помогает
+            приложение в открытый доступ. Более того — расширил его возможности: теперь «Вуаль Грядущего» помогает
             оценивать не только IT-задачи, но и любые вопросы жизни, от сложных решений до простых сомнений.
+          </p>
+          <p>
+            Наш ИИ становится точнее благодаря вам: мы анализируем ваши отклики на расклады и используем их
+            как обучающий сигнал, чтобы интерпретации в будущем лучше отражали реальность. Никаких персональных
+            данных — только ощущения от предсказаний.
           </p>
           <p class="text-center text-mystic-accent/80 italic pt-2">
             Доверься картам. Они знают больше, чем кажется.
@@ -80,6 +96,14 @@ const open = ref(false)
 .about-link:hover {
   text-shadow: 0 0 12px rgba(245, 194, 107, 0.8);
 }
+.support-link {
+  color: #f5c26b;
+  text-decoration: none;
+  transition: text-shadow 0.3s ease;
+}
+.support-link:hover {
+  text-shadow: 0 0 10px rgba(245, 194, 107, 0.7);
+}
 .about-overlay {
   position: fixed;
   inset: 0;
@@ -120,6 +144,18 @@ const open = ref(false)
 }
 .story p {
   font-size: 0.95rem;
+}
+@media (max-width: 480px) {
+  .about-overlay {
+    padding: 0.75rem;
+  }
+  .about-modal {
+    padding: 2rem 1.25rem;
+    max-height: 92vh;
+  }
+  .story p {
+    font-size: 0.9rem;
+  }
 }
 .fade-enter-active,
 .fade-leave-active {
