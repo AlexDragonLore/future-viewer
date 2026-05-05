@@ -32,6 +32,10 @@ async function submit() {
       const result = await auth.register(email.value, password.value)
       if (result.verificationRequired) {
         info.value = `Мы отправили письмо на ${result.email}. Перейдите по ссылке, чтобы подтвердить почту.`
+      } else {
+        await auth.login(email.value, password.value)
+        const redirect = (route.query.redirect as string) || '/'
+        router.replace(redirect)
       }
     }
   } catch (e) {

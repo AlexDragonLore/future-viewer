@@ -2,6 +2,8 @@ namespace FutureViewer.DomainServices.Interfaces;
 
 public interface IEmailSender
 {
+    bool IsConfigured { get; }
+
     Task SendAsync(string to, string subject, string htmlBody, CancellationToken ct = default);
 }
 

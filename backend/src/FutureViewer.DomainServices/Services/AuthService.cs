@@ -39,25 +39,28 @@ public sealed class AuthService
         if (existing is not null)
             throw new ConflictException("User with this email already exists");
 
-        var token = GenerateToken();
+        var verificationRequired = _email.IsConfigured;
+        var token = verificationRequired ? GenerateToken() : null;
+        var now = DateTime.UtcNow;
         var user = new User
         {
             Email = normalized,
             PasswordHash = _hasher.Hash(request.Password),
-            CreatedAt = DateTime.UtcNow,
-            IsEmailVerified = false,
+            CreatedAt = now,
+            IsEmailVerified = !verificationRequired,
             EmailVerificationToken = token,
-            EmailVerificationSentAt = DateTime.UtcNow
+            EmailVerificationSentAt = verificationRequired ? now : null
         };
         await _users.AddAsync(user, ct);
 
-        await SendVerificationEmailAsync(normalized, token, ct);
+        if (verificationRequired)
+            await SendVerificationEmailAsync(normalized, token!, ct);
 
         return new RegisterResponse
         {
             UserId = user.Id,
             Email = user.Email,
-            VerificationRequired = true
+            VerificationRequired = verificationRequired
         };
     }
 
@@ -117,8 +120,16 @@ public sealed class AuthService
         if (!_hasher.Verify(request.Password, user.PasswordHash))
             throw new UnauthorizedException("Invalid credentials");
 
-        if (!user.IsEmailVerified)
+        if (!user.IsEmailVerified && _email.IsConfigured)
             throw new EmailNotVerifiedException("Email address is not verified");
+
+        if (!user.IsEmailVerified)
+        {
+            user.IsEmailVerified = true;
+            user.EmailVerificationToken = null;
+            user.EmailVerificationSentAt = null;
+            await _users.UpdateAsync(user, ct);
+        }
 
         var (token, expires) = _jwt.CreateAccessToken(user);
         return new AuthResponse
