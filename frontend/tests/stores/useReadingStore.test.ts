@@ -4,12 +4,14 @@ import { DeckType, SpreadType, type Reading } from '@/types'
 
 const spreadsMock = vi.fn()
 const createMock = vi.fn()
+const createStreamMock = vi.fn()
 
 vi.mock('@/api/readingApi', () => ({
   readingApi: {
     spreads: () => spreadsMock(),
     create: (type: SpreadType, question: string, deckType: DeckType) =>
       createMock(type, question, deckType),
+    createStream: (...args: unknown[]) => createStreamMock(...args),
     get: vi.fn(),
     history: vi.fn(),
   },
@@ -34,6 +36,7 @@ describe('useReadingStore', () => {
     setActivePinia(createPinia())
     spreadsMock.mockReset()
     createMock.mockReset()
+    createStreamMock.mockReset()
     localStorage.clear()
   })
 
@@ -89,5 +92,24 @@ describe('useReadingStore', () => {
     store.reset()
     expect(store.current).toBeNull()
     expect(store.error).toBeNull()
+  })
+
+  it('createStream stops streaming when interpretation fails after cards arrive', async () => {
+    createStreamMock.mockImplementation(async (_type, _question, _deckType, handlers) => {
+      handlers.onCards(sampleReading)
+      handlers.onChunk('Partial interpretation')
+      throw new Error('stream broke')
+    })
+
+    const store = useReadingStore()
+    const { cardsPromise, donePromise } = store.createStream(SpreadType.SingleCard, 'q')
+
+    await expect(cardsPromise).resolves.toEqual(sampleReading)
+    await expect(donePromise).rejects.toThrow('stream broke')
+    expect(store.streamingDone).toBe(true)
+    expect(store.loading).toBe(false)
+    expect(store.error).toBe('stream broke')
+    expect(store.current?.interpretation).toContain('Partial interpretation')
+    expect(store.current?.interpretation).toContain('stream broke')
   })
 })

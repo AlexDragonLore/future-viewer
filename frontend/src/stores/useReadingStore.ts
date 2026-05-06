@@ -77,6 +77,12 @@ export const useReadingStore = defineStore('reading', () => {
       .catch((e) => {
         const msg = extractApiError(e, 'Не удалось создать расклад')
         error.value = msg
+        const text = streamingText.value ? `${streamingText.value}\n\n> ${msg}` : msg
+        streamingText.value = text
+        streamingDone.value = true
+        if (current.value) {
+          current.value = { ...current.value, interpretation: text }
+        }
         if (!cardsReady.value) rejectCards(e)
         throw e
       })
