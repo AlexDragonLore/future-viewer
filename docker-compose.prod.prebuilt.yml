@@ -1,0 +1,8 @@
+services:
+  backend:
+    image: future-viewer-backend:${FV_IMAGE_TAG:-latest}
+    build: null
+
+  frontend:
+    image: future-viewer-frontend:${FV_IMAGE_TAG:-latest}
+    build: null

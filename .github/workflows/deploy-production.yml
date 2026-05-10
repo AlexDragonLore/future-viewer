@@ -16,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: write
     env:
       DEPLOY_BRANCH: ${{ github.ref_name }}
+      IMAGE_TAG: ${{ github.sha }}
       PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
       PRODUCTION_PORT: ${{ vars.PRODUCTION_PORT || '22' }}
       PRODUCTION_APP_DIR: ${{ vars.PRODUCTION_APP_DIR || '/opt/future-viewer' }}
@@ -26,6 +28,18 @@ jobs:
       PRODUCTION_DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
       PRODUCTION_ROOT_SSH_KEY: ${{ secrets.PRODUCTION_ROOT_SSH_KEY }}
       PRODUCTION_HEALTH_URL: ${{ vars.PRODUCTION_HEALTH_URL || 'https://alex-taro.ru/health' }}
+      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
+      VITE_MERCHANT_SERVICE_NAME: ${{ vars.VITE_MERCHANT_SERVICE_NAME || 'Future Viewer' }}
+      VITE_MERCHANT_OWNER_NAME: ${{ vars.VITE_MERCHANT_OWNER_NAME || 'Дунецев Александр Дмитриевич' }}
+      VITE_MERCHANT_TAX_STATUS: ${{ vars.VITE_MERCHANT_TAX_STATUS || 'самозанятый, плательщик налога на профессиональный доход' }}
+      VITE_MERCHANT_INN: ${{ vars.VITE_MERCHANT_INN || '592108465422' }}
+      VITE_MERCHANT_PHONE: ${{ vars.VITE_MERCHANT_PHONE || '79967669613' }}
+      VITE_MERCHANT_EMAIL: ${{ vars.VITE_MERCHANT_EMAIL || 'duntsev010@mail.ru' }}
+      VITE_MERCHANT_POSTAL_ADDRESS: ${{ vars.VITE_MERCHANT_POSTAL_ADDRESS || 'duntsev010@mail.ru' }}
+      VITE_PAID_PRODUCT_TITLE: ${{ vars.VITE_PAID_PRODUCT_TITLE || 'Подписка Future Viewer Pro' }}
+      VITE_PAID_PRODUCT_PRICE: ${{ vars.VITE_PAID_PRODUCT_PRICE || '300 ₽' }}
+      VITE_PAID_PRODUCT_PERIOD: ${{ vars.VITE_PAID_PRODUCT_PERIOD || '1 месяц' }}
+      VITE_PAID_PRODUCT_DESCRIPTION: ${{ vars.VITE_PAID_PRODUCT_DESCRIPTION || 'Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.' }}
     steps:
       - name: Check deploy configuration
         id: config
@@ -43,6 +57,55 @@ jobs:
           else
             echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.deploy_ready == 'true'
+
+      - name: Set up Docker Buildx
+        if: steps.config.outputs.deploy_ready == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          docker buildx build \
+            --cache-from type=gha,scope=future-viewer-backend \
+            --cache-to type=gha,scope=future-viewer-backend,mode=max \
+            --tag "future-viewer-backend:$IMAGE_TAG" \
+            --load \
+            ./backend
+
+      - name: Build frontend image
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          docker buildx build \
+            --cache-from type=gha,scope=future-viewer-frontend \
+            --cache-to type=gha,scope=future-viewer-frontend,mode=max \
+            --build-arg "VITE_API_URL=$VITE_API_URL" \
+            --build-arg "VITE_MERCHANT_SERVICE_NAME=$VITE_MERCHANT_SERVICE_NAME" \
+            --build-arg "VITE_MERCHANT_OWNER_NAME=$VITE_MERCHANT_OWNER_NAME" \
+            --build-arg "VITE_MERCHANT_TAX_STATUS=$VITE_MERCHANT_TAX_STATUS" \
+            --build-arg "VITE_MERCHANT_INN=$VITE_MERCHANT_INN" \
+            --build-arg "VITE_MERCHANT_PHONE=$VITE_MERCHANT_PHONE" \
+            --build-arg "VITE_MERCHANT_EMAIL=$VITE_MERCHANT_EMAIL" \
+            --build-arg "VITE_MERCHANT_POSTAL_ADDRESS=$VITE_MERCHANT_POSTAL_ADDRESS" \
+            --build-arg "VITE_PAID_PRODUCT_TITLE=$VITE_PAID_PRODUCT_TITLE" \
+            --build-arg "VITE_PAID_PRODUCT_PRICE=$VITE_PAID_PRODUCT_PRICE" \
+            --build-arg "VITE_PAID_PRODUCT_PERIOD=$VITE_PAID_PRODUCT_PERIOD" \
+            --build-arg "VITE_PAID_PRODUCT_DESCRIPTION=$VITE_PAID_PRODUCT_DESCRIPTION" \
+            --target prod \
+            --tag "future-viewer-frontend:$IMAGE_TAG" \
+            --load \
+            ./frontend
+
+      - name: Pack images
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          docker save "future-viewer-backend:$IMAGE_TAG" "future-viewer-frontend:$IMAGE_TAG" \
+            | gzip -1 > /tmp/future-viewer-images.tar.gz
 
       - name: Configure SSH
         if: steps.config.outputs.deploy_ready == 'true'
@@ -77,6 +140,18 @@ jobs:
           git merge --ff-only "origin/$DEPLOY_BRANCH"
           REMOTE
 
+      - name: Upload images to server
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          scp \
+            -i ~/.ssh/future_viewer_root \
+            -P "$PRODUCTION_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            /tmp/future-viewer-images.tar.gz \
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST:/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+
       - name: Run production deploy
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
@@ -87,7 +162,30 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
-            "cd '$PRODUCTION_APP_DIR' && bash init.sh"
+            "IMAGE_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$APP_DIR"
+          docker load -i "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+          FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
+            --env-file /opt/fv-app/.env.production \
+            -f docker-compose.prod.yml \
+            -f docker-compose.prod.prebuilt.yml \
+            -p future-viewer \
+            config >/dev/null
+          FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
+            --env-file /opt/fv-app/.env.production \
+            -f docker-compose.prod.yml \
+            -f docker-compose.prod.prebuilt.yml \
+            -p future-viewer \
+            pull postgres caddy
+          FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
+            --env-file /opt/fv-app/.env.production \
+            -f docker-compose.prod.yml \
+            -f docker-compose.prod.prebuilt.yml \
+            -p future-viewer \
+            up -d --no-build
+          rm -f "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+          REMOTE
 
       - name: Verify production containers
         if: steps.config.outputs.deploy_ready == 'true'
@@ -99,7 +197,7 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
-            "cd '$PRODUCTION_APP_DIR' && docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps"
+            "cd '$PRODUCTION_APP_DIR' && FV_IMAGE_TAG='$IMAGE_TAG' docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -f docker-compose.prod.prebuilt.yml -p future-viewer ps"
 
       - name: Verify production health
         if: steps.config.outputs.deploy_ready == 'true'

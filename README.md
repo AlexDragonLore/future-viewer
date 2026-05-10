@@ -102,6 +102,12 @@ Workflow [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-pr
 запускается автоматически на push в `main` или `master`, а также вручную через
 `workflow_dispatch`.
 
+Автодеплой собирает backend/frontend Docker images в GitHub Actions, переносит
+готовые images на сервер и запускает production compose с
+[`docker-compose.prod.prebuilt.yml`](docker-compose.prod.prebuilt.yml). Сервер в
+этом режиме не выполняет `docker compose up --build`; `init.sh` остаётся для
+первичной установки и ручного полного rebuild.
+
 Нужные GitHub Secrets:
 
 - `PRODUCTION_HOST` — SSH host, например `alex-taro.ru`.
