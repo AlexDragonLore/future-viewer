@@ -2,6 +2,7 @@ using System.ClientModel;
 using System.Text.Json;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
+using FutureViewer.DomainServices.Services;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
 
@@ -70,6 +71,10 @@ public sealed class QuestionValidationInterpreter : IAIQuestionValidator
 
     public async Task<QuestionValidationResult> ValidateAsync(string question, CancellationToken ct = default)
     {
+        var localDecision = QuestionValidationHeuristics.TryValidate(question);
+        if (localDecision is not null)
+            return localDecision;
+
         var messages = new List<ChatMessage>
         {
             new SystemChatMessage(SystemPrompt),
@@ -87,13 +92,13 @@ public sealed class QuestionValidationInterpreter : IAIQuestionValidator
         }
         catch (ClientResultException ex)
         {
-            _logger.LogWarning(ex, "AI question validation failed; accepting question");
-            return Accepted("Вопрос принят.");
+            _logger.LogWarning(ex, "AI question validation failed; using local fallback");
+            return Fallback(question);
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Failed to parse question validation response; accepting question");
-            return Accepted("Вопрос принят.");
+            _logger.LogWarning(ex, "Failed to parse question validation response; using local fallback");
+            return Fallback(question);
         }
     }
 
@@ -132,4 +137,10 @@ public sealed class QuestionValidationInterpreter : IAIQuestionValidator
         Reason = reason,
         SuggestedQuestion = null
     };
+
+    private static QuestionValidationResult Fallback(string question)
+    {
+        return QuestionValidationHeuristics.TryValidate(question)
+            ?? Accepted("Вопрос принят локальной проверкой.");
+    }
 }

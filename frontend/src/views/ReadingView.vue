@@ -85,6 +85,7 @@ async function startReading() {
   cardsPromise.catch((e) => {
     const err = e as ReadingApiError
     if (err.code === 'question_needs_rewrite' || err.code === 'question_rejected') {
+      cardsFailed = true
       sessionStorage.setItem('fv_question_validation', JSON.stringify({
         code: err.code,
         message: err.message,
@@ -101,7 +102,7 @@ async function startReading() {
     shuffleDeck(deckEl, () => resolve())
   })
 
-  if (cardsFailed) return
+  if (cardsFailed || !board.value || !pendingSpread.value) return
 
   const boardRect = board.value.getBoundingClientRect()
   const deckRect = deckEl.getBoundingClientRect()
