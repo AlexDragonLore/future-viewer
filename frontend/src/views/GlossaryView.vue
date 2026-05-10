@@ -4,6 +4,7 @@ import { useGlossaryStore } from '@/stores/useGlossaryStore'
 import { CardSuit } from '@/types'
 import { DECKS } from '@/data/decks'
 import { SPREADS_META } from '@/data/spreads'
+import { versionedCardImage } from '@/utils/assets'
 
 const store = useGlossaryStore()
 
@@ -90,9 +91,10 @@ onMounted(() => store.loadAll())
           <RouterLink :to="{ name: 'glossary-card', params: { id: card.id } }" class="card-tile">
             <img
               v-if="card.imagePath"
-              :src="card.imagePath"
+              :src="versionedCardImage(card.imagePath)"
               :alt="card.name"
               loading="lazy"
+              decoding="async"
               class="card-image"
             />
             <div v-else class="card-placeholder">✦</div>

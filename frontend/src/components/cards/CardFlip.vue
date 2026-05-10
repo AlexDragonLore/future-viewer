@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ReadingCard } from '@/types'
+import { versionedCardImage } from '@/utils/assets'
 
 const props = defineProps<{
   card?: ReadingCard
@@ -31,9 +32,10 @@ const compact = computed(() => w.value < 90)
         <div v-if="card" class="card-front-inner">
           <img
             v-if="card.imagePath"
-            :src="card.imagePath"
+            :src="versionedCardImage(card.imagePath)"
             :alt="card.cardName"
             class="card-img"
+            decoding="async"
             draggable="false"
           />
           <div v-else class="card-image" aria-hidden="true">✵</div>

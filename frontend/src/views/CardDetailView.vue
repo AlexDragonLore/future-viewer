@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useGlossaryStore } from '@/stores/useGlossaryStore'
 import { DeckType } from '@/types'
+import { versionedCardImage } from '@/utils/assets'
 
 const route = useRoute()
 const store = useGlossaryStore()
@@ -58,9 +59,10 @@ function variantNoteFor(deck: DeckType): string | null {
       <div class="md:w-1/3 flex-shrink-0">
         <img
           v-if="card.imagePath"
-          :src="card.imagePath"
+          :src="versionedCardImage(card.imagePath)"
           :alt="card.name"
           class="w-full rounded-xl border border-mystic-accent/30"
+          decoding="async"
         />
         <div v-else class="card-placeholder">✦</div>
       </div>
