@@ -2,8 +2,10 @@ name: deploy-production
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+      - master
+  workflow_dispatch:
 
 concurrency:
   group: deploy-production
@@ -12,41 +14,95 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: production
+    permissions:
+      contents: read
     env:
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      AI_PROVIDER: ${{ vars.AI_PROVIDER || 'OpenAI' }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
-      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-      DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-chat' }}
-      DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
-      VITE_API_URL: ${{ vars.VITE_API_URL }}
+      DEPLOY_BRANCH: ${{ github.ref_name }}
+      PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
+      PRODUCTION_PORT: ${{ vars.PRODUCTION_PORT || '22' }}
+      PRODUCTION_APP_DIR: ${{ vars.PRODUCTION_APP_DIR || '/opt/future-viewer' }}
+      PRODUCTION_DEPLOY_USER: ${{ vars.PRODUCTION_DEPLOY_USER || 'deploy' }}
+      PRODUCTION_ROOT_USER: ${{ vars.PRODUCTION_ROOT_USER || 'root' }}
+      PRODUCTION_DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+      PRODUCTION_ROOT_SSH_KEY: ${{ secrets.PRODUCTION_ROOT_SSH_KEY }}
+      PRODUCTION_HEALTH_URL: ${{ vars.PRODUCTION_HEALTH_URL || 'https://alex-taro.ru/health' }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check deploy configuration
+        id: config
+        run: |
+          set -Eeuo pipefail
+          missing=0
+          if [ -z "$PRODUCTION_HOST" ]; then echo "::warning::PRODUCTION_HOST secret is required"; missing=1; fi
+          if [ -z "$PRODUCTION_DEPLOY_SSH_KEY" ]; then echo "::warning::PRODUCTION_DEPLOY_SSH_KEY secret is required"; missing=1; fi
+          if [ -z "$PRODUCTION_ROOT_SSH_KEY" ]; then echo "::warning::PRODUCTION_ROOT_SSH_KEY secret is required"; missing=1; fi
+          if [ -z "$DEPLOY_BRANCH" ]; then echo "::warning::DEPLOY_BRANCH is empty"; missing=1; fi
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          if [ "$missing" -eq 1 ]; then
+            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
+            echo "Production deploy skipped because required SSH configuration is missing."
+          else
+            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Build backend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: false
-          tags: future-viewer-backend:${{ github.ref_name }}
-          load: true
+      - name: Configure SSH
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$PRODUCTION_DEPLOY_SSH_KEY" > ~/.ssh/future_viewer_deploy
+          printf '%s\n' "$PRODUCTION_ROOT_SSH_KEY" > ~/.ssh/future_viewer_root
+          chmod 600 ~/.ssh/future_viewer_deploy ~/.ssh/future_viewer_root
+          ssh-keyscan -p "$PRODUCTION_PORT" "$PRODUCTION_HOST" >> ~/.ssh/known_hosts
 
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          target: prod
-          build-args: |
-            VITE_API_URL=${{ vars.VITE_API_URL }}
-          push: false
-          tags: future-viewer-frontend:${{ github.ref_name }}
-          load: true
+      - name: Update server repository
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -i ~/.ssh/future_viewer_deploy \
+            -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST" \
+            "DEPLOY_BRANCH='$DEPLOY_BRANCH' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$APP_DIR"
+          git fetch origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
 
-      - name: Production deploy step
-        run: echo "Deploy ${{ github.ref_name }} to production (registry push / k8s / ssh compose)."
+          current_branch="$(git rev-parse --abbrev-ref HEAD)"
+          if [ "$current_branch" != "$DEPLOY_BRANCH" ]; then
+            git switch "$DEPLOY_BRANCH" 2>/dev/null || git switch -c "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
+          fi
+
+          git merge --ff-only "origin/$DEPLOY_BRANCH"
+          REMOTE
+
+      - name: Run production deploy
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -i ~/.ssh/future_viewer_root \
+            -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
+            "cd '$PRODUCTION_APP_DIR' && bash init.sh"
+
+      - name: Verify production containers
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -i ~/.ssh/future_viewer_root \
+            -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
+            "cd '$PRODUCTION_APP_DIR' && docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps"
+
+      - name: Verify production health
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          curl -fsS "$PRODUCTION_HEALTH_URL"
