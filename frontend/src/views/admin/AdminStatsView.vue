@@ -14,7 +14,7 @@ function refresh(): void {
 
 <template>
   <section class="space-y-6" data-testid="admin-stats-view">
-    <div class="flex justify-between items-center">
+    <div class="stats-head flex justify-between items-center">
       <h2 class="font-display text-xl gold-text">Статистика</h2>
       <button
         class="admin-btn"
@@ -115,5 +115,16 @@ function refresh(): void {
   padding: 2rem;
   color: rgba(224, 212, 186, 0.6);
   font-style: italic;
+}
+@media (max-width: 640px) {
+  .stats-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+  }
+  .admin-btn {
+    width: 100%;
+  }
 }
 </style>

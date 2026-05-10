@@ -80,4 +80,15 @@ describe('LeaderboardTable', () => {
     expect(wrapper.text()).toContain('Итог')
     expect(wrapper.text()).not.toContain('Сумма')
   })
+
+  it('renders a mobile card list with the key score fields', () => {
+    const wrapper = mount(LeaderboardTable, { props: { entries: makeEntries() } })
+    const list = wrapper.find('[data-testid="leaderboard-mobile-list"]')
+
+    expect(list.exists()).toBe(true)
+    expect(list.text()).toContain('a***@mail.com')
+    expect(list.text()).toContain('Откликов: 8')
+    expect(list.text()).toContain('Средний: 7.3')
+    expect(list.text()).toContain('Итог')
+  })
 })

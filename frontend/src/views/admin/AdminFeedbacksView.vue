@@ -45,7 +45,7 @@ async function runNotifications(): Promise<void> {
 
 <template>
   <section class="space-y-6" data-testid="admin-feedbacks-view">
-    <div class="mystic-card p-4 flex flex-wrap gap-3 items-end">
+    <div class="admin-toolbar mystic-card p-4 flex flex-wrap gap-3 items-end">
       <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
         <span>UserId</span>
         <input
@@ -71,7 +71,7 @@ async function runNotifications(): Promise<void> {
           <option :value="3">Scored</option>
         </select>
       </label>
-      <div class="ml-auto flex gap-2">
+      <div class="admin-actions ml-auto flex gap-2">
         <button class="admin-btn" data-testid="admin-feedback-run-notifications" @click="runNotifications">
           Запустить рассылку
         </button>
@@ -96,7 +96,7 @@ async function runNotifications(): Promise<void> {
 
     <AdminFeedbacksTable />
 
-    <div class="flex justify-between items-center mt-4 text-sm text-mystic-muted">
+    <div class="admin-pager flex justify-between items-center mt-4 text-sm text-mystic-muted">
       <span data-testid="admin-feedback-total">Всего: {{ store.feedbackTotal }}</span>
       <div class="flex gap-2 items-center">
         <button class="admin-btn" :disabled="store.feedbackPage === 1" @click="prevPage">‹</button>
@@ -120,7 +120,8 @@ async function runNotifications(): Promise<void> {
   border-radius: 0.4rem;
   padding: 0.4rem 0.75rem;
   color: #f8f4eb;
-  min-width: 11rem;
+  min-width: min(11rem, 100%);
+  width: 100%;
 }
 .admin-btn {
   padding: 0.45rem 0.9rem;
@@ -154,5 +155,30 @@ async function runNotifications(): Promise<void> {
   border: 1px solid rgba(80, 200, 120, 0.2);
   padding: 0.6rem 0.9rem;
   border-radius: 0.4rem;
+}
+@media (max-width: 640px) {
+  .admin-toolbar {
+    align-items: stretch;
+  }
+  .admin-toolbar label,
+  .admin-actions {
+    flex-basis: 100%;
+  }
+  .admin-actions {
+    margin-left: 0;
+    flex-direction: column;
+  }
+  .admin-btn {
+    width: 100%;
+  }
+  .admin-pager {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+  }
+  .admin-pager > div {
+    justify-content: center;
+  }
 }
 </style>

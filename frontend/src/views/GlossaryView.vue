@@ -28,10 +28,10 @@ onMounted(() => store.loadAll())
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 max-w-6xl mx-auto">
+  <main class="glossary-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-6xl mx-auto">
     <header class="mb-10 text-center">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ ГЛОССАРИЙ ✦</div>
-      <h1 class="font-display text-4xl md:text-5xl gold-text mb-3">78 Карт Таро</h1>
+      <div class="glossary-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ ГЛОССАРИЙ ✦</div>
+      <h1 class="glossary-title font-display text-4xl md:text-5xl gold-text mb-3">78 Карт Таро</h1>
       <p class="text-mystic-silver/70 max-w-xl mx-auto">
         Значения, ключевые слова и вариации по колодам.
       </p>
@@ -248,5 +248,46 @@ onMounted(() => store.loadAll())
   color: rgba(229, 217, 188, 0.55);
   text-align: center;
   margin-top: 0.15rem;
+}
+@media (max-width: 640px) {
+  .glossary-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .glossary-kicker {
+    letter-spacing: 0.14em;
+  }
+  .glossary-title {
+    font-size: 2.2rem;
+  }
+  .section-nav {
+    gap: 0.45rem;
+  }
+  .section-nav a,
+  .suit-chip {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+  .info-section {
+    margin: 2.25rem 0;
+  }
+  .section-title {
+    font-size: 1.45rem;
+  }
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
+    padding: 0;
+  }
+  .card-tile {
+    padding: 0.55rem;
+  }
+  .card-title {
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
 }
 </style>

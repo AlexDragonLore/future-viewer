@@ -16,11 +16,11 @@ const activeTab = computed(() => route.name?.toString() ?? '')
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-12 max-w-6xl mx-auto" data-testid="admin-view">
+  <main class="admin-page min-h-screen px-4 sm:px-6 py-10 sm:py-12 max-w-6xl mx-auto" data-testid="admin-view">
     <header class="mb-6 text-center">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АДМИН ✦</div>
-      <h1 class="font-display text-4xl gold-text">Панель администратора</h1>
-      <p class="text-mystic-muted mt-2 text-sm">{{ auth.email }}</p>
+      <div class="admin-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АДМИН ✦</div>
+      <h1 class="admin-title font-display text-4xl gold-text">Панель администратора</h1>
+      <p class="admin-email text-mystic-muted mt-2 text-sm">{{ auth.email }}</p>
     </header>
 
     <nav class="flex gap-2 justify-center mb-8 flex-wrap" data-testid="admin-tabs">
@@ -60,5 +60,28 @@ const activeTab = computed(() => route.name?.toString() ?? '')
   background: rgba(245, 194, 107, 0.15);
   color: #f5c26b;
   border-color: rgba(245, 194, 107, 0.7);
+}
+@media (max-width: 640px) {
+  .admin-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .admin-kicker {
+    letter-spacing: 0.14em;
+  }
+  .admin-title {
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+  .admin-email {
+    overflow-wrap: anywhere;
+  }
+  .admin-tab {
+    flex: 1 1 8rem;
+    text-align: center;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+  }
 }
 </style>

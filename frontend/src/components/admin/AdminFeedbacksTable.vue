@@ -50,57 +50,101 @@ function statusName(s: FeedbackStatus): string {
   <div v-else-if="store.feedbacks.length === 0" class="empty" data-testid="admin-feedbacks-empty">
     Нет фидбеков по фильтру
   </div>
-  <div v-else class="table-scroll">
-    <table class="admin-table" data-testid="admin-feedbacks-table">
-      <thead>
-        <tr>
-          <th class="mobile-hide">Создан</th>
-          <th>Email</th>
-          <th class="mobile-hide">Reading</th>
-          <th>Статус</th>
-          <th>Score</th>
-          <th class="mobile-hide">Sincere</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="f in store.feedbacks" :key="f.id" data-testid="admin-feedback-row">
-          <td class="mono mobile-hide">{{ new Date(f.createdAt).toLocaleString() }}</td>
-          <td>{{ f.userEmail || f.userId.slice(0, 8) }}</td>
-          <td class="mono mobile-hide">{{ f.readingId.slice(0, 8) }}</td>
-          <td>
+  <template v-else>
+    <div class="table-scroll">
+      <table class="admin-table" data-testid="admin-feedbacks-table">
+        <thead>
+          <tr>
+            <th class="mobile-hide">Создан</th>
+            <th>Email</th>
+            <th class="mobile-hide">Reading</th>
+            <th>Статус</th>
+            <th>Score</th>
+            <th class="mobile-hide">Sincere</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="f in store.feedbacks" :key="f.id" data-testid="admin-feedback-row">
+            <td class="mono mobile-hide">{{ new Date(f.createdAt).toLocaleString() }}</td>
+            <td>{{ f.userEmail || f.userId.slice(0, 8) }}</td>
+            <td class="mono mobile-hide">{{ f.readingId.slice(0, 8) }}</td>
+            <td>
+              <select v-model="ensureRowState(f).status" class="cell-input">
+                <option :value="0">Pending</option>
+                <option :value="1">Notified</option>
+                <option :value="2">Answered</option>
+                <option :value="3">Scored</option>
+              </select>
+              <span class="status-label">{{ statusName(f.status) }}</span>
+            </td>
+            <td>
+              <input
+                v-model.number="ensureRowState(f).aiScore"
+                type="number"
+                min="1"
+                max="10"
+                class="cell-input score-input"
+                data-testid="admin-feedback-score-input"
+              />
+            </td>
+            <td class="mobile-hide">
+              <select v-model="ensureRowState(f).isSincere" class="cell-input">
+                <option :value="true">Да</option>
+                <option :value="false">Нет</option>
+              </select>
+            </td>
+            <td class="actions">
+              <button class="row-btn" data-testid="admin-feedback-save" @click="saveRow(f)">💾</button>
+              <button class="row-btn danger" data-testid="admin-feedback-delete" @click="deleteRow(f)">🗑</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ul class="feedback-cards" data-testid="admin-feedbacks-mobile-list">
+      <li v-for="f in store.feedbacks" :key="`mobile-${f.id}`" class="feedback-card">
+        <div class="feedback-head">
+          <strong>{{ f.userEmail || f.userId.slice(0, 8) }}</strong>
+          <span class="mono">{{ new Date(f.createdAt).toLocaleDateString() }}</span>
+        </div>
+        <div class="feedback-id mono">reading {{ f.readingId.slice(0, 8) }}</div>
+        <div class="mobile-controls">
+          <label>
+            <span>Статус</span>
             <select v-model="ensureRowState(f).status" class="cell-input">
               <option :value="0">Pending</option>
               <option :value="1">Notified</option>
               <option :value="2">Answered</option>
               <option :value="3">Scored</option>
             </select>
-            <span class="status-label">{{ statusName(f.status) }}</span>
-          </td>
-          <td>
+          </label>
+          <label>
+            <span>Score</span>
             <input
               v-model.number="ensureRowState(f).aiScore"
               type="number"
               min="1"
               max="10"
               class="cell-input score-input"
-              data-testid="admin-feedback-score-input"
             />
-          </td>
-          <td class="mobile-hide">
+          </label>
+          <label>
+            <span>Sincere</span>
             <select v-model="ensureRowState(f).isSincere" class="cell-input">
               <option :value="true">Да</option>
               <option :value="false">Нет</option>
             </select>
-          </td>
-          <td class="actions">
-            <button class="row-btn" data-testid="admin-feedback-save" @click="saveRow(f)">💾</button>
-            <button class="row-btn danger" data-testid="admin-feedback-delete" @click="deleteRow(f)">🗑</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+          </label>
+        </div>
+        <div class="actions mobile-actions">
+          <button class="row-btn" @click="saveRow(f)">Сохранить</button>
+          <button class="row-btn danger" @click="deleteRow(f)">Удалить</button>
+        </div>
+      </li>
+    </ul>
+  </template>
 </template>
 
 <style scoped>
@@ -179,7 +223,68 @@ function statusName(s: FeedbackStatus): string {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+.feedback-cards {
+  display: none;
+}
 @media (max-width: 768px) {
+  .table-scroll {
+    display: none;
+  }
+  .feedback-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+  }
+  .feedback-card {
+    padding: 0.85rem;
+    border: 1px solid rgba(245, 194, 107, 0.18);
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.2);
+  }
+  .feedback-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    color: rgba(224, 212, 186, 0.92);
+  }
+  .feedback-head strong {
+    overflow-wrap: anywhere;
+  }
+  .feedback-id {
+    margin-top: 0.25rem;
+    color: rgba(224, 212, 186, 0.55);
+  }
+  .mobile-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+  }
+  .mobile-controls label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    color: rgba(224, 212, 186, 0.58);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .cell-input {
+    width: 100%;
+  }
+  .mobile-actions {
+    display: flex;
+    justify-content: stretch;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+  }
+  .mobile-actions .row-btn {
+    flex: 1;
+    margin-left: 0;
+  }
   .mobile-hide {
     display: none;
   }

@@ -126,6 +126,7 @@ async function submit(): Promise<void> {
   border-radius: 0.4rem;
   padding: 0.4rem 0.75rem;
   color: #f8f4eb;
+  width: 100%;
 }
 .admin-btn {
   padding: 0.45rem 0.9rem;
@@ -144,5 +145,13 @@ async function submit(): Promise<void> {
 .admin-btn.primary {
   background: rgba(245, 194, 107, 0.2);
   color: #f5c26b;
+}
+@media (max-width: 640px) {
+  form {
+    padding: 1rem;
+  }
+  .admin-btn {
+    flex: 1;
+  }
 }
 </style>

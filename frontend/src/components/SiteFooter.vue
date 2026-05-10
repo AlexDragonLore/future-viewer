@@ -82,6 +82,7 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
   font-size: 0.8rem;
   letter-spacing: 0.1em;
   pointer-events: auto;
+  overflow-wrap: anywhere;
 }
 .about-link {
   color: #f5c26b;
@@ -147,9 +148,30 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
 .story p {
   font-size: 0.95rem;
 }
+@media (max-width: 640px) {
+  .site-footer {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.25rem 0.35rem;
+    padding: 1rem 0.75rem 1.25rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    background: rgba(11, 6, 24, 0.72);
+    border-top: 1px solid rgba(245, 194, 107, 0.12);
+  }
+  .about-link {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    padding: 0.2rem 0.25rem;
+  }
+}
+
 @media (max-width: 480px) {
   .about-overlay {
     padding: 0.75rem;
+    align-items: flex-start;
   }
   .about-modal {
     padding: 2rem 1.25rem;

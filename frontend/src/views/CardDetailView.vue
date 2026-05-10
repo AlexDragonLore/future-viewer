@@ -43,7 +43,7 @@ function variantNoteFor(deck: DeckType): string | null {
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 max-w-4xl mx-auto">
+  <main class="card-detail-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-4xl mx-auto">
     <div class="mb-6">
       <RouterLink to="/glossary" class="text-sm text-mystic-accent/80 hover:text-mystic-accent transition">
         ← К глоссарию
@@ -66,8 +66,8 @@ function variantNoteFor(deck: DeckType): string | null {
       </div>
 
       <div class="flex-1">
-        <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ КАРТА ✦</div>
-        <h1 class="font-display text-4xl gold-text mb-1">{{ card.name }}</h1>
+        <div class="card-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ КАРТА ✦</div>
+        <h1 class="card-title-heading font-display text-4xl gold-text mb-1">{{ card.name }}</h1>
         <div class="text-mystic-silver/60 mb-6 italic">{{ card.nameEn }}</div>
 
         <section class="mystic-card p-5 mb-4">
@@ -157,5 +157,25 @@ function variantNoteFor(deck: DeckType): string | null {
   border-color: #f5c26b;
   background: rgba(245, 194, 107, 0.18);
   color: #f5c26b;
+}
+@media (max-width: 640px) {
+  .card-detail-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .card-kicker {
+    letter-spacing: 0.14em;
+  }
+  .card-title-heading {
+    font-size: 2rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+  .deck-tab {
+    flex: 1 1 8rem;
+  }
+  p {
+    overflow-wrap: anywhere;
+  }
 }
 </style>

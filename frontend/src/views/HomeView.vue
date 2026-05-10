@@ -74,10 +74,10 @@ function begin() {
 </script>
 
 <template>
-  <main class="min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16">
+  <main class="home-page min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16">
     <header class="text-center mb-10">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ВУАЛЬ ГРЯДУЩЕГО ✦</div>
-      <h1 class="font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
+      <div class="home-kicker text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ВУАЛЬ ГРЯДУЩЕГО ✦</div>
+      <h1 class="home-title font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
       <p class="text-mystic-silver/70 max-w-xl mx-auto">
         Задай вопрос Вселенной. Карты Таро раскроют тайные нити судьбы и покажут путь сквозь туман грядущего.
       </p>
@@ -162,7 +162,7 @@ function begin() {
         <RouterLink to="/legal" class="payment-link">Условия оплаты</RouterLink>
       </div>
 
-      <div class="flex justify-between text-xs text-mystic-silver/50">
+      <div class="home-links flex justify-between text-xs text-mystic-silver/50">
         <RouterLink v-if="!auth.isAuthenticated" to="/auth" class="hover:text-mystic-accent transition">Войти / Регистрация</RouterLink>
         <RouterLink v-else to="/history" class="hover:text-mystic-accent transition">История раскладов</RouterLink>
         <span v-if="auth.email">{{ auth.email }}</span>
@@ -289,6 +289,29 @@ function begin() {
   text-decoration: underline;
 }
 @media (max-width: 620px) {
+  .home-page {
+    justify-content: flex-start;
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+  }
+  .home-kicker {
+    letter-spacing: 0.14em;
+  }
+  .home-title {
+    font-size: clamp(2rem, 13vw, 2.75rem);
+    line-height: 1.12;
+  }
+  .deck-blurb-head,
+  .subscription-badge,
+  .home-links {
+    flex-wrap: wrap;
+  }
+  .home-links {
+    gap: 0.5rem;
+    justify-content: center;
+    overflow-wrap: anywhere;
+    text-align: center;
+  }
   .payment-info {
     align-items: flex-start;
     flex-direction: column;

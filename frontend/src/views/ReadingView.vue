@@ -147,8 +147,8 @@ function setCardRef(el: Element | null, idx: number) {
 <template>
   <main ref="board" class="reading-board min-h-screen relative px-3 sm:px-6 py-8 sm:py-12">
     <div class="text-center mb-6 sm:mb-8 relative z-10">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2 break-words px-2">✦ {{ pendingQuestion }}</div>
-      <h2 class="font-display text-2xl sm:text-3xl gold-text">
+      <div class="question-ribbon text-mystic-accent text-xs tracking-[0.4em] mb-2 break-words px-2">✦ {{ pendingQuestion }}</div>
+      <h2 class="reading-title font-display text-2xl sm:text-3xl gold-text">
         {{
           stage === 'idle' ? 'Коснись колоды' :
           stage === 'shuffling' ? 'Перемешиваю судьбу…' :
@@ -181,7 +181,7 @@ function setCardRef(el: Element | null, idx: number) {
       />
     </div>
 
-    <div class="fixed bottom-6 left-0 right-0 text-center text-xs text-mystic-silver/50 z-10">
+    <div class="reading-hint fixed bottom-6 left-0 right-0 text-center text-xs text-mystic-silver/50 z-10">
       <span v-if="stage === 'idle' && !store.error">коснись, чтобы перемешать колоду</span>
       <span v-else-if="store.error" class="text-red-400/80">{{ store.error }}</span>
     </div>
@@ -191,8 +191,33 @@ function setCardRef(el: Element | null, idx: number) {
 <style scoped>
 .reading-board {
   overflow: hidden;
+  min-height: calc(100svh - 4rem);
 }
 .cards-layer {
   z-index: 5;
+}
+.question-ribbon {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .reading-board {
+    padding-top: 1.25rem;
+    padding-bottom: 4.75rem;
+  }
+  .question-ribbon {
+    max-width: 100%;
+    letter-spacing: 0.12em;
+    font-size: 0.68rem;
+  }
+  .reading-title {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+  .reading-hint {
+    bottom: 1.1rem;
+    padding: 0 1rem;
+  }
 }
 </style>

@@ -37,10 +37,10 @@ function averageScore(feedback: FeedbackInfo): number | null {
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 max-w-3xl mx-auto">
+  <main class="profile-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-3xl mx-auto">
     <header class="mb-8 text-center">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ ПРОФИЛЬ ✦</div>
-      <h1 class="font-display text-4xl gold-text">{{ auth.email ?? 'Мой профиль' }}</h1>
+      <div class="profile-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ ПРОФИЛЬ ✦</div>
+      <h1 class="profile-title font-display text-4xl gold-text">{{ auth.email ?? 'Мой профиль' }}</h1>
     </header>
 
     <div v-if="store.loading" class="text-center text-mystic-silver/60" data-testid="profile-loading">
@@ -164,5 +164,26 @@ function averageScore(feedback: FeedbackInfo): number | null {
   display: flex;
   gap: 0.5rem;
   margin-top: 0.15rem;
+}
+@media (max-width: 640px) {
+  .profile-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .profile-kicker {
+    letter-spacing: 0.14em;
+  }
+  .profile-title {
+    font-size: 2rem;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+  .feedback-row {
+    align-items: flex-start;
+  }
+  .feedback-sub {
+    flex-wrap: wrap;
+    gap: 0.25rem 0.45rem;
+  }
 }
 </style>

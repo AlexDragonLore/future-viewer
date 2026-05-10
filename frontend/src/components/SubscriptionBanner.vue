@@ -65,7 +65,7 @@ async function subscribe() {
   flex-direction: column;
   gap: 0.15rem;
   flex: 1;
-  min-width: 14rem;
+  min-width: min(14rem, 100%);
 }
 .title {
   font-family: 'Cinzel', serif;
@@ -81,5 +81,13 @@ async function subscribe() {
   flex-basis: 100%;
   font-size: 0.75rem;
   color: #fca5a5;
+}
+@media (max-width: 640px) {
+  .subscription-banner {
+    align-items: stretch;
+  }
+  .subscription-banner .glow-button {
+    width: 100%;
+  }
 }
 </style>

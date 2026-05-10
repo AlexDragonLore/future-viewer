@@ -25,9 +25,9 @@ async function submit() {
 </script>
 
 <template>
-  <main class="min-h-screen flex items-center justify-center px-6">
-    <section class="mystic-card p-8 w-full max-w-md">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2 text-center">✦ ВРАТА ✦</div>
+  <main class="forgot-page min-h-screen flex items-center justify-center px-4 sm:px-6 py-10">
+    <section class="mystic-card p-6 sm:p-8 w-full max-w-md">
+      <div class="forgot-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2 text-center">✦ ВРАТА ✦</div>
       <h1 class="font-display text-3xl gold-text text-center mb-6">Забыли пароль?</h1>
 
       <div v-if="sent" class="text-center space-y-4">
@@ -63,3 +63,18 @@ async function submit() {
     </section>
   </main>
 </template>
+
+<style scoped>
+@media (max-width: 640px) {
+  .forgot-page {
+    align-items: flex-start;
+    padding-top: 2.5rem;
+  }
+  .forgot-kicker {
+    letter-spacing: 0.14em;
+  }
+  p {
+    overflow-wrap: anywhere;
+  }
+}
+</style>

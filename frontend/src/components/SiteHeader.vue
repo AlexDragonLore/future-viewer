@@ -111,10 +111,10 @@ const quotaLabel = computed(() => {
         </div>
 
         <template v-if="auth.isAuthenticated">
-          <div class="quota" v-if="quotaLabel" data-testid="header-quota" :class="{ subscribed: auth.isSubscribed }">
+          <div class="quota desktop-account" v-if="quotaLabel" data-testid="header-quota" :class="{ subscribed: auth.isSubscribed }">
             {{ quotaLabel }}
           </div>
-          <div class="user-menu">
+          <div class="user-menu desktop-account">
             <button class="user-button" type="button" @click="menuOpen = !menuOpen" data-testid="user-button">
               <span class="user-email">{{ auth.email }}</span>
               <span class="chev">▾</span>
@@ -138,53 +138,60 @@ const quotaLabel = computed(() => {
           </div>
         </template>
         <template v-else>
-          <RouterLink to="/auth" class="auth-link" data-testid="nav-auth">Войти</RouterLink>
+          <RouterLink to="/auth" class="auth-link desktop-account" data-testid="nav-auth">Войти</RouterLink>
         </template>
       </div>
     </div>
 
-    <transition name="burger-panel">
-      <div
-        v-if="burgerOpen"
-        class="burger-panel"
-        data-testid="burger-panel"
-        @click.self="burgerOpen = false"
-      >
-        <nav class="burger-nav">
-          <RouterLink to="/glossary" class="burger-link" data-testid="burger-glossary" @click="burgerOpen = false">
-            Глоссарий
-          </RouterLink>
-          <RouterLink to="/leaderboard" class="burger-link" data-testid="burger-leaderboard" @click="burgerOpen = false">
-            Лидерборд
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/history" class="burger-link" data-testid="burger-history" @click="burgerOpen = false">
-            История
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="burger-link" data-testid="burger-achievements" @click="burgerOpen = false">
-            Ачивки
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated" to="/profile" class="burger-link" data-testid="burger-profile" @click="burgerOpen = false">
-            Профиль
-          </RouterLink>
-          <RouterLink v-if="auth.isAuthenticated && auth.isAdmin" to="/admin" class="burger-link" data-testid="burger-admin" @click="burgerOpen = false">
-            Админ
-          </RouterLink>
-          <button
-            v-if="auth.isAuthenticated"
-            class="burger-link as-btn"
-            type="button"
-            data-testid="burger-logout"
-            @click="handleLogout"
-          >
-            Выйти
-          </button>
-          <RouterLink v-else to="/auth" class="burger-link" data-testid="burger-auth" @click="burgerOpen = false">
-            Войти
-          </RouterLink>
-        </nav>
-      </div>
-    </transition>
   </header>
+
+  <transition name="burger-panel">
+    <div
+      v-if="burgerOpen"
+      class="burger-panel"
+      data-testid="burger-panel"
+      @click.self="burgerOpen = false"
+    >
+      <nav class="burger-nav">
+        <div class="burger-summary">
+          <span v-if="auth.email" class="burger-email">{{ auth.email }}</span>
+          <span v-if="quotaLabel" class="burger-quota" :class="{ subscribed: auth.isSubscribed }">
+            {{ auth.isSubscribed ? 'Подписка активна' : `Лимит: ${quotaLabel}` }}
+          </span>
+        </div>
+        <RouterLink to="/glossary" class="burger-link" data-testid="burger-glossary" @click="burgerOpen = false">
+          Глоссарий
+        </RouterLink>
+        <RouterLink to="/leaderboard" class="burger-link" data-testid="burger-leaderboard" @click="burgerOpen = false">
+          Лидерборд
+        </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/history" class="burger-link" data-testid="burger-history" @click="burgerOpen = false">
+          История
+        </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="burger-link" data-testid="burger-achievements" @click="burgerOpen = false">
+          Ачивки
+        </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/profile" class="burger-link" data-testid="burger-profile" @click="burgerOpen = false">
+          Профиль
+        </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated && auth.isAdmin" to="/admin" class="burger-link" data-testid="burger-admin" @click="burgerOpen = false">
+          Админ
+        </RouterLink>
+        <button
+          v-if="auth.isAuthenticated"
+          class="burger-link as-btn"
+          type="button"
+          data-testid="burger-logout"
+          @click="handleLogout"
+        >
+          Выйти
+        </button>
+        <RouterLink v-else to="/auth" class="burger-link" data-testid="burger-auth" @click="burgerOpen = false">
+          Войти
+        </RouterLink>
+      </nav>
+    </div>
+  </transition>
 </template>
 
 <style scoped>
@@ -207,6 +214,7 @@ const quotaLabel = computed(() => {
   display: flex;
   align-items: center;
   gap: 1.25rem;
+  min-width: 0;
 }
 .logo {
   display: inline-flex;
@@ -216,6 +224,13 @@ const quotaLabel = computed(() => {
   font-family: 'Cinzel', serif;
   letter-spacing: 0.14em;
   font-size: 0.95rem;
+  min-width: 0;
+  flex-shrink: 0;
+}
+.logo-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .logo-mark {
   color: #f5c26b;
@@ -247,6 +262,7 @@ const quotaLabel = computed(() => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  min-width: 0;
 }
 .deck-picker {
   position: relative;
@@ -266,6 +282,7 @@ const quotaLabel = computed(() => {
   font-size: 0.72rem;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+  max-width: 100%;
 }
 .deck-button:hover,
 .user-button:hover {
@@ -295,6 +312,7 @@ const quotaLabel = computed(() => {
   backdrop-filter: blur(12px);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   z-index: 40;
+  max-width: calc(100vw - 1rem);
 }
 .deck-option,
 .dd-link {
@@ -342,6 +360,7 @@ const quotaLabel = computed(() => {
 }
 .user-menu {
   position: relative;
+  min-width: 0;
 }
 .user-email {
   max-width: 10rem;
@@ -418,6 +437,14 @@ const quotaLabel = computed(() => {
   padding: 1rem 1.25rem 2rem;
   border-top: 1px solid rgba(245, 194, 107, 0.18);
 }
+.burger-summary {
+  display: none;
+}
+.burger-email,
+.burger-quota {
+  display: block;
+  overflow-wrap: anywhere;
+}
 .burger-link {
   display: block;
   width: 100%;
@@ -456,6 +483,9 @@ const quotaLabel = computed(() => {
   .links {
     display: none;
   }
+  .desktop-account {
+    display: none;
+  }
   .user-email {
     max-width: 5rem;
   }
@@ -469,11 +499,56 @@ const quotaLabel = computed(() => {
     padding: 0.6rem 0.85rem;
     gap: 0.6rem;
   }
+  .logo {
+    flex: 1;
+    flex-shrink: 1;
+  }
   .logo-text {
     font-size: 0.85rem;
+    max-width: 11.5rem;
   }
   .right {
     gap: 0.4rem;
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+  .deck-button {
+    padding: 0.4rem 0.55rem;
+  }
+  .deck-menu {
+    position: fixed;
+    top: 3.45rem;
+    right: 0.5rem;
+    left: auto;
+    min-width: min(13rem, calc(100vw - 1rem));
+  }
+  .burger-panel {
+    top: 3.5rem;
+    overflow-y: auto;
+  }
+  .burger-nav {
+    padding: 1rem 0.85rem 2rem;
+  }
+  .burger-summary {
+    display: block;
+    padding: 0.7rem 0.5rem 0.9rem;
+    border-bottom: 1px solid rgba(245, 194, 107, 0.12);
+    margin-bottom: 0.25rem;
+    color: rgba(224, 212, 186, 0.72);
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+  .burger-quota {
+    margin-top: 0.2rem;
+    color: #f5c26b;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.06em;
+  }
+}
+
+@media (max-width: 360px) {
+  .logo-text {
+    max-width: 8.5rem;
   }
 }
 </style>

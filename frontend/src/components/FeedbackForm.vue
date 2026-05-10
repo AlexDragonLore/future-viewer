@@ -102,4 +102,19 @@ function onSubmit() {
   color: #fca5a5;
   font-size: 0.85rem;
 }
+@media (max-width: 640px) {
+  .feedback-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    line-height: 1.35;
+  }
+  .feedback-foot {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .feedback-foot .glow-button {
+    width: 100%;
+  }
+}
 </style>

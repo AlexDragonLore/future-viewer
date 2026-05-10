@@ -20,9 +20,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 max-w-3xl mx-auto">
+  <main class="history-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-3xl mx-auto">
     <header class="mb-8 text-center">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АРХИВ ✦</div>
+      <div class="history-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АРХИВ ✦</div>
       <h1 class="font-display text-4xl gold-text">История</h1>
     </header>
 
@@ -38,7 +38,7 @@ onMounted(async () => {
           :to="{ name: 'reading-detail', params: { id: r.id } }"
           class="mystic-card p-5 block transition hover:border-mystic-accent/60 hover:shadow-[0_0_24px_rgba(245,194,107,0.25)]"
         >
-          <div class="flex justify-between items-start mb-2">
+          <div class="history-card-head flex justify-between items-start mb-2">
             <div class="font-display text-mystic-accent">{{ r.spreadName }}</div>
             <div class="text-xs text-mystic-silver/50">{{ new Date(r.createdAt).toLocaleString() }}</div>
           </div>
@@ -53,3 +53,22 @@ onMounted(async () => {
     </div>
   </main>
 </template>
+
+<style scoped>
+@media (max-width: 640px) {
+  .history-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .history-kicker {
+    letter-spacing: 0.14em;
+  }
+  .history-card-head {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  p {
+    overflow-wrap: anywhere;
+  }
+}
+</style>

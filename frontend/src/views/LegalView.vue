@@ -3,7 +3,7 @@ import { merchant, paidProduct } from '@/content/legal'
 </script>
 
 <template>
-  <main class="legal-page px-6 py-12">
+  <main class="legal-page px-4 sm:px-6 py-10 sm:py-12">
     <section class="mystic-card legal-shell">
       <div class="text-mystic-accent text-xs tracking-[0.35em] mb-3 text-center">FUTURE VIEWER</div>
       <h1 class="font-display text-3xl md:text-4xl gold-text text-center mb-8">Оплата и условия сервиса</h1>
@@ -179,8 +179,22 @@ a:hover {
   text-decoration: underline;
 }
 @media (max-width: 760px) {
+  .legal-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
   .legal-shell {
-    padding: 1.25rem;
+    padding: 1rem;
+  }
+  .legal-shell > div:first-child {
+    letter-spacing: 0.14em;
+  }
+  .legal-shell h1 {
+    font-size: 1.85rem;
+    line-height: 1.15;
+  }
+  .legal-section {
+    padding: 1rem;
   }
   .legal-grid {
     grid-template-columns: 1fr;

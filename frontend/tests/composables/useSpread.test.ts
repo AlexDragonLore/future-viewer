@@ -36,6 +36,27 @@ describe('computeSlots', () => {
     expect(gap).toBeGreaterThan(0)
   })
 
+  it('keeps three mobile cards inside a 320px board without overlap', () => {
+    const width = computeCardWidth(SpreadType.ThreeCard, 320)
+    const slots = computeSlots(SpreadType.ThreeCard, 320, 568)
+
+    expect(slots[0].x - width / 2).toBeGreaterThanOrEqual(0)
+    expect(slots[2].x + width / 2).toBeLessThanOrEqual(320)
+    expect(slots[1].x - slots[0].x).toBeGreaterThanOrEqual(width)
+    expect(slots[2].x - slots[1].x).toBeGreaterThanOrEqual(width)
+  })
+
+  it('places celtic cross mobile slots inside a 320px board', () => {
+    const width = computeCardWidth(SpreadType.CelticCross, 320)
+    const slots = computeSlots(SpreadType.CelticCross, 320, 568)
+
+    expect(slots).toHaveLength(10)
+    for (const slot of slots) {
+      expect(slot.x - width / 2).toBeGreaterThanOrEqual(0)
+      expect(slot.x + width / 2).toBeLessThanOrEqual(320)
+    }
+  })
+
   it('falls back to a single slot for unknown spread type', () => {
     const slots = computeSlots(999 as unknown as SpreadType, 800, 600)
     expect(slots).toEqual([{ x: 400, y: 300 }])

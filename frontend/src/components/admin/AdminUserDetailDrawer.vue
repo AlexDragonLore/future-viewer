@@ -349,6 +349,7 @@ async function unlinkTelegram(): Promise<void> {
   overflow-y: auto;
   z-index: 50;
   box-shadow: -4px 0 24px rgba(0, 0, 0, 0.5);
+  overflow-wrap: anywhere;
 }
 .close {
   position: absolute;
@@ -406,6 +407,7 @@ async function unlinkTelegram(): Promise<void> {
   border-radius: 0.4rem;
   padding: 0.4rem 0.75rem;
   color: #f8f4eb;
+  width: 100%;
 }
 .admin-btn {
   padding: 0.45rem 0.9rem;
@@ -451,5 +453,30 @@ async function unlinkTelegram(): Promise<void> {
 }
 .danger-zone {
   border-color: rgba(255, 80, 80, 0.3);
+}
+@media (max-width: 640px) {
+  .drawer {
+    width: 100%;
+    padding: 1rem;
+    padding-top: 3.5rem;
+    border-left: none;
+  }
+  .section :deep(.grid),
+  .section .grid {
+    grid-template-columns: 1fr;
+  }
+  .section :deep(.flex),
+  .section .flex {
+    flex-wrap: wrap;
+  }
+  .admin-btn {
+    width: 100%;
+  }
+  .section .admin-btn.ml-auto {
+    margin-left: 0;
+  }
+  .list li {
+    overflow-wrap: anywhere;
+  }
 }
 </style>

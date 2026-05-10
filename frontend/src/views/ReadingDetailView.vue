@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { readingApi } from '@/api/readingApi'
 import { extractApiError } from '@/api/httpClient'
@@ -11,6 +11,14 @@ const route = useRoute()
 const reading = ref<Reading | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
+
+function onResize() {
+  viewportWidth.value = window.innerWidth
+}
+
+onMounted(() => window.addEventListener('resize', onResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onResize))
 
 async function load(id: string) {
   loading.value = true
@@ -36,10 +44,16 @@ watch(
 const interpretationHtml = computed(() =>
   reading.value?.interpretation ? (marked.parse(reading.value.interpretation) as string) : '',
 )
+
+const cardWidth = computed(() => {
+  if (viewportWidth.value <= 380) return 96
+  if (viewportWidth.value <= 640) return 110
+  return 130
+})
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 flex flex-col items-center">
+  <main class="reading-detail-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center">
     <div class="w-full max-w-3xl mb-6">
       <RouterLink to="/history" class="text-sm text-mystic-accent/80 hover:text-mystic-accent transition">
         ← К истории
@@ -52,9 +66,9 @@ const interpretationHtml = computed(() =>
 
     <template v-else>
       <header class="text-center mb-10">
-        <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
+        <div class="detail-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
         <h1 class="font-display text-4xl md:text-5xl gold-text">Архивный расклад</h1>
-        <p class="text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
+        <p class="detail-question text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
         <p class="text-xs text-mystic-silver/40 mt-1">{{ new Date(reading.createdAt).toLocaleString() }}</p>
       </header>
 
@@ -63,7 +77,7 @@ const interpretationHtml = computed(() =>
           <div class="text-xs text-mystic-accent/80 uppercase tracking-widest mb-2 text-center">
             {{ card.positionName }}
           </div>
-          <CardFlip :card="card" :face-up="true" :width="130" />
+          <CardFlip :card="card" :face-up="true" :width="cardWidth" />
           <div class="text-xs text-mystic-silver/60 mt-2 text-center max-w-[140px]">
             {{ card.meaning }}
           </div>
@@ -83,13 +97,15 @@ const interpretationHtml = computed(() =>
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 2rem;
+  gap: clamp(0.75rem, 2vw, 2rem);
   max-width: 1000px;
+  width: 100%;
 }
 .card-entry {
   display: flex;
   flex-direction: column;
   align-items: center;
+  max-width: 9rem;
 }
 .prose-mystic :deep(h2) {
   font-size: 1.1rem;
@@ -113,5 +129,27 @@ const interpretationHtml = computed(() =>
 }
 .prose-mystic :deep(p) {
   margin-bottom: 0.6rem;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .reading-detail-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .detail-kicker {
+    letter-spacing: 0.14em;
+    line-height: 1.45;
+  }
+  .detail-question {
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+  .cards-grid {
+    gap: 1rem 0.65rem;
+    margin-bottom: 2rem;
+  }
+  .card-entry {
+    max-width: 7.2rem;
+  }
 }
 </style>

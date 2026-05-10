@@ -13,11 +13,13 @@ const h = computed(() => Math.round((props.width ?? 140) * 1.65))
 
 const rotation = computed(() => (props.card?.isReversed ? 180 : 0))
 const orientation = computed(() => (props.card?.isReversed ? 'перевёрнутая' : 'прямая'))
+const compact = computed(() => w.value < 90)
 </script>
 
 <template>
   <div
     class="card-flip relative select-none"
+    :class="{ compact }"
     :style="{ width: w + 'px', height: h + 'px', '--card-rotation': rotation + 'deg' }"
   >
     <div class="card-inner" :class="{ 'is-flipped': faceUp }">
@@ -162,5 +164,16 @@ const orientation = computed(() => (props.card?.isReversed ? 'перевёрну
   align-items: center;
   justify-content: center;
   height: 100%;
+}
+.card-flip.compact .card-orientation {
+  display: none;
+}
+.card-flip.compact .card-name-overlay {
+  font-size: 0.48rem;
+  letter-spacing: 0.03em;
+  padding: 0.22rem 0.18rem;
+}
+.card-flip.compact .card-face {
+  border-radius: 8px;
 }
 </style>

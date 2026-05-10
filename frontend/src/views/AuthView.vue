@@ -64,9 +64,9 @@ async function resendVerification() {
 </script>
 
 <template>
-  <main class="min-h-screen flex items-center justify-center px-6">
-    <section class="mystic-card p-8 w-full max-w-md">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2 text-center">✦ ВРАТА ✦</div>
+  <main class="auth-page min-h-screen flex items-center justify-center px-4 sm:px-6 py-10">
+    <section class="mystic-card p-6 sm:p-8 w-full max-w-md">
+      <div class="auth-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2 text-center">✦ ВРАТА ✦</div>
       <h1 class="font-display text-3xl gold-text text-center mb-6">
         {{ mode === 'login' ? 'Войти' : 'Регистрация' }}
       </h1>
@@ -118,3 +118,15 @@ async function resendVerification() {
     </section>
   </main>
 </template>
+
+<style scoped>
+@media (max-width: 640px) {
+  .auth-page {
+    align-items: flex-start;
+    padding-top: 2.5rem;
+  }
+  .auth-kicker {
+    letter-spacing: 0.14em;
+  }
+}
+</style>

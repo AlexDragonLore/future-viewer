@@ -22,9 +22,9 @@ function goHome() {
 </script>
 
 <template>
-  <main class="min-h-screen flex items-center justify-center px-6">
-    <section class="mystic-card p-8 w-full max-w-md text-center">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ПЛАТЁЖ ✦</div>
+  <main class="payment-page min-h-screen flex items-center justify-center px-4 sm:px-6 py-10">
+    <section class="mystic-card p-6 sm:p-8 w-full max-w-md text-center">
+      <div class="payment-kicker text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ПЛАТЁЖ ✦</div>
 
       <template v-if="refreshing">
         <h1 class="font-display text-3xl gold-text mb-4">Проверяем подписку…</h1>
@@ -50,3 +50,19 @@ function goHome() {
     </section>
   </main>
 </template>
+
+<style scoped>
+@media (max-width: 640px) {
+  .payment-page {
+    align-items: flex-start;
+    padding-top: 2.5rem;
+  }
+  .payment-kicker {
+    letter-spacing: 0.14em;
+  }
+  h1 {
+    font-size: 1.9rem;
+    line-height: 1.15;
+  }
+}
+</style>

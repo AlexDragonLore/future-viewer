@@ -92,12 +92,14 @@ const iconComponent = computed(() => iconForAchievement(props.achievement.code))
   letter-spacing: 0.08em;
   color: #f5c26b;
   margin-bottom: 0.4rem;
+  overflow-wrap: anywhere;
 }
 .desc {
   font-size: 0.8rem;
   color: rgba(224, 212, 186, 0.8);
   line-height: 1.4;
   margin-bottom: 0.5rem;
+  overflow-wrap: anywhere;
 }
 .date {
   font-size: 0.7rem;

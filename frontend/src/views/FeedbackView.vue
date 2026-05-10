@@ -63,10 +63,10 @@ watch(
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 max-w-3xl mx-auto">
+  <main class="feedback-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-3xl mx-auto">
     <header class="text-center mb-8">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ ОТКЛИК ✦</div>
-      <h1 class="font-display text-4xl gold-text">Как прошёл день?</h1>
+      <div class="feedback-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ ОТКЛИК ✦</div>
+      <h1 class="feedback-title font-display text-4xl gold-text">Как прошёл день?</h1>
     </header>
 
     <div v-if="loading" class="text-center text-mystic-silver/60" data-testid="feedback-loading">
@@ -158,5 +158,27 @@ watch(
   line-height: 1.5;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 0 8px 8px 0;
+}
+@media (max-width: 640px) {
+  .feedback-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .feedback-kicker {
+    letter-spacing: 0.14em;
+  }
+  .feedback-title {
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+  p,
+  blockquote,
+  .prose-mystic {
+    overflow-wrap: anywhere;
+  }
+  .insincere-tag {
+    margin-left: 0;
+    margin-top: 0.35rem;
+  }
 }
 </style>

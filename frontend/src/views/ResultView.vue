@@ -112,11 +112,11 @@ function again() {
 </script>
 
 <template>
-  <main v-if="reading" class="min-h-screen px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center">
+  <main v-if="reading" class="result-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center">
     <header class="text-center mb-10">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
+      <div class="result-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
       <h1 class="font-display text-3xl sm:text-4xl md:text-5xl gold-text">Расклад раскрыт</h1>
-      <p class="text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
+      <p class="result-question text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
     </header>
 
     <section class="cards-grid mb-12">
@@ -153,6 +153,7 @@ function again() {
   display: flex;
   flex-direction: column;
   align-items: center;
+  max-width: 9rem;
 }
 .prose-mystic :deep(h2) {
   font-size: 1.1rem;
@@ -176,6 +177,7 @@ function again() {
 }
 .prose-mystic :deep(p) {
   margin-bottom: 0.6rem;
+  overflow-wrap: anywhere;
 }
 .caret {
   display: inline-block;
@@ -186,6 +188,27 @@ function again() {
 @keyframes blink {
   to {
     visibility: hidden;
+  }
+}
+@media (max-width: 640px) {
+  .result-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .result-kicker {
+    letter-spacing: 0.14em;
+    line-height: 1.45;
+  }
+  .result-question {
+    overflow-wrap: anywhere;
+    line-height: 1.45;
+  }
+  .cards-grid {
+    gap: 1rem 0.65rem;
+    margin-bottom: 2rem;
+  }
+  .card-entry {
+    max-width: 7.2rem;
   }
 }
 </style>

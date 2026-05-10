@@ -13,9 +13,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 max-w-5xl mx-auto">
+  <main class="achievements-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-5xl mx-auto">
     <header class="mb-8 text-center">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АЧИВКИ ✦</div>
+      <div class="achievements-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АЧИВКИ ✦</div>
       <h1 class="font-display text-4xl gold-text">Достижения</h1>
       <p v-if="!store.loading && !store.error" class="text-mystic-silver/70 mt-2" data-testid="achievements-counter">
         Открыто {{ unlockedCount }} из {{ store.items.length }}
@@ -40,3 +40,15 @@ onMounted(async () => {
     </section>
   </main>
 </template>
+
+<style scoped>
+@media (max-width: 640px) {
+  .achievements-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .achievements-kicker {
+    letter-spacing: 0.14em;
+  }
+}
+</style>

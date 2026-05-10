@@ -39,9 +39,9 @@ function parseSubFromToken(token: string): string | null {
 </script>
 
 <template>
-  <main class="min-h-screen px-6 py-16 max-w-3xl mx-auto">
+  <main class="leaderboard-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-3xl mx-auto">
     <header class="mb-8 text-center">
-      <div class="text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ РЕЙТИНГ ✦</div>
+      <div class="leaderboard-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ РЕЙТИНГ ✦</div>
       <h1 class="font-display text-4xl gold-text">Лидерборд</h1>
     </header>
 
@@ -108,5 +108,23 @@ function parseSubFromToken(token: string): string | null {
   border-color: #f5c26b;
   color: #f5c26b;
   box-shadow: 0 0 16px rgba(245, 194, 107, 0.35);
+}
+@media (max-width: 640px) {
+  .leaderboard-page {
+    padding-top: 2rem;
+    padding-bottom: 2.5rem;
+  }
+  .leaderboard-kicker {
+    letter-spacing: 0.14em;
+  }
+  .tabs {
+    align-items: stretch;
+  }
+  .tab {
+    flex: 1;
+    padding: 0.55rem 0.6rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+  }
 }
 </style>

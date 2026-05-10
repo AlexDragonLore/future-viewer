@@ -48,7 +48,7 @@ function onCloseDrawer(): void {
 
 <template>
   <section class="space-y-6" data-testid="admin-users-view">
-    <div class="mystic-card p-4 flex flex-wrap gap-3 items-end">
+    <div class="admin-toolbar mystic-card p-4 flex flex-wrap gap-3 items-end">
       <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1 flex-grow">
         <span>Email</span>
         <input
@@ -66,7 +66,7 @@ function onCloseDrawer(): void {
 
     <AdminUsersTable @select="onSelect" />
 
-    <div class="flex justify-between items-center mt-4 text-sm text-mystic-muted">
+    <div class="admin-pager flex justify-between items-center mt-4 text-sm text-mystic-muted">
       <span data-testid="admin-user-total">Всего: {{ store.userTotal }}</span>
       <div class="flex gap-2 items-center">
         <button class="admin-btn" :disabled="store.userPage === 1" @click="prevPage">‹</button>
@@ -92,6 +92,7 @@ function onCloseDrawer(): void {
   border-radius: 0.4rem;
   padding: 0.4rem 0.75rem;
   color: #f8f4eb;
+  width: 100%;
 }
 .admin-btn {
   padding: 0.45rem 0.9rem;
@@ -120,5 +121,22 @@ function onCloseDrawer(): void {
   border: 1px solid rgba(80, 200, 120, 0.2);
   padding: 0.6rem 0.9rem;
   border-radius: 0.4rem;
+}
+@media (max-width: 640px) {
+  .admin-toolbar {
+    align-items: stretch;
+  }
+  .admin-toolbar label {
+    flex-basis: 100%;
+  }
+  .admin-pager {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+    text-align: center;
+  }
+  .admin-pager > div {
+    justify-content: center;
+  }
 }
 </style>
