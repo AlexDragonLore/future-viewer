@@ -161,13 +161,13 @@ jobs:
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
           set -Eeuo pipefail
-          gzip -dc /tmp/future-viewer-images.tar.gz | ssh \
+          ssh \
             -i ~/.ssh/future_viewer_root \
             -p "$PRODUCTION_PORT" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
-            "docker load"
+            "gzip -dc | docker load" < /tmp/future-viewer-images.tar.gz
 
       - name: Run production deploy
         if: steps.config.outputs.deploy_ready == 'true'
