@@ -105,4 +105,12 @@ jobs:
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
           set -Eeuo pipefail
-          curl -fsS "$PRODUCTION_HEALTH_URL"
+          for attempt in $(seq 1 20); do
+            if curl -fsS "$PRODUCTION_HEALTH_URL"; then
+              exit 0
+            fi
+            echo "Health check failed, retry $attempt/20"
+            sleep 5
+          done
+          echo "Production health check failed after retries"
+          exit 1
