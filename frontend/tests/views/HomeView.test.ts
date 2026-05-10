@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { SpreadType, SubscriptionStatusValue } from '@/types'
 
+const validateQuestionMock = vi.fn()
 vi.mock('@/api/readingApi', () => ({
   readingApi: {
     spreads: vi.fn(async () => [
@@ -12,6 +13,7 @@ vi.mock('@/api/readingApi', () => ({
       { type: SpreadType.CelticCross, name: 'Cross', cardCount: 10, positions: [] },
     ]),
     create: vi.fn(),
+    validateQuestion: (...args: [unknown, unknown, unknown]) => validateQuestionMock(...args),
     get: vi.fn(),
     history: vi.fn(),
   },
@@ -62,6 +64,12 @@ describe('HomeView', () => {
     statusMock.mockReset()
     personalizationMock.mockReset()
     updatePersonalizationMock.mockReset()
+    validateQuestionMock.mockReset()
+    validateQuestionMock.mockResolvedValue({
+      status: 'accepted',
+      reason: 'ok',
+      suggestedQuestion: null,
+    })
     statusMock.mockResolvedValue({
       status: SubscriptionStatusValue.None,
       expiresAt: null,
@@ -114,6 +122,7 @@ describe('HomeView', () => {
     const parsed = JSON.parse(stored!)
     expect(parsed.question).toBe('Question?')
     expect(parsed.spreadType).toBe(SpreadType.SingleCard)
+    expect(validateQuestionMock).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
@@ -153,7 +162,34 @@ describe('HomeView', () => {
       lastName: 'Lovelace',
       birthDate: '1815-12-10',
     })
+    expect(validateQuestionMock).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('reading')
+  })
+
+  it('stays on home and shows validator response when question needs rewrite', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'u@x.com')
+    validateQuestionMock.mockRejectedValue({
+      response: {
+        data: {
+          error: 'question_needs_rewrite',
+          message: 'Вопрос слишком общий.',
+          suggestedQuestion: 'На что мне стоит обратить внимание?',
+        },
+      },
+    })
+    const { wrapper, router } = await mountHome()
+    await wrapper.findAll('.spread-option')[0].trigger('click')
+    await wrapper.find('textarea').setValue('что будет?')
+    await wrapper.find('.glow-button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('home')
+    expect(sessionStorage.getItem('fv_pending')).toBeNull()
+    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain('Вопрос слишком общий.')
+    expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
+      'На что мне стоит обратить внимание?',
+    )
   })
 
   it('shows subscription badge with remaining free quota when authenticated', async () => {

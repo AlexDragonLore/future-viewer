@@ -10,6 +10,8 @@ import { paidProduct } from '@/content/legal'
 import { findDeckMeta } from '@/data/decks'
 import { SPREADS_META, findSpreadMeta } from '@/data/spreads'
 import { extractApiError } from '@/api/httpClient'
+import { readingApi } from '@/api/readingApi'
+import type { AxiosError } from 'axios'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -23,6 +25,7 @@ const birthDate = ref('')
 const introError = ref<string | null>(null)
 const validationMessage = ref<string | null>(null)
 const validationSuggestion = ref<string | null>(null)
+const validatingQuestion = ref(false)
 const spreadType = ref<SpreadType>(SpreadType.ThreeCard)
 
 const currentDeckMeta = computed(() => findDeckMeta(deck.current))
@@ -78,6 +81,7 @@ const blockMessage = computed(() => {
 })
 
 const canBegin = computed(() => {
+  if (validatingQuestion.value) return false
   if (!question.value.trim()) return false
   if (needsIntro.value && (!firstName.value.trim() || !lastName.value.trim() || !birthDate.value)) return false
   if (!auth.isAuthenticated) return true
@@ -107,7 +111,8 @@ async function begin() {
   introError.value = null
   validationMessage.value = null
   validationSuggestion.value = null
-  sessionStorage.setItem('fv_pending', JSON.stringify({ spreadType: spreadType.value, question: question.value }))
+  const pending = { spreadType: spreadType.value, question: question.value.trim() }
+  sessionStorage.setItem('fv_pending', JSON.stringify(pending))
   if (!auth.isAuthenticated) {
     router.push({ name: 'auth', query: { redirect: '/reading' } })
     return
@@ -124,6 +129,26 @@ async function begin() {
       return
     }
   }
+
+  validatingQuestion.value = true
+  try {
+    await readingApi.validateQuestion(spreadType.value, pending.question, deck.current)
+  } catch (e) {
+    const err = e as AxiosError<{ message?: string; error?: string; suggestedQuestion?: string | null }>
+    const code = err.response?.data?.error
+    if (code === 'question_needs_rewrite' || code === 'question_rejected') {
+      validationMessage.value = extractApiError(e, 'Вопрос нужно уточнить')
+      validationSuggestion.value = err.response?.data?.suggestedQuestion ?? null
+      sessionStorage.removeItem('fv_pending')
+      return
+    }
+    validationMessage.value = extractApiError(e, 'Не удалось проверить вопрос')
+    sessionStorage.removeItem('fv_pending')
+    return
+  } finally {
+    validatingQuestion.value = false
+  }
+
   router.push({ name: 'reading' })
 }
 </script>
@@ -206,6 +231,11 @@ async function begin() {
         </button>
       </div>
 
+      <div v-if="validatingQuestion" class="validation-pending" data-testid="question-validating">
+        <span class="validation-spinner" aria-hidden="true"></span>
+        <span>Сверяю вопрос с Вуалью…</span>
+      </div>
+
       <section v-if="needsIntro" class="intro-block" data-testid="personalization-intro">
         <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Знакомство</div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -240,7 +270,7 @@ async function begin() {
       </div>
 
       <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
-        {{ auth.isAuthenticated ? 'Начать расклад' : 'Войти и начать' }}
+        {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : 'Войти и начать' }}
       </button>
 
       <SubscriptionBanner
@@ -290,7 +320,8 @@ async function begin() {
 .deck-blurb,
 .spread-blurb,
 .intro-block,
-.validation-warning {
+.validation-warning,
+.validation-pending {
   padding: 0.75rem 1rem;
   border: 1px solid rgba(245, 194, 107, 0.2);
   border-radius: 10px;
@@ -316,6 +347,26 @@ async function begin() {
 }
 .validation-warning {
   color: rgba(252, 165, 165, 0.95);
+}
+.validation-pending {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: rgba(245, 194, 107, 0.95);
+}
+.validation-spinner {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  border: 2px solid rgba(245, 194, 107, 0.18);
+  border-top-color: #f5c26b;
+  border-radius: 999px;
+  animation: validation-spin 0.9s linear infinite;
+}
+@keyframes validation-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .suggestion-button {
   display: block;

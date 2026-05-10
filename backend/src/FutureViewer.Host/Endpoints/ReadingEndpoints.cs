@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using FluentValidation;
 using FutureViewer.DomainServices.DTOs;
+using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.DomainServices.Services;
 
 namespace FutureViewer.Host.Endpoints;
@@ -84,6 +85,38 @@ public static class ReadingEndpoints
                     // Best-effort terminal frame.
                 }
             }
+        }).RequireAuthorization();
+
+        group.MapPost("/validate-question", async (
+            CreateReadingRequest request,
+            IValidator<CreateReadingRequest> validator,
+            IAIQuestionValidator questionValidator,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            await validator.ValidateAndThrowAsync(request, ct);
+            _ = GetUserId(ctx.User)
+                ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
+
+            var validation = await questionValidator.ValidateAsync(request.Question, ct);
+            if (validation.Status == QuestionValidationStatus.Accepted)
+            {
+                return Results.Ok(new
+                {
+                    status = "accepted",
+                    reason = validation.Reason,
+                    suggestedQuestion = (string?)null
+                });
+            }
+
+            var code = validation.Status == QuestionValidationStatus.NeedsRewrite
+                ? "question_needs_rewrite"
+                : "question_rejected";
+
+            throw new DomainServices.Exceptions.QuestionValidationException(
+                code,
+                validation.Reason,
+                validation.SuggestedQuestion);
         }).RequireAuthorization();
 
         group.MapGet("/{id:guid}", async (

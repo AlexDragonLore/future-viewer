@@ -13,6 +13,12 @@ export interface ReadingApiError extends Error {
   suggestedQuestion?: string | null
 }
 
+export interface QuestionValidationResponse {
+  status: 'accepted'
+  reason: string
+  suggestedQuestion: null
+}
+
 type StreamEvent =
   | { type: 'cards'; reading: Reading }
   | { type: 'chunk'; delta: string }
@@ -22,6 +28,21 @@ type StreamEvent =
 export const readingApi = {
   async create(spreadType: SpreadType, question: string, deckType: DeckType): Promise<Reading> {
     const { data } = await httpClient.post<Reading>('/api/readings', {
+      spreadType,
+      question,
+      deckType,
+      clientDate: todayLocal(),
+      clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    })
+    return data
+  },
+
+  async validateQuestion(
+    spreadType: SpreadType,
+    question: string,
+    deckType: DeckType,
+  ): Promise<QuestionValidationResponse> {
+    const { data } = await httpClient.post<QuestionValidationResponse>('/api/readings/validate-question', {
       spreadType,
       question,
       deckType,

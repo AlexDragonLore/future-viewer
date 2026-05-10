@@ -87,6 +87,33 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
+    public async Task Post_validate_question_returns_accepted_without_creating_reading()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings/validate-question",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "What should I notice?" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        body!["status"].ToString().Should().Be("accepted");
+    }
+
+    [Fact]
+    public async Task Post_validate_question_returns_rewrite_error()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings/validate-question",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "needs rewrite" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        body!["error"].ToString().Should().Be("question_needs_rewrite");
+        body["suggestedQuestion"].ToString().Should().Contain("обратить внимание");
+    }
+
+    [Fact]
     public async Task Post_reading_without_token_returns_unauthorized()
     {
         var client = _fixture.CreateClient();
