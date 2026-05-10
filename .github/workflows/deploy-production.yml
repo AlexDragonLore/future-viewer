@@ -147,17 +147,17 @@ jobs:
           git merge --ff-only "origin/$DEPLOY_BRANCH"
           REMOTE
 
-      - name: Load images on server
+      - name: Upload images to server
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
           set -Eeuo pipefail
-          ssh \
+          scp \
             -i ~/.ssh/future_viewer_root \
-            -p "$PRODUCTION_PORT" \
+            -P "$PRODUCTION_PORT" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
-            "gzip -dc | docker load" < /tmp/future-viewer-images.tar.gz
+            /tmp/future-viewer-images.tar.gz \
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST:/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
 
       - name: Run production deploy
         if: steps.config.outputs.deploy_ready == 'true'
@@ -172,6 +172,7 @@ jobs:
             "IMAGE_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$APP_DIR"
+          docker load -i "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
           FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
             --env-file /opt/fv-app/.env.production \
             -f docker-compose.prod.yml \
@@ -190,6 +191,7 @@ jobs:
             -f docker-compose.prod.prebuilt.yml \
             -p future-viewer \
             up -d --no-build
+          rm -f "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
           docker image prune -af
           REMOTE
 
