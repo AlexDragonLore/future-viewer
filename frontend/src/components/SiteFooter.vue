@@ -8,6 +8,8 @@ const open = ref(false)
   <footer class="site-footer">
     <button class="about-link" @click="open = true">О нас</button>
     <span class="mx-2 text-mystic-silver/30">·</span>
+    <RouterLink to="/legal" class="about-link">Оплата и оферта</RouterLink>
+    <span class="mx-2 text-mystic-silver/30">·</span>
     <span class="text-mystic-silver/40">Future Viewer</span>
   </footer>
 

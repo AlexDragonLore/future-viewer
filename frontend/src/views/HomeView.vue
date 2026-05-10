@@ -5,6 +5,7 @@ import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { SpreadType } from '@/types'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
+import { paidProduct } from '@/content/legal'
 
 const router = useRouter()
 const store = useReadingStore()
@@ -130,6 +131,17 @@ function begin() {
         :message="requiresSubscription ? 'Расклад требует подписки' : 'Лимит бесплатных раскладов исчерпан'"
       />
 
+      <div class="payment-info">
+        <div>
+          <div class="payment-title">{{ paidProduct.title }}</div>
+          <p>
+            {{ paidProduct.price }} за {{ paidProduct.period }}. Цифровой доступ к безлимитным раскладам
+            активируется в аккаунте после успешной онлайн-оплаты.
+          </p>
+        </div>
+        <RouterLink to="/legal" class="payment-link">Условия оплаты</RouterLink>
+      </div>
+
       <div class="flex justify-between text-xs text-mystic-silver/50">
         <RouterLink v-if="!auth.isAuthenticated" to="/auth" class="hover:text-mystic-accent transition">Войти / Регистрация</RouterLink>
         <RouterLink v-else to="/history" class="hover:text-mystic-accent transition">История раскладов</RouterLink>
@@ -186,5 +198,41 @@ function begin() {
 .glow-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.payment-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid rgba(245, 194, 107, 0.18);
+  border-bottom: 1px solid rgba(245, 194, 107, 0.12);
+}
+.payment-info p {
+  margin: 0.2rem 0 0;
+  color: rgba(224, 212, 186, 0.62);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+.payment-title {
+  color: rgba(245, 194, 107, 0.9);
+  font-family: 'Cinzel', serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+}
+.payment-link {
+  flex: 0 0 auto;
+  color: #f5c26b;
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+.payment-link:hover {
+  text-decoration: underline;
+}
+@media (max-width: 620px) {
+  .payment-info {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }
 </style>
