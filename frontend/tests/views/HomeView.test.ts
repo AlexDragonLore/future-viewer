@@ -24,6 +24,17 @@ vi.mock('@/api/subscriptionApi', () => ({
   },
 }))
 
+const personalizationMock = vi.fn()
+const updatePersonalizationMock = vi.fn()
+vi.mock('@/api/profileApi', () => ({
+  profileApi: {
+    personalization: (...args: []) => personalizationMock(...args),
+    updatePersonalization: (...args: [unknown]) => updatePersonalizationMock(...args),
+    deleteMemoryRule: vi.fn(),
+    clearMemory: vi.fn(),
+  },
+}))
+
 import HomeView from '@/views/HomeView.vue'
 
 async function mountHome() {
@@ -49,6 +60,8 @@ describe('HomeView', () => {
     sessionStorage.clear()
     localStorage.clear()
     statusMock.mockReset()
+    personalizationMock.mockReset()
+    updatePersonalizationMock.mockReset()
     statusMock.mockResolvedValue({
       status: SubscriptionStatusValue.None,
       expiresAt: null,
@@ -56,6 +69,20 @@ describe('HomeView', () => {
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
       canCreateFreeReading: true,
+    })
+    personalizationMock.mockResolvedValue({
+      firstName: 'Test',
+      lastName: 'User',
+      birthDate: '1990-01-01',
+      isComplete: true,
+      memoryRules: [],
+    })
+    updatePersonalizationMock.mockResolvedValue({
+      firstName: 'Test',
+      lastName: 'User',
+      birthDate: '1990-01-01',
+      isComplete: true,
+      memoryRules: [],
     })
   })
 
@@ -98,6 +125,35 @@ describe('HomeView', () => {
 
     expect(sessionStorage.getItem('fv_pending')).not.toBeNull()
     expect(router.currentRoute.value.name).toBe('auth')
+  })
+
+  it('asks authenticated user for personalization before first reading', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'u@x.com')
+    personalizationMock.mockResolvedValue({
+      firstName: null,
+      lastName: null,
+      birthDate: null,
+      isComplete: false,
+      memoryRules: [],
+    })
+    const { wrapper, router } = await mountHome()
+    await wrapper.findAll('.spread-option')[0].trigger('click')
+    await wrapper.find('textarea').setValue('Question?')
+    expect(wrapper.find('[data-testid="personalization-intro"]').exists()).toBe(true)
+
+    await wrapper.find('[data-testid="first-name-input"]').setValue('Ada')
+    await wrapper.find('[data-testid="last-name-input"]').setValue('Lovelace')
+    await wrapper.find('[data-testid="birth-date-input"]').setValue('1815-12-10')
+    await wrapper.find('.glow-button').trigger('click')
+    await flushPromises()
+
+    expect(updatePersonalizationMock).toHaveBeenCalledWith({
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      birthDate: '1815-12-10',
+    })
+    expect(router.currentRoute.value.name).toBe('reading')
   })
 
   it('shows subscription badge with remaining free quota when authenticated', async () => {

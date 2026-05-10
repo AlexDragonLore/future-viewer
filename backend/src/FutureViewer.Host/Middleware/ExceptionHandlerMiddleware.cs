@@ -49,6 +49,21 @@ public sealed class ExceptionHandlerMiddleware
             ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
             await ctx.Response.WriteAsJsonAsync(new { error = "email_not_verified", message = ex.Message });
         }
+        catch (ProfileRequiredException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+            await ctx.Response.WriteAsJsonAsync(new { error = "profile_required", message = ex.Message });
+        }
+        catch (QuestionValidationException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
+            await ctx.Response.WriteAsJsonAsync(new
+            {
+                error = ex.ErrorCode,
+                message = ex.Message,
+                suggestedQuestion = ex.SuggestedQuestion
+            });
+        }
         catch (QuotaExceededException ex)
         {
             ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;

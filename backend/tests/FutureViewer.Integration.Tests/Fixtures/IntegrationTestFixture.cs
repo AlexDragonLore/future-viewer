@@ -58,6 +58,14 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             if (aiDescriptor is not null) services.Remove(aiDescriptor);
             services.AddSingleton<IAIInterpreter, StubAIInterpreter>();
 
+            var validatorDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IAIQuestionValidator));
+            if (validatorDescriptor is not null) services.Remove(validatorDescriptor);
+            services.AddSingleton<IAIQuestionValidator, StubQuestionValidator>();
+
+            var memoryDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IAIMemoryExtractor));
+            if (memoryDescriptor is not null) services.Remove(memoryDescriptor);
+            services.AddSingleton<IAIMemoryExtractor, StubMemoryExtractor>();
+
             var scorerDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IFeedbackScorer));
             if (scorerDescriptor is not null) services.Remove(scorerDescriptor);
             services.AddSingleton<IFeedbackScorer, StubFeedbackScorer>();

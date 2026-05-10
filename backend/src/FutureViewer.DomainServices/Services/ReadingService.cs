@@ -15,6 +15,9 @@ public sealed class ReadingService
     private readonly InterpretationService _interpreter;
     private readonly SubscriptionService _subscription;
     private readonly FeedbackService _feedback;
+    private readonly PersonalizationService _personalization;
+    private readonly IAIQuestionValidator _questionValidator;
+    private readonly IAIMemoryExtractor _memoryExtractor;
     private readonly ILogger<ReadingService> _logger;
 
     public ReadingService(
@@ -23,6 +26,9 @@ public sealed class ReadingService
         InterpretationService interpreter,
         SubscriptionService subscription,
         FeedbackService feedback,
+        PersonalizationService personalization,
+        IAIQuestionValidator questionValidator,
+        IAIMemoryExtractor memoryExtractor,
         ILogger<ReadingService> logger)
     {
         _repo = repo;
@@ -30,6 +36,9 @@ public sealed class ReadingService
         _interpreter = interpreter;
         _subscription = subscription;
         _feedback = feedback;
+        _personalization = personalization;
+        _questionValidator = questionValidator;
+        _memoryExtractor = memoryExtractor;
         _logger = logger;
     }
 
@@ -39,8 +48,10 @@ public sealed class ReadingService
         CancellationToken ct = default)
     {
         var spread = Spread.From(request.SpreadType);
+        var promptContext = await PreparePromptContextAsync(request, userId, ct);
         if (userId is { } uid)
             await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
+        await ValidateQuestionAsync(request.Question, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -59,7 +70,7 @@ public sealed class ReadingService
             ct);
 
         var interpretation = await _interpreter.InterpretAsync(
-            spread, request.Question, cards, request.DeckType, variantNotes, ct);
+            spread, request.Question, cards, request.DeckType, variantNotes, promptContext, ct);
 
         var reading = new Reading
         {
@@ -88,6 +99,8 @@ public sealed class ReadingService
             {
                 _logger.LogWarning(ex, "Failed to schedule feedback for reading {ReadingId}", reading.Id);
             }
+
+            await RememberAsync(reading.UserId.Value, request.Question, interpretation.Text, promptContext, ct);
         }
 
         return Map(reading, spread);
@@ -99,8 +112,10 @@ public sealed class ReadingService
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var spread = Spread.From(request.SpreadType);
+        var promptContext = await PreparePromptContextAsync(request, userId, ct);
         if (userId is { } uid)
             await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
+        await ValidateQuestionAsync(request.Question, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -136,7 +151,7 @@ public sealed class ReadingService
         try
         {
             await foreach (var delta in _interpreter.InterpretStreamAsync(
-                spread, request.Question, cards, request.DeckType, variantNotes, ct))
+                spread, request.Question, cards, request.DeckType, variantNotes, promptContext, ct))
             {
                 if (!persisted)
                 {
@@ -172,6 +187,9 @@ public sealed class ReadingService
                 {
                     _logger.LogWarning(ex, "Failed to schedule feedback for streaming reading {ReadingId}", reading.Id);
                 }
+
+                if (sb.Length > 0)
+                    await RememberAsync(reading.UserId.Value, request.Question, sb.ToString(), promptContext, CancellationToken.None);
             }
         }
 
@@ -192,6 +210,60 @@ public sealed class ReadingService
     {
         var readings = await _repo.GetHistoryAsync(userId, take: 50, ct);
         return readings.Select(r => Map(r, Spread.From(r.SpreadType))).ToList();
+    }
+
+    private async Task<UserPromptContext> PreparePromptContextAsync(
+        CreateReadingRequest request,
+        Guid? userId,
+        CancellationToken ct)
+    {
+        if (userId is not { } uid)
+            throw new UnauthorizedException("Authentication required");
+
+        return await _personalization.GetPromptContextAsync(
+            uid,
+            request.ClientDate,
+            request.ClientTimeZone,
+            ct);
+    }
+
+    private async Task ValidateQuestionAsync(string question, CancellationToken ct)
+    {
+        var validation = await _questionValidator.ValidateAsync(question, ct);
+        if (validation.Status == QuestionValidationStatus.Accepted) return;
+
+        var code = validation.Status == QuestionValidationStatus.NeedsRewrite
+            ? "question_needs_rewrite"
+            : "question_rejected";
+
+        throw new QuestionValidationException(code, validation.Reason, validation.SuggestedQuestion);
+    }
+
+    private async Task RememberAsync(
+        Guid userId,
+        string question,
+        string interpretation,
+        UserPromptContext promptContext,
+        CancellationToken ct)
+    {
+        try
+        {
+            var rules = await _memoryExtractor.ExtractAsync(new MemoryExtractionContext
+            {
+                Question = question,
+                Interpretation = interpretation,
+                PromptContext = promptContext
+            }, ct);
+            await _personalization.SaveExtractedMemoryAsync(userId, rules, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to extract memory for user {UserId}", userId);
+        }
     }
 
     private static ReadingResult Map(Reading reading, Spread spread)

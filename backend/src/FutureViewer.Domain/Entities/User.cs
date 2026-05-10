@@ -11,6 +11,10 @@ public sealed class User
 
     public bool IsAdmin { get; set; } = false;
 
+    public string? FirstName { get; set; }
+    public string? LastName { get; set; }
+    public DateOnly? BirthDate { get; set; }
+
     public bool IsEmailVerified { get; set; } = false;
     public string? EmailVerificationToken { get; set; }
     public DateTime? EmailVerificationSentAt { get; set; }
@@ -28,4 +32,5 @@ public sealed class User
     public ICollection<Reading> Readings { get; init; } = new List<Reading>();
     public ICollection<ReadingFeedback> Feedbacks { get; init; } = new List<ReadingFeedback>();
     public ICollection<UserAchievement> Achievements { get; init; } = new List<UserAchievement>();
+    public ICollection<UserMemoryRule> MemoryRules { get; init; } = new List<UserMemoryRule>();
 }

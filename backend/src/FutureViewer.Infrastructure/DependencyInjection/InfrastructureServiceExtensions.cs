@@ -42,12 +42,15 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IAchievementRepository, AchievementRepository>();
         services.AddScoped<ILeaderboardRepository, LeaderboardRepository>();
+        services.AddScoped<IUserMemoryRepository, UserMemoryRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<AIChatClientFactory>();
         services.AddSingleton<IAIInterpreter, OpenAIInterpreter>();
+        services.AddSingleton<IAIQuestionValidator, QuestionValidationInterpreter>();
+        services.AddSingleton<IAIMemoryExtractor, MemoryExtractionInterpreter>();
         services.AddSingleton<IFeedbackScorer, FeedbackScoringInterpreter>();
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IEmailLinkBuilder, EmailLinkBuilder>();

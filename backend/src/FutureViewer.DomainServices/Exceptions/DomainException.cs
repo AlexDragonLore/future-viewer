@@ -39,3 +39,21 @@ public sealed class EmailNotVerifiedException : DomainException
 {
     public EmailNotVerifiedException(string message) : base(message) { }
 }
+
+public sealed class ProfileRequiredException : DomainException
+{
+    public ProfileRequiredException(string message) : base(message) { }
+}
+
+public sealed class QuestionValidationException : DomainException
+{
+    public QuestionValidationException(string errorCode, string message, string? suggestedQuestion = null)
+        : base(message)
+    {
+        ErrorCode = errorCode;
+        SuggestedQuestion = suggestedQuestion;
+    }
+
+    public string ErrorCode { get; }
+    public string? SuggestedQuestion { get; }
+}

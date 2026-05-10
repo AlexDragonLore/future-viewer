@@ -8,6 +8,7 @@ import { computeSlots, computeCardWidth } from '@/composables/useSpread'
 import { dealCards, shuffleDeck } from '@/composables/useCardAnimation'
 import type { ReadingCard, SpreadType } from '@/types'
 import { playShuffle, playDeal, playCardFlip, playReveal } from '@/composables/useAudio'
+import type { ReadingApiError } from '@/api/readingApi'
 
 const router = useRouter()
 const store = useReadingStore()
@@ -81,7 +82,17 @@ async function startReading() {
   const { cardsPromise, donePromise } = store.createStream(pendingSpread.value, pendingQuestion.value)
   donePromise.catch(() => {})
   let cardsFailed = false
-  cardsPromise.catch(() => {
+  cardsPromise.catch((e) => {
+    const err = e as ReadingApiError
+    if (err.code === 'question_needs_rewrite' || err.code === 'question_rejected') {
+      sessionStorage.setItem('fv_question_validation', JSON.stringify({
+        code: err.code,
+        message: err.message,
+        suggestedQuestion: err.suggestedQuestion ?? null,
+      }))
+      router.replace({ name: 'home' })
+      return
+    }
     cardsFailed = true
     stage.value = 'idle'
   })

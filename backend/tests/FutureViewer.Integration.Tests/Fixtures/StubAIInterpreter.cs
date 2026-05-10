@@ -1,6 +1,7 @@
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.Domain.ValueObjects;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 
 namespace FutureViewer.Integration.Tests.Fixtures;
@@ -15,6 +16,7 @@ public sealed class StubAIInterpreter : IAIInterpreter
         IReadOnlyList<ReadingCard> cards,
         DeckType deckType,
         IReadOnlyDictionary<int, string> variantNotes,
+        UserPromptContext promptContext,
         CancellationToken ct = default)
     {
         return Task.FromResult(new InterpretationResult
@@ -31,6 +33,7 @@ public sealed class StubAIInterpreter : IAIInterpreter
         IReadOnlyList<ReadingCard> cards,
         DeckType deckType,
         IReadOnlyDictionary<int, string> variantNotes,
+        UserPromptContext promptContext,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         yield return $"Stub interpretation for {spread.Name} with {cards.Count} cards ({deckType})";

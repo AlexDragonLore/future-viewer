@@ -8,6 +8,11 @@ export interface ReadingStreamHandlers {
   onError?: (error: unknown) => void
 }
 
+export interface ReadingApiError extends Error {
+  code?: string
+  suggestedQuestion?: string | null
+}
+
 type StreamEvent =
   | { type: 'cards'; reading: Reading }
   | { type: 'chunk'; delta: string }
@@ -20,6 +25,8 @@ export const readingApi = {
       spreadType,
       question,
       deckType,
+      clientDate: todayLocal(),
+      clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     })
     return data
   },
@@ -42,7 +49,13 @@ export const readingApi = {
       response = await fetch(`${baseURL}/api/readings/stream`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ spreadType, question, deckType }),
+        body: JSON.stringify({
+          spreadType,
+          question,
+          deckType,
+          clientDate: todayLocal(),
+          clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
         signal,
       })
     } catch (e) {
@@ -52,8 +65,12 @@ export const readingApi = {
 
     if (!response.ok || !response.body) {
       let message = `Stream failed: ${response.status} ${response.statusText}`
+      let code: string | undefined
+      let suggestedQuestion: string | null | undefined
       try {
-        const errBody = (await response.json()) as { message?: string; error?: string }
+        const errBody = (await response.json()) as { message?: string; error?: string; suggestedQuestion?: string | null }
+        code = errBody?.error
+        suggestedQuestion = errBody?.suggestedQuestion
         if (errBody?.message) message = errBody.message
         else if (errBody?.error) message = errBody.error
       } catch {
@@ -66,7 +83,9 @@ export const readingApi = {
           window.location.assign('/auth')
         }
       }
-      const error = new Error(message)
+      const error = new Error(message) as ReadingApiError
+      error.code = code
+      error.suggestedQuestion = suggestedQuestion
       handlers.onError?.(error)
       throw error
     }
@@ -144,6 +163,13 @@ export const readingApi = {
     const { data } = await httpClient.get<SpreadInfo[]>('/api/cards/spreads')
     return data
   },
+}
+
+function todayLocal(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
 }
 
 function parseEvent(line: string): StreamEvent | null {

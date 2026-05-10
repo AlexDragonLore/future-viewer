@@ -46,6 +46,33 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
+    public async Task Post_reading_requires_personalization_profile()
+    {
+        var client = await CreateAuthenticatedSubscribedClient(clearProfile: true);
+
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "What should I notice?" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        body!["error"].ToString().Should().Be("profile_required");
+    }
+
+    [Fact]
+    public async Task Post_reading_returns_validation_error_before_creating_reading()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "needs rewrite" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        body!["error"].ToString().Should().Be("question_needs_rewrite");
+        body["suggestedQuestion"].ToString().Should().Contain("обратить внимание");
+    }
+
+    [Fact]
     public async Task Post_reading_without_token_returns_unauthorized()
     {
         var client = _fixture.CreateClient();
@@ -111,7 +138,7 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    private async Task<HttpClient> CreateAuthenticatedSubscribedClient()
+    private async Task<HttpClient> CreateAuthenticatedSubscribedClient(bool clearProfile = false)
     {
         var client = _fixture.CreateClient();
         var email = $"reader-{Guid.NewGuid():N}@example.com";
@@ -124,6 +151,12 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
         var user = await users.GetByIdAsync(auth.UserId);
         user!.SubscriptionStatus = SubscriptionStatus.Active;
         user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+        if (clearProfile)
+        {
+            user.FirstName = null;
+            user.LastName = null;
+            user.BirthDate = null;
+        }
         await users.UpdateAsync(user);
 
         return client;

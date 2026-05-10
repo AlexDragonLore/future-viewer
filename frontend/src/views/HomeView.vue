@@ -3,25 +3,56 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useDeckStore } from '@/stores/useDeckStore'
+import { useProfileStore } from '@/stores/useProfileStore'
 import { SpreadType } from '@/types'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
 import { paidProduct } from '@/content/legal'
 import { findDeckMeta } from '@/data/decks'
 import { SPREADS_META, findSpreadMeta } from '@/data/spreads'
+import { extractApiError } from '@/api/httpClient'
 
 const router = useRouter()
 const auth = useAuthStore()
 const deck = useDeckStore()
+const profile = useProfileStore()
 
 const question = ref('')
+const firstName = ref('')
+const lastName = ref('')
+const birthDate = ref('')
+const introError = ref<string | null>(null)
+const validationMessage = ref<string | null>(null)
+const validationSuggestion = ref<string | null>(null)
 const spreadType = ref<SpreadType>(SpreadType.ThreeCard)
 
 const currentDeckMeta = computed(() => findDeckMeta(deck.current))
 const currentSpreadMeta = computed(() => findSpreadMeta(spreadType.value))
 
 onMounted(async () => {
-  if (auth.isAuthenticated) await auth.refreshSubscription()
+  const validation = sessionStorage.getItem('fv_question_validation')
+  if (validation) {
+    sessionStorage.removeItem('fv_question_validation')
+    try {
+      const parsed = JSON.parse(validation) as { message?: string; suggestedQuestion?: string | null }
+      validationMessage.value = parsed.message ?? null
+      validationSuggestion.value = parsed.suggestedQuestion ?? null
+    } catch {
+      validationMessage.value = null
+      validationSuggestion.value = null
+    }
+  }
+
+  if (auth.isAuthenticated) {
+    await Promise.all([auth.refreshSubscription(), profile.loadPersonalization()])
+    if (profile.personalization) {
+      firstName.value = profile.personalization.firstName ?? ''
+      lastName.value = profile.personalization.lastName ?? ''
+      birthDate.value = profile.personalization.birthDate ?? ''
+    }
+  }
 })
+
+const needsIntro = computed(() => auth.isAuthenticated && !(profile.personalization?.isComplete ?? false))
 
 const requiresSubscription = computed(() => {
   if (!auth.isAuthenticated) return false
@@ -48,6 +79,7 @@ const blockMessage = computed(() => {
 
 const canBegin = computed(() => {
   if (!question.value.trim()) return false
+  if (needsIntro.value && (!firstName.value.trim() || !lastName.value.trim() || !birthDate.value)) return false
   if (!auth.isAuthenticated) return true
   return !blocked.value
 })
@@ -62,12 +94,35 @@ const badgeText = computed(() => {
   return `Бесплатно сегодня: ${left}/${s.freeReadingsDailyLimit}`
 })
 
-function begin() {
+function applySuggestion() {
+  if (validationSuggestion.value) {
+    question.value = validationSuggestion.value
+    validationMessage.value = null
+    validationSuggestion.value = null
+  }
+}
+
+async function begin() {
   if (!canBegin.value) return
+  introError.value = null
+  validationMessage.value = null
+  validationSuggestion.value = null
   sessionStorage.setItem('fv_pending', JSON.stringify({ spreadType: spreadType.value, question: question.value }))
   if (!auth.isAuthenticated) {
     router.push({ name: 'auth', query: { redirect: '/reading' } })
     return
+  }
+  if (needsIntro.value) {
+    try {
+      await profile.savePersonalization({
+        firstName: firstName.value,
+        lastName: lastName.value,
+        birthDate: birthDate.value,
+      })
+    } catch (e) {
+      introError.value = extractApiError(e, 'Не удалось сохранить знакомство')
+      return
+    }
   }
   router.push({ name: 'reading' })
 }
@@ -138,6 +193,48 @@ function begin() {
         />
       </div>
 
+      <div v-if="validationMessage" class="validation-warning" data-testid="question-validation">
+        <p>{{ validationMessage }}</p>
+        <button
+          v-if="validationSuggestion"
+          type="button"
+          class="suggestion-button"
+          @click="applySuggestion"
+          data-testid="apply-suggested-question"
+        >
+          {{ validationSuggestion }}
+        </button>
+      </div>
+
+      <section v-if="needsIntro" class="intro-block" data-testid="personalization-intro">
+        <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Знакомство</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input
+            v-model="firstName"
+            type="text"
+            placeholder="Имя"
+            maxlength="80"
+            class="intro-input"
+            data-testid="first-name-input"
+          />
+          <input
+            v-model="lastName"
+            type="text"
+            placeholder="Фамилия"
+            maxlength="80"
+            class="intro-input"
+            data-testid="last-name-input"
+          />
+          <input
+            v-model="birthDate"
+            type="date"
+            class="intro-input sm:col-span-2"
+            data-testid="birth-date-input"
+          />
+        </div>
+        <p v-if="introError" class="text-red-300 text-xs mt-2">{{ introError }}</p>
+      </section>
+
       <div v-if="blocked" class="block-warning" data-testid="block-warning">
         {{ blockMessage }}
       </div>
@@ -191,7 +288,9 @@ function begin() {
   box-shadow: 0 0 20px rgba(245, 194, 107, 0.3);
 }
 .deck-blurb,
-.spread-blurb {
+.spread-blurb,
+.intro-block,
+.validation-warning {
   padding: 0.75rem 1rem;
   border: 1px solid rgba(245, 194, 107, 0.2);
   border-radius: 10px;
@@ -202,6 +301,32 @@ function begin() {
 }
 .spread-blurb {
   margin-top: 0.75rem;
+}
+.intro-input {
+  width: 100%;
+  border: 1px solid rgba(245, 194, 107, 0.3);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0.7rem 0.8rem;
+  color: #e0d4ba;
+  outline: none;
+}
+.intro-input:focus {
+  border-color: #f5c26b;
+}
+.validation-warning {
+  color: rgba(252, 165, 165, 0.95);
+}
+.suggestion-button {
+  display: block;
+  width: 100%;
+  margin-top: 0.65rem;
+  border: 1px solid rgba(245, 194, 107, 0.35);
+  border-radius: 8px;
+  padding: 0.65rem 0.8rem;
+  color: #f5c26b;
+  text-align: left;
+  background: rgba(245, 194, 107, 0.08);
 }
 .deck-blurb-head {
   display: flex;

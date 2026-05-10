@@ -25,6 +25,9 @@ public static class AuthTestExtensions
             user.IsEmailVerified = true;
             user.EmailVerificationToken = null;
             user.EmailVerificationSentAt = null;
+            user.FirstName = "Test";
+            user.LastName = "User";
+            user.BirthDate = new DateOnly(1990, 1, 1);
             await users.UpdateAsync(user);
         }
 

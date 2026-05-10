@@ -3,6 +3,7 @@ using System.Text;
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.Domain.ValueObjects;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using OpenAI.Chat;
 
@@ -32,9 +33,10 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         IReadOnlyList<ReadingCard> cards,
         DeckType deckType,
         IReadOnlyDictionary<int, string> variantNotes,
+        UserPromptContext promptContext,
         CancellationToken ct = default)
     {
-        var messages = BuildMessages(spread, question, cards, deckType, variantNotes);
+        var messages = BuildMessages(spread, question, cards, deckType, variantNotes, promptContext);
         var response = await _chat.CompleteChatAsync(messages, cancellationToken: ct);
         var text = response.Value.Content[0].Text;
 
@@ -52,9 +54,10 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         IReadOnlyList<ReadingCard> cards,
         DeckType deckType,
         IReadOnlyDictionary<int, string> variantNotes,
+        UserPromptContext promptContext,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var messages = BuildMessages(spread, question, cards, deckType, variantNotes);
+        var messages = BuildMessages(spread, question, cards, deckType, variantNotes, promptContext);
         var stream = _chat.CompleteChatStreamingAsync(messages, cancellationToken: ct);
 
         await foreach (var update in stream.WithCancellation(ct))
@@ -73,16 +76,17 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         string question,
         IReadOnlyList<ReadingCard> cards,
         DeckType deckType,
-        IReadOnlyDictionary<int, string> variantNotes)
+        IReadOnlyDictionary<int, string> variantNotes,
+        UserPromptContext promptContext)
     {
         return new List<ChatMessage>
         {
-            new SystemChatMessage(BuildSystemPrompt(deckType)),
+            new SystemChatMessage(BuildSystemPrompt(deckType, promptContext)),
             new UserChatMessage(BuildPrompt(spread, question, cards, deckType, variantNotes))
         };
     }
 
-    private static string BuildSystemPrompt(DeckType deckType)
+    private static string BuildSystemPrompt(DeckType deckType, UserPromptContext promptContext)
     {
         var deckTone = deckType switch
         {
@@ -100,7 +104,30 @@ public sealed class OpenAIInterpreter : IAIInterpreter
                 "Работай в классической традиции Райдера–Уэйта–Смит: опирайся на каноничные образы и сюжеты."
         };
 
-        return SystemPrompt + " " + deckTone;
+        var sb = new StringBuilder();
+        sb.Append(SystemPrompt).Append(' ').AppendLine(deckTone);
+        sb.Append("Сегодняшний день: ").Append(promptContext.Today.ToString("yyyy-MM-dd"));
+        if (!string.IsNullOrWhiteSpace(promptContext.ClientTimeZone))
+            sb.Append(" (часовой пояс пользователя: ").Append(promptContext.ClientTimeZone).Append(')');
+        sb.AppendLine(".");
+        sb.Append("Профиль пользователя: ")
+            .Append(promptContext.FirstName).Append(' ')
+            .Append(promptContext.LastName)
+            .Append(", дата рождения: ")
+            .Append(promptContext.BirthDate.ToString("yyyy-MM-dd"))
+            .AppendLine(".");
+
+        if (promptContext.MemoryRules.Count > 0)
+        {
+            sb.AppendLine("Сохранённая память о пользователе, которую можно учитывать только когда она релевантна вопросу:");
+            foreach (var rule in promptContext.MemoryRules.Take(20))
+            {
+                sb.Append("- ").AppendLine(rule);
+            }
+        }
+
+        sb.AppendLine("Не упоминай память явно и не делай выводы о пользователе как факты, если это не помогает ответу.");
+        return sb.ToString();
     }
 
     private static string BuildPrompt(

@@ -182,3 +182,24 @@ export interface TelegramLinkResponse {
   deepLinkUrl: string
   isLinked: boolean
 }
+
+export interface UserMemoryRule {
+  id: string
+  text: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Personalization {
+  firstName: string | null
+  lastName: string | null
+  birthDate: string | null
+  isComplete: boolean
+  memoryRules: UserMemoryRule[]
+}
+
+export interface UpdatePersonalizationPayload {
+  firstName: string
+  lastName: string
+  birthDate: string
+}

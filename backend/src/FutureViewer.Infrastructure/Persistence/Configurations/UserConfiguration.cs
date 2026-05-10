@@ -15,6 +15,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.HasIndex(x => x.Email).IsUnique();
         b.Property(x => x.PasswordHash).HasColumnName("password_hash").IsRequired();
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
+        b.Property(x => x.FirstName).HasColumnName("first_name").HasMaxLength(80);
+        b.Property(x => x.LastName).HasColumnName("last_name").HasMaxLength(80);
+        b.Property(x => x.BirthDate).HasColumnName("birth_date");
 
         b.Property(x => x.IsAdmin)
             .HasColumnName("is_admin")
@@ -54,6 +57,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.HasIndex(x => x.TelegramChatId).IsUnique();
 
         b.HasMany(x => x.Readings)
+            .WithOne(x => x.User)
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.HasMany(x => x.MemoryRules)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);

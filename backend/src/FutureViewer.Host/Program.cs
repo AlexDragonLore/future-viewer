@@ -82,6 +82,7 @@ app.MapCards();
 app.MapSubscription();
 app.MapPayments();
 app.MapFeedbacks();
+app.MapProfile();
 app.MapLeaderboard();
 app.MapAchievements();
 app.MapTelegram();

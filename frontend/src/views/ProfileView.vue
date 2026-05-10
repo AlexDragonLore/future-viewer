@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useProfileStore } from '@/stores/useProfileStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import ScoreBadge from '@/components/ScoreBadge.vue'
 import TelegramLinkButton from '@/components/TelegramLinkButton.vue'
+import { extractApiError } from '@/api/httpClient'
 import { FeedbackStatus, type FeedbackInfo } from '@/types'
 
 const store = useProfileStore()
@@ -11,6 +12,21 @@ const auth = useAuthStore()
 
 const recentFeedbacks = computed(() => store.feedbacks.slice(0, 5))
 const isLinked = computed(() => store.telegram?.isLinked ?? false)
+const firstName = ref('')
+const lastName = ref('')
+const birthDate = ref('')
+const personalizationError = ref<string | null>(null)
+const personalizationSaved = ref(false)
+
+watch(
+  () => store.personalization,
+  (value) => {
+    firstName.value = value?.firstName ?? ''
+    lastName.value = value?.lastName ?? ''
+    birthDate.value = value?.birthDate ?? ''
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   store.loadAll()
@@ -33,6 +49,39 @@ function statusLabel(status: FeedbackStatus): string {
 
 function averageScore(feedback: FeedbackInfo): number | null {
   return feedback.aiScore ?? null
+}
+
+async function savePersonalization() {
+  personalizationError.value = null
+  personalizationSaved.value = false
+  try {
+    await store.savePersonalization({
+      firstName: firstName.value,
+      lastName: lastName.value,
+      birthDate: birthDate.value,
+    })
+    personalizationSaved.value = true
+  } catch (e) {
+    personalizationError.value = extractApiError(e, 'Не удалось сохранить знакомство')
+  }
+}
+
+async function deleteMemory(id: string) {
+  personalizationError.value = null
+  try {
+    await store.deleteMemoryRule(id)
+  } catch (e) {
+    personalizationError.value = extractApiError(e, 'Не удалось удалить память')
+  }
+}
+
+async function clearMemory() {
+  personalizationError.value = null
+  try {
+    await store.clearMemory()
+  } catch (e) {
+    personalizationError.value = extractApiError(e, 'Не удалось очистить память')
+  }
 }
 </script>
 
@@ -95,6 +144,46 @@ function averageScore(feedback: FeedbackInfo): number | null {
           </template>
         </p>
         <TelegramLinkButton :is-linked="isLinked" @update="store.loadTelegram()" />
+      </section>
+
+      <section class="mystic-card p-6 mb-6" data-testid="profile-personalization">
+        <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Знакомство и память</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <input v-model="firstName" class="profile-input" maxlength="80" placeholder="Имя" data-testid="profile-first-name" />
+          <input v-model="lastName" class="profile-input" maxlength="80" placeholder="Фамилия" data-testid="profile-last-name" />
+          <input v-model="birthDate" class="profile-input sm:col-span-2" type="date" data-testid="profile-birth-date" />
+        </div>
+        <button
+          class="memory-action primary"
+          :disabled="!firstName.trim() || !lastName.trim() || !birthDate"
+          @click="savePersonalization"
+          data-testid="save-personalization"
+        >
+          Сохранить
+        </button>
+        <p v-if="personalizationSaved" class="text-xs text-mystic-accent mt-2">Сохранено</p>
+        <p v-if="personalizationError" class="text-xs text-red-300 mt-2">{{ personalizationError }}</p>
+
+        <div class="memory-head">
+          <span>Память AI</span>
+          <button
+            v-if="store.personalization?.memoryRules.length"
+            class="memory-action"
+            @click="clearMemory"
+            data-testid="clear-memory"
+          >
+            Очистить
+          </button>
+        </div>
+        <div v-if="!store.personalization?.memoryRules.length" class="text-sm text-mystic-silver/60">
+          AI пока ничего не сохранил для будущих раскладов.
+        </div>
+        <ul v-else class="memory-list">
+          <li v-for="rule in store.personalization.memoryRules" :key="rule.id" class="memory-row">
+            <span>{{ rule.text }}</span>
+            <button class="memory-action" @click="deleteMemory(rule.id)" data-testid="delete-memory-rule">Удалить</button>
+          </li>
+        </ul>
       </section>
 
       <section class="mystic-card p-6" data-testid="profile-feedbacks">
@@ -165,6 +254,64 @@ function averageScore(feedback: FeedbackInfo): number | null {
   gap: 0.5rem;
   margin-top: 0.15rem;
 }
+.profile-input {
+  width: 100%;
+  border: 1px solid rgba(245, 194, 107, 0.25);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.7rem 0.8rem;
+  color: #e0d4ba;
+  outline: none;
+}
+.profile-input:focus {
+  border-color: #f5c26b;
+}
+.memory-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1.2rem 0 0.75rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(245, 194, 107, 0.8);
+}
+.memory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.memory-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(245, 194, 107, 0.15);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(224, 212, 186, 0.86);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.memory-action {
+  flex: 0 0 auto;
+  border: 1px solid rgba(245, 194, 107, 0.28);
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  color: #f5c26b;
+  background: rgba(245, 194, 107, 0.06);
+  font-size: 0.75rem;
+}
+.memory-action.primary {
+  width: 100%;
+  padding: 0.7rem;
+}
+.memory-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 @media (max-width: 640px) {
   .profile-page {
     padding-top: 2rem;
@@ -184,6 +331,9 @@ function averageScore(feedback: FeedbackInfo): number | null {
   .feedback-sub {
     flex-wrap: wrap;
     gap: 0.25rem 0.45rem;
+  }
+  .memory-row {
+    flex-direction: column;
   }
 }
 </style>
