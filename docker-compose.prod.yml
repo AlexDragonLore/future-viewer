@@ -1,0 +1,105 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-future_viewer}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in /opt/fv-app/.env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-future_viewer}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-future_viewer} -d ${POSTGRES_DB:-future_viewer}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - ${FV_ENV_FILE:-/opt/fv-app/.env.production}
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=postgres;Port=5432;Database=${POSTGRES_DB:-future_viewer};Username=${POSTGRES_USER:-future_viewer};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in /opt/fv-app/.env.production}
+      Cors__AllowedOrigins__0: https://${APP_DOMAIN:?Set APP_DOMAIN in /opt/fv-app/.env.production}
+      Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in /opt/fv-app/.env.production}
+      Jwt__Issuer: ${JWT_ISSUER:-future-viewer}
+      Jwt__Audience: ${JWT_AUDIENCE:-future-viewer}
+      AI__Provider: ${AI_PROVIDER:-OpenAI}
+      OpenAI__ApiKey: ${OPENAI_API_KEY:-}
+      OpenAI__Model: ${OPENAI_MODEL:-gpt-4o}
+      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-}
+      DeepSeek__ApiKey: ${DEEPSEEK_API_KEY:-}
+      DeepSeek__Model: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DeepSeek__BaseUrl: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
+      Telegram__SiteUrl: https://${APP_DOMAIN}
+      Support__Email: ${SUPPORT_EMAIL:-support@vualgryaduschego.ru}
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__Username: ${EMAIL_USERNAME:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__From: ${EMAIL_FROM:-no-reply@vualgryaduschego.ru}
+      Email__UseSsl: ${EMAIL_USE_SSL:-true}
+      Email__FrontendUrl: https://${APP_DOMAIN}
+      Yukassa__ShopId: ${YUKASSA_SHOP_ID:-}
+      Yukassa__SecretKey: ${YUKASSA_SECRET_KEY:-}
+      Yukassa__ReturnUrl: https://${APP_DOMAIN}/payment/success
+      Yukassa__Currency: ${YUKASSA_CURRENCY:-RUB}
+      Yukassa__MonthlyPriceAmount: ${YUKASSA_MONTHLY_PRICE_AMOUNT:-300}
+      Yukassa__ApiBaseUrl: ${YUKASSA_API_BASE_URL:-https://api.yookassa.ru/v3/}
+    expose:
+      - "8080"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_MERCHANT_SERVICE_NAME: ${VITE_MERCHANT_SERVICE_NAME:-Future Viewer}
+        VITE_MERCHANT_OWNER_NAME: ${VITE_MERCHANT_OWNER_NAME:-Дунецев Александр Дмитриевич}
+        VITE_MERCHANT_TAX_STATUS: ${VITE_MERCHANT_TAX_STATUS:-самозанятый, плательщик налога на профессиональный доход}
+        VITE_MERCHANT_INN: ${VITE_MERCHANT_INN:-592108465422}
+        VITE_MERCHANT_PHONE: ${VITE_MERCHANT_PHONE:-79967669613}
+        VITE_MERCHANT_EMAIL: ${VITE_MERCHANT_EMAIL:-duntsev010@mail.ru}
+        VITE_MERCHANT_POSTAL_ADDRESS: ${VITE_MERCHANT_POSTAL_ADDRESS:-duntsev010@mail.ru}
+        VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-Подписка Future Viewer Pro}
+        VITE_PAID_PRODUCT_PRICE: ${VITE_PAID_PRODUCT_PRICE:-300 ₽}
+        VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-1 месяц}
+        VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in /opt/fv-app/.env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

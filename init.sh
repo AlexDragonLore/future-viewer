@@ -1,42 +1,270 @@
-#!/usr/bin/env sh
-set -eu
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
-ROOT_ENV="$ROOT_DIR/.env"
-FRONTEND_ENV="$ROOT_DIR/frontend/.env.local"
+APP_DIR="${FV_APP_DIR:-/opt/fv-app}"
+ENV_FILE="${FV_ENV_FILE:-$APP_DIR/.env.production}"
+COMPOSE_FILE="${FV_COMPOSE_FILE:-docker-compose.prod.yml}"
+PROJECT_NAME="${FV_COMPOSE_PROJECT_NAME:-future-viewer}"
+DEV_JWT_SECRET="dev-secret-please-change-me-in-prod-32chars-minimum"
 
-append_env_if_missing() {
-  file="$1"
-  key="$2"
-  value="$3"
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
 
-  mkdir -p "$(dirname "$file")"
-  touch "$file"
-
-  if ! grep -q "^${key}=" "$file"; then
-    printf '%s=%s\n' "$key" "$value" >> "$file"
+detect_compose() {
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+  elif command -v docker-compose >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+  else
+    fail "Docker Compose is not installed. Install docker-compose or the Docker Compose plugin."
   fi
 }
 
-append_legal_env() {
-  file="$1"
-
-  append_env_if_missing "$file" "VITE_MERCHANT_SERVICE_NAME" "Future Viewer"
-  append_env_if_missing "$file" "VITE_MERCHANT_OWNER_NAME" "Дунецев Александр Дмитриевич"
-  append_env_if_missing "$file" "VITE_MERCHANT_TAX_STATUS" "самозанятый, плательщик налога на профессиональный доход"
-  append_env_if_missing "$file" "VITE_MERCHANT_INN" "592108465422"
-  append_env_if_missing "$file" "VITE_MERCHANT_PHONE" "79967669613"
-  append_env_if_missing "$file" "VITE_MERCHANT_EMAIL" "duntsev010@mail.ru"
-  append_env_if_missing "$file" "VITE_MERCHANT_POSTAL_ADDRESS" "duntsev010@mail.ru"
-  append_env_if_missing "$file" "VITE_PAID_PRODUCT_TITLE" "Подписка Future Viewer Pro"
-  append_env_if_missing "$file" "VITE_PAID_PRODUCT_PRICE" "300 ₽"
-  append_env_if_missing "$file" "VITE_PAID_PRODUCT_PERIOD" "1 месяц"
-  append_env_if_missing "$file" "VITE_PAID_PRODUCT_DESCRIPTION" "Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer."
+random_secret() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -base64 48 | tr -d '\n'
+  else
+    head -c 48 /dev/urandom | base64 | tr -d '\n'
+  fi
 }
 
-append_legal_env "$ROOT_ENV"
-append_legal_env "$FRONTEND_ENV"
+prompt_required() {
+  local prompt="$1"
+  local value=""
 
-printf 'Environment defaults are ready:\n'
-printf '  %s\n' "$ROOT_ENV"
-printf '  %s\n' "$FRONTEND_ENV"
+  while [[ -z "$value" ]]; do
+    read -r -p "$prompt: " value
+  done
+
+  printf '%s' "$value"
+}
+
+prompt_optional() {
+  local prompt="$1"
+  local default="${2:-}"
+  local value=""
+
+  if [[ -n "$default" ]]; then
+    read -r -p "$prompt [$default]: " value
+    printf '%s' "${value:-$default}"
+  else
+    read -r -p "$prompt: " value
+    printf '%s' "$value"
+  fi
+}
+
+env_quote() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//\$/\\\$}"
+  value="${value//\`/\\\`}"
+  printf '"%s"' "$value"
+}
+
+write_env_line() {
+  local key="$1"
+  local value="$2"
+  printf '%s=%s\n' "$key" "$(env_quote "$value")" >> "$ENV_FILE"
+}
+
+write_admin_emails() {
+  local emails="$1"
+  local index=0
+  local email=""
+
+  IFS=',' read -ra parts <<< "$emails"
+  for email in "${parts[@]}"; do
+    email="$(printf '%s' "$email" | xargs)"
+    if [[ -n "$email" ]]; then
+      write_env_line "Admin__Emails__$index" "$email"
+      index=$((index + 1))
+    fi
+  done
+}
+
+create_env_file() {
+  mkdir -p "$APP_DIR"
+
+  local app_domain
+  local ai_provider
+  local openai_api_key=""
+  local openai_model="gpt-4o"
+  local openai_base_url=""
+  local deepseek_api_key=""
+  local deepseek_model="deepseek-v4-flash"
+  local deepseek_base_url="https://api.deepseek.com"
+  local admin_emails
+  local support_email
+  local jwt_secret
+  local postgres_password
+
+  echo "Creating production env file at $ENV_FILE"
+  app_domain="$(prompt_required "Domain pointed to this server, without https://")"
+  ai_provider="$(prompt_optional "AI provider (OpenAI or DeepSeek)" "OpenAI")"
+  case "$ai_provider" in
+    OpenAI|openai|ChatGPT|chatgpt|GPT|gpt)
+      ai_provider="OpenAI"
+      openai_api_key="$(prompt_required "OpenAI API key")"
+      openai_model="$(prompt_optional "OpenAI model" "gpt-4o")"
+      openai_base_url="$(prompt_optional "OpenAI base URL override (optional)")"
+      ;;
+    DeepSeek|deepseek)
+      ai_provider="DeepSeek"
+      deepseek_api_key="$(prompt_required "DeepSeek API key")"
+      deepseek_model="$(prompt_optional "DeepSeek model" "deepseek-v4-flash")"
+      deepseek_base_url="$(prompt_optional "DeepSeek base URL" "https://api.deepseek.com")"
+      ;;
+    *)
+      fail "Unsupported AI provider '$ai_provider'. Use OpenAI or DeepSeek."
+      ;;
+  esac
+  admin_emails="$(prompt_required "Admin email(s), comma-separated")"
+  support_email="$(prompt_required "Support email shown in the footer")"
+  jwt_secret="$(random_secret)"
+  postgres_password="$(random_secret)"
+
+  umask 077
+  : > "$ENV_FILE"
+
+  cat >> "$ENV_FILE" <<'EOF'
+# Generated by init.sh. Do not commit this file.
+# Runtime location: /opt/fv-app/.env.production
+
+EOF
+
+  write_env_line APP_DOMAIN "$app_domain"
+  write_env_line POSTGRES_USER "future_viewer"
+  write_env_line POSTGRES_PASSWORD "$postgres_password"
+  write_env_line POSTGRES_DB "future_viewer"
+  write_env_line JWT_SECRET "$jwt_secret"
+  write_env_line JWT_ISSUER "future-viewer"
+  write_env_line JWT_AUDIENCE "future-viewer"
+  write_env_line AI_PROVIDER "$ai_provider"
+  write_env_line OPENAI_API_KEY "$openai_api_key"
+  write_env_line OPENAI_MODEL "$openai_model"
+  write_env_line OPENAI_BASE_URL "$openai_base_url"
+  write_env_line DEEPSEEK_API_KEY "$deepseek_api_key"
+  write_env_line DEEPSEEK_MODEL "$deepseek_model"
+  write_env_line DEEPSEEK_BASE_URL "$deepseek_base_url"
+  write_env_line VITE_API_URL ""
+  write_admin_emails "$admin_emails"
+  write_env_line SUPPORT_EMAIL "$support_email"
+
+  echo >> "$ENV_FILE"
+  echo "# Public payment/legal details compiled into the frontend." >> "$ENV_FILE"
+  write_env_line VITE_MERCHANT_SERVICE_NAME "$(prompt_optional "Merchant service name" "Future Viewer")"
+  write_env_line VITE_MERCHANT_OWNER_NAME "$(prompt_optional "Merchant owner full name" "Дунецев Александр Дмитриевич")"
+  write_env_line VITE_MERCHANT_TAX_STATUS "$(prompt_optional "Merchant tax status" "самозанятый, плательщик налога на профессиональный доход")"
+  write_env_line VITE_MERCHANT_INN "$(prompt_optional "Merchant INN" "592108465422")"
+  write_env_line VITE_MERCHANT_PHONE "$(prompt_optional "Merchant phone" "79967669613")"
+  write_env_line VITE_MERCHANT_EMAIL "$(prompt_optional "Merchant email" "duntsev010@mail.ru")"
+  write_env_line VITE_MERCHANT_POSTAL_ADDRESS "$(prompt_optional "Merchant postal address" "duntsev010@mail.ru")"
+  write_env_line VITE_PAID_PRODUCT_TITLE "$(prompt_optional "Paid product title" "Подписка Future Viewer Pro")"
+  write_env_line VITE_PAID_PRODUCT_PRICE "$(prompt_optional "Paid product price label" "300 ₽")"
+  write_env_line VITE_PAID_PRODUCT_PERIOD "$(prompt_optional "Paid product period label" "1 месяц")"
+  write_env_line VITE_PAID_PRODUCT_DESCRIPTION "$(prompt_optional "Paid product description" "Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.")"
+
+  echo >> "$ENV_FILE"
+  echo "# Optional Telegram settings. Empty token disables bot features." >> "$ENV_FILE"
+  write_env_line TELEGRAM_BOT_TOKEN "$(prompt_optional "Telegram bot token (optional)")"
+  write_env_line TELEGRAM_BOT_USERNAME "$(prompt_optional "Telegram bot username" "FutureViewerBot")"
+
+  echo >> "$ENV_FILE"
+  echo "# Optional SMTP settings. Empty host logs email links instead of sending." >> "$ENV_FILE"
+  write_env_line EMAIL_HOST "$(prompt_optional "SMTP host (optional)")"
+  write_env_line EMAIL_PORT "$(prompt_optional "SMTP port" "587")"
+  write_env_line EMAIL_USERNAME "$(prompt_optional "SMTP username (optional)")"
+  write_env_line EMAIL_PASSWORD "$(prompt_optional "SMTP password (optional)")"
+  write_env_line EMAIL_FROM "$(prompt_optional "Email from address" "no-reply@$app_domain")"
+  write_env_line EMAIL_USE_SSL "$(prompt_optional "Use SSL for SMTP (true/false)" "true")"
+
+  echo >> "$ENV_FILE"
+  echo "# Optional YooKassa settings. Required only when paid subscriptions are enabled." >> "$ENV_FILE"
+  write_env_line YUKASSA_SHOP_ID "$(prompt_optional "YooKassa shop id (optional)")"
+  write_env_line YUKASSA_SECRET_KEY "$(prompt_optional "YooKassa secret key (optional)")"
+  write_env_line YUKASSA_CURRENCY "$(prompt_optional "YooKassa currency" "RUB")"
+  write_env_line YUKASSA_MONTHLY_PRICE_AMOUNT "$(prompt_optional "Monthly subscription price" "300")"
+  write_env_line YUKASSA_API_BASE_URL "$(prompt_optional "YooKassa API base URL" "https://api.yookassa.ru/v3/")"
+
+  chmod 600 "$ENV_FILE"
+}
+
+load_env_file() {
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+}
+
+validate_env() {
+  [[ -f "$ENV_FILE" ]] || fail "$ENV_FILE does not exist"
+  load_env_file
+
+  [[ -n "${APP_DOMAIN:-}" ]] || fail "APP_DOMAIN is required"
+  [[ "$APP_DOMAIN" != http://* && "$APP_DOMAIN" != https://* ]] || fail "APP_DOMAIN must not include http:// or https://"
+  [[ -n "${POSTGRES_PASSWORD:-}" ]] || fail "POSTGRES_PASSWORD is required"
+  [[ -n "${JWT_SECRET:-}" ]] || fail "JWT_SECRET is required"
+  [[ "$JWT_SECRET" != "$DEV_JWT_SECRET" ]] || fail "JWT_SECRET still uses the development default"
+  [[ "${#JWT_SECRET}" -ge 32 ]] || fail "JWT_SECRET must be at least 32 characters"
+
+  local ai_provider="${AI_PROVIDER:-OpenAI}"
+  case "$ai_provider" in
+    OpenAI|openai|ChatGPT|chatgpt|GPT|gpt)
+      [[ -n "${OPENAI_API_KEY:-}" ]] || fail "OPENAI_API_KEY is required when AI_PROVIDER=$ai_provider"
+      ;;
+    DeepSeek|deepseek)
+      [[ -n "${DEEPSEEK_API_KEY:-}" ]] || fail "DEEPSEEK_API_KEY is required when AI_PROVIDER=$ai_provider"
+      ;;
+    *)
+      fail "AI_PROVIDER '$ai_provider' is not supported. Use OpenAI or DeepSeek."
+      ;;
+  esac
+
+  local admin_found=0
+  local env_name
+  for env_name in $(compgen -A variable 'Admin__Emails__'); do
+    if [[ -n "${!env_name}" ]]; then
+      admin_found=1
+      break
+    fi
+  done
+  [[ "$admin_found" -eq 1 ]] || fail "At least one Admin__Emails__N value is required"
+}
+
+run_compose() {
+  export FV_ENV_FILE="$ENV_FILE"
+
+  "${COMPOSE[@]}" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" config >/dev/null
+  "${COMPOSE[@]}" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" pull postgres caddy
+  "${COMPOSE[@]}" --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -p "$PROJECT_NAME" up -d --build
+}
+
+main() {
+  cd "$(dirname "$0")"
+  command -v docker >/dev/null 2>&1 || fail "Docker is not installed"
+  [[ -f "$COMPOSE_FILE" ]] || fail "$COMPOSE_FILE not found. Run this script from the repository root."
+
+  detect_compose
+
+  if [[ ! -f "$ENV_FILE" ]]; then
+    create_env_file
+  else
+    echo "Using existing production env file: $ENV_FILE"
+  fi
+
+  validate_env
+  run_compose
+
+  echo
+  echo "Future Viewer is starting at: https://$APP_DOMAIN"
+  echo
+  echo "Diagnostics:"
+  echo "  ${COMPOSE[*]} --env-file $ENV_FILE -f $COMPOSE_FILE -p $PROJECT_NAME ps"
+  echo "  ${COMPOSE[*]} --env-file $ENV_FILE -f $COMPOSE_FILE -p $PROJECT_NAME logs -f backend"
+  echo "  curl -I https://$APP_DOMAIN/health"
+}
+
+main "$@"

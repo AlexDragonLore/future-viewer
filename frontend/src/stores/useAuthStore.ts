@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '@/api/authApi'
 import { subscriptionApi } from '@/api/subscriptionApi'
-import type { SubscriptionStatus } from '@/types'
+import type { RegisterResponse, SubscriptionStatus } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('fv_token'))
@@ -37,8 +37,26 @@ export const useAuthStore = defineStore('auth', () => {
     void refreshSubscription()
   }
 
-  async function register(e: string, password: string) {
-    const response = await authApi.register(e, password)
+  async function register(e: string, password: string): Promise<RegisterResponse> {
+    return await authApi.register(e, password)
+  }
+
+  async function verifyEmail(token: string) {
+    const response = await authApi.verifyEmail(token)
+    persist(response.accessToken, response.email, response.userId, response.isAdmin)
+    void refreshSubscription()
+  }
+
+  async function resendVerification(e: string) {
+    await authApi.resendVerification(e)
+  }
+
+  async function forgotPassword(e: string) {
+    await authApi.forgotPassword(e)
+  }
+
+  async function resetPassword(resetToken: string, newPassword: string) {
+    const response = await authApi.resetPassword(resetToken, newPassword)
     persist(response.accessToken, response.email, response.userId, response.isAdmin)
     void refreshSubscription()
   }
@@ -75,6 +93,10 @@ export const useAuthStore = defineStore('auth', () => {
     canCreateReading,
     login,
     register,
+    verifyEmail,
+    resendVerification,
+    forgotPassword,
+    resetPassword,
     logout,
     refreshSubscription,
   }

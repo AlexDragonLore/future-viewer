@@ -14,7 +14,7 @@ FROM node:22-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ARG VITE_API_URL=http://localhost:5000
+ARG VITE_API_URL=
 ARG VITE_MERCHANT_SERVICE_NAME="Future Viewer"
 ARG VITE_MERCHANT_OWNER_NAME="Дунецев Александр Дмитриевич"
 ARG VITE_MERCHANT_TAX_STATUS="самозанятый, плательщик налога на профессиональный доход"

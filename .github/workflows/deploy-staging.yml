@@ -15,7 +15,11 @@ jobs:
       name: staging
     env:
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      AI_PROVIDER: ${{ vars.AI_PROVIDER || 'OpenAI' }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || 'gpt-4o' }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || 'deepseek-chat' }}
       DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
       VITE_API_URL: ${{ vars.VITE_API_URL }}
     steps:

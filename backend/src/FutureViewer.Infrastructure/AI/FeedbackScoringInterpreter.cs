@@ -3,15 +3,12 @@ using System.Text.Json;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using OpenAI;
 using OpenAI.Chat;
 
 namespace FutureViewer.Infrastructure.AI;
 
 public sealed class FeedbackScoringInterpreter : IFeedbackScorer
 {
-    private readonly OpenAIOptions _options;
     private readonly ChatClient _chat;
     private readonly ILogger<FeedbackScoringInterpreter> _logger;
 
@@ -28,15 +25,11 @@ public sealed class FeedbackScoringInterpreter : IFeedbackScorer
         "Никаких markdown, никакого текста вне JSON.";
 
     public FeedbackScoringInterpreter(
-        IOptions<OpenAIOptions> options,
+        AIChatClientFactory chatClientFactory,
         ILogger<FeedbackScoringInterpreter> logger)
     {
-        _options = options.Value;
         _logger = logger;
-        if (string.IsNullOrWhiteSpace(_options.ApiKey))
-            throw new InvalidOperationException("OpenAI:ApiKey is not configured");
-
-        _chat = new OpenAIClient(_options.ApiKey).GetChatClient(_options.Model);
+        _chat = chatClientFactory.CreateChatClient();
     }
 
     public async Task<FeedbackScoringResult> ScoreAsync(
@@ -69,7 +62,7 @@ public sealed class FeedbackScoringInterpreter : IFeedbackScorer
         }
         catch (ClientResultException ex)
         {
-            _logger.LogError(ex, "OpenAI scoring call failed");
+            _logger.LogError(ex, "AI scoring call failed");
             return new FeedbackScoringResult
             {
                 Score = 1,
@@ -79,7 +72,7 @@ public sealed class FeedbackScoringInterpreter : IFeedbackScorer
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Failed to parse OpenAI scoring response");
+            _logger.LogError(ex, "Failed to parse AI scoring response");
             return new FeedbackScoringResult
             {
                 Score = 1,

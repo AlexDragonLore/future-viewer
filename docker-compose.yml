@@ -1,3 +1,4 @@
+# Local development compose. Production server deployment uses docker-compose.prod.yml.
 services:
   postgres:
     image: postgres:17-alpine
@@ -31,13 +32,24 @@ services:
       Jwt__Secret: ${JWT_SECRET:-dev-secret-please-change-me-in-prod-32chars-minimum}
       Jwt__Issuer: future-viewer
       Jwt__Audience: future-viewer
+      AI__Provider: ${AI_PROVIDER:-OpenAI}
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
-      OpenAI__Model: gpt-4o
+      OpenAI__Model: ${OPENAI_MODEL:-gpt-4o}
+      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-}
+      DeepSeek__ApiKey: ${DEEPSEEK_API_KEY:-}
+      DeepSeek__Model: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DeepSeek__BaseUrl: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
       Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
       Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
-      Telegram__WebhookUrl: ${TELEGRAM_WEBHOOK_URL:-}
-      Telegram__SecretToken: ${TELEGRAM_SECRET_TOKEN:-}
       Telegram__SiteUrl: ${TELEGRAM_SITE_URL:-http://localhost:5173}
+      Support__Email: ${SUPPORT_EMAIL:-support@vualgryaduschego.ru}
+      Email__Host: ${EMAIL_HOST:-}
+      Email__Port: ${EMAIL_PORT:-587}
+      Email__Username: ${EMAIL_USERNAME:-}
+      Email__Password: ${EMAIL_PASSWORD:-}
+      Email__From: ${EMAIL_FROM:-no-reply@vualgryaduschego.ru}
+      Email__UseSsl: ${EMAIL_USE_SSL:-true}
+      Email__FrontendUrl: ${EMAIL_FRONTEND_URL:-http://localhost:5173}
     ports:
       - "5050:8080"
 
