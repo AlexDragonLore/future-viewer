@@ -102,8 +102,9 @@ Workflow [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-pr
 запускается автоматически на push в `main` или `master`, а также вручную через
 `workflow_dispatch`.
 
-Автодеплой собирает backend/frontend Docker images в GitHub Actions, переносит
-готовые images на сервер и запускает production compose с
+Автодеплой собирает backend/frontend Docker images в GitHub Actions, чистит
+неиспользуемые Docker-слои на сервере, передает готовые images потоком через SSH
+в `docker load` и запускает production compose с
 [`docker-compose.prod.prebuilt.yml`](docker-compose.prod.prebuilt.yml). Сервер в
 этом режиме не выполняет `docker compose up --build`; `init.sh` остаётся для
 первичной установки и ручного полного rebuild.
@@ -114,7 +115,7 @@ Workflow [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-pr
 - `PRODUCTION_DEPLOY_SSH_KEY` — private key пользователя, который может выполнять
   `git fetch/merge` в production checkout.
 - `PRODUCTION_ROOT_SSH_KEY` — private key пользователя, который может запускать
-  `bash init.sh` и читать `/opt/fv-app/.env.production`.
+  Docker/Compose команды и читать `/opt/fv-app/.env.production`.
 
 Если эти secrets не заданы, workflow не падает, а пропускает деплой с warning.
 После добавления secrets следующий push в `main`/`master` запустит полный деплой.
@@ -129,8 +130,8 @@ Workflow [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-pr
   `https://alex-taro.ru/health`.
 
 Текущая production-схема использует два SSH-подключения: `deploy` обновляет git
-checkout, затем `root` запускает `init.sh`. Это нужно, потому что production env
-файл закрыт правами root.
+checkout, затем `root` загружает готовые images и перезапускает compose. Это
+нужно, потому что production env файл закрыт правами root.
 
 Полезные команды диагностики:
 

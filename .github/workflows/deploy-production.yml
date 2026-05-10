@@ -140,17 +140,34 @@ jobs:
           git merge --ff-only "origin/$DEPLOY_BRANCH"
           REMOTE
 
-      - name: Upload images to server
+      - name: Prepare server Docker storage
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
           set -Eeuo pipefail
-          scp \
+          ssh \
             -i ~/.ssh/future_viewer_root \
-            -P "$PRODUCTION_PORT" \
+            -p "$PRODUCTION_PORT" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
-            /tmp/future-viewer-images.tar.gz \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST:/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
+            "bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          rm -f /tmp/future-viewer-images-*.tar.gz
+          docker system prune -af
+          df -h /
+          REMOTE
+
+      - name: Load images on server
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          gzip -dc /tmp/future-viewer-images.tar.gz | ssh \
+            -i ~/.ssh/future_viewer_root \
+            -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
+            "docker load"
 
       - name: Run production deploy
         if: steps.config.outputs.deploy_ready == 'true'
@@ -165,7 +182,6 @@ jobs:
             "IMAGE_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$APP_DIR"
-          docker load -i "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
           FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
             --env-file /opt/fv-app/.env.production \
             -f docker-compose.prod.yml \
@@ -184,7 +200,7 @@ jobs:
             -f docker-compose.prod.prebuilt.yml \
             -p future-viewer \
             up -d --no-build
-          rm -f "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+          docker image prune -af
           REMOTE
 
       - name: Verify production containers
