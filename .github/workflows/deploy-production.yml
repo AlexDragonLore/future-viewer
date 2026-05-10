@@ -117,6 +117,23 @@ jobs:
           chmod 600 ~/.ssh/future_viewer_deploy ~/.ssh/future_viewer_root
           ssh-keyscan -p "$PRODUCTION_PORT" "$PRODUCTION_HOST" >> ~/.ssh/known_hosts
 
+      - name: Prepare server Docker storage
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -i ~/.ssh/future_viewer_root \
+            -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
+            "bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          rm -f /tmp/future-viewer-images-*.tar.gz
+          docker system prune -af
+          df -h /
+          REMOTE
+
       - name: Update server repository
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
@@ -138,23 +155,6 @@ jobs:
           fi
 
           git merge --ff-only "origin/$DEPLOY_BRANCH"
-          REMOTE
-
-      - name: Prepare server Docker storage
-        if: steps.config.outputs.deploy_ready == 'true'
-        run: |
-          set -Eeuo pipefail
-          ssh \
-            -i ~/.ssh/future_viewer_root \
-            -p "$PRODUCTION_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
-            "bash -s" <<'REMOTE'
-          set -Eeuo pipefail
-          rm -f /tmp/future-viewer-images-*.tar.gz
-          docker system prune -af
-          df -h /
           REMOTE
 
       - name: Load images on server
