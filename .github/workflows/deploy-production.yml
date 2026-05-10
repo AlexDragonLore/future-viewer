@@ -9,7 +9,7 @@ on:
 
 concurrency:
   group: deploy-production
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -61,28 +61,19 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.config.outputs.deploy_ready == 'true'
 
-      - name: Set up Docker Buildx
-        if: steps.config.outputs.deploy_ready == 'true'
-        uses: docker/setup-buildx-action@v3
-
       - name: Build backend image
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
           set -Eeuo pipefail
-          docker buildx build \
-            --cache-from type=gha,scope=future-viewer-backend \
-            --cache-to type=gha,scope=future-viewer-backend,mode=max \
+          docker build \
             --tag "future-viewer-backend:$IMAGE_TAG" \
-            --load \
             ./backend
 
       - name: Build frontend image
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
           set -Eeuo pipefail
-          docker buildx build \
-            --cache-from type=gha,scope=future-viewer-frontend \
-            --cache-to type=gha,scope=future-viewer-frontend,mode=max \
+          docker build \
             --build-arg "VITE_API_URL=$VITE_API_URL" \
             --build-arg "VITE_MERCHANT_SERVICE_NAME=$VITE_MERCHANT_SERVICE_NAME" \
             --build-arg "VITE_MERCHANT_OWNER_NAME=$VITE_MERCHANT_OWNER_NAME" \
@@ -97,7 +88,6 @@ jobs:
             --build-arg "VITE_PAID_PRODUCT_DESCRIPTION=$VITE_PAID_PRODUCT_DESCRIPTION" \
             --target prod \
             --tag "future-viewer-frontend:$IMAGE_TAG" \
-            --load \
             ./frontend
 
       - name: Pack images
