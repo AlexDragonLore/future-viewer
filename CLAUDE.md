@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Every finalized /plan must be copied into `plans/` in the repo root:
 - Use a descriptive kebab-case filename reflecting the plan topic (e.g. `streaming-ai-parallel-animation.md`), not the auto-generated Claude plan filename.
 - Copy the plan right after ExitPlanMode is approved, before starting implementation.
+- Every implementation plan must include an explicit **QA / verification** section. For frontend or UX changes this must include rendered browser QA with the Browser Use MCP/in-app browser whenever available, plus the relevant automated checks (`npm run type-check`, `npm test`, `npm run build`, backend `dotnet test`, or narrower justified commands). If Browser Use cannot cover an exact viewport or authenticated state, state that limitation and cover it with component/unit tests or another safe verification path.
+- If the requested work includes publishing changes, every plan must include an explicit **deploy** section with the branch/merge target, push step, server/update command, and post-deploy verification. For the current production server, verify containers and health with `docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps` and `GET https://alex-taro.ru/health`; also do a production browser smoke check for frontend-affecting changes.
+- After implementation, do not stop at local checks when deployment was requested: run the planned QA, push/merge to the target branch, deploy, verify production, and summarize the exact checks and deploy result in the final response.
 
 ## Architecture
 
