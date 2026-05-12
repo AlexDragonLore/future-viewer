@@ -58,6 +58,86 @@ docker compose up --build
 - Swagger:  http://localhost:5050/swagger
 - Frontend: http://localhost:5173
 
+### Локальный smoke-test оплаты
+
+Для проверки платежного сценария не коммитьте credentials. Передавайте ключи
+только через env/runtime config.
+
+#### ЮKassa Payments API
+
+Для ЮKassa Payments API нужны именно credentials магазина:
+`Yukassa__ShopId` и `Yukassa__SecretKey`. Payout/gate credentials для этого
+endpoint не подходят и дают `401 invalid_credentials` с описанием
+`Authentication type is not allowed`.
+
+```bash
+docker compose up -d postgres
+
+Payment__Provider=Yukassa \
+Yukassa__ShopId=<test-shop-id> \
+Yukassa__SecretKey=<test-secret-key> \
+Yukassa__ReturnUrl=http://localhost:5174/payment/success \
+ASPNETCORE_URLS=http://localhost:5050 \
+ConnectionStrings__Default='Host=localhost;Port=5432;Database=future_viewer;Username=future_viewer;Password=future_viewer_dev' \
+Cors__AllowedOrigins__0=http://localhost:5174 \
+dotnet run --project backend/src/FutureViewer.Host --no-launch-profile
+
+cd frontend
+VITE_API_URL=http://localhost:5050 npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
+```
+
+Открывайте именно `http://localhost:5174/`, а не `127.0.0.1`, если backend
+разрешает CORS только для `http://localhost:5174`. Затем зарегистрируйте
+тестового пользователя, нажмите `Оплатить доступ` и проверьте редирект на
+confirmation URL ЮKassa. В чисто локальном окружении внешний webhook ЮKassa не
+сможет достучаться до `localhost`; для полной проверки активации нужен публичный
+tunnel/webhook URL или ручной локальный `POST /api/payments/webhook` после
+успешной тестовой оплаты.
+
+#### YooMoney redirect
+
+YooMoney redirect flow не вызывает Payments API ЮKassa. Backend создает URL
+`https://yoomoney.ru/quickpay/confirm?...`, frontend переводит пользователя на
+страницу YooMoney, а подписка активируется только после HTTP-уведомления от
+YooMoney на `/api/payments/webhook`.
+
+Для локального запуска:
+
+```bash
+docker compose up -d postgres
+
+Payment__Provider=YooMoney \
+YooMoney__Receiver=<yoomoney-wallet-number> \
+YooMoney__NotificationSecret=<http-notification-secret> \
+YooMoney__ReturnUrl=http://localhost:5174/payment/success \
+ASPNETCORE_URLS=http://localhost:5050 \
+ConnectionStrings__Default='Host=localhost;Port=5432;Database=future_viewer;Username=future_viewer;Password=future_viewer_dev' \
+Cors__AllowedOrigins__0=http://localhost:5174 \
+dotnet run --project backend/src/FutureViewer.Host --no-launch-profile
+
+cd frontend
+VITE_API_URL=http://localhost:5050 npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
+```
+
+`YooMoney__Receiver` — это номер кошелька ЮMoney, на который зачисляются
+деньги. Это не `gate_id` выплат ЮKassa. `YooMoney__NotificationSecret` должен
+совпадать с секретом HTTP-уведомлений в настройках кошелька.
+
+Для локальных вебхуков YooMoney нужен публичный HTTPS tunnel до backend, потому
+что `localhost` недоступен провайдеру. URL уведомлений в настройках YooMoney:
+
+- локально через tunnel: `https://<tunnel-host>/api/payments/webhook`;
+- production: `https://alex-taro.ru/api/payments/webhook`.
+
+Для production success redirect используйте `https://alex-taro.ru/payment/success`.
+YooMoney отправляет уведомление методом `POST` с
+`Content-Type: application/x-www-form-urlencoded`; app принимает кодом `200 OK`.
+Для smoke без реальной оплаты можно создать оплату тестовым пользователем, взять
+`paymentId`/`label` из ответа `/api/payments/subscribe` и отправить на webhook
+подписанный тестовый payload с тем же `label`. Подпись `sign` — HMAC-SHA256 в
+hex lower-case по URL-encoded строке всех параметров уведомления, кроме `sign`,
+отсортированных по имени, с секретом `YooMoney__NotificationSecret`.
+
 > Важно: если реальный `OPENAI_API_KEY` когда-либо попадал в локальный `.env`,
 > shell history, логи или чат, считайте его скомпрометированным и перевыпустите
 > ключ в кабинете OpenAI. Реальные секреты не должны коммититься.

@@ -25,7 +25,9 @@ public static class InfrastructureServiceExtensions
         services.Configure<AIOptions>(configuration.GetSection(AIOptions.SectionName));
         services.Configure<OpenAIOptions>(configuration.GetSection(OpenAIOptions.SectionName));
         services.Configure<DeepSeekOptions>(configuration.GetSection(DeepSeekOptions.SectionName));
+        services.Configure<PaymentOptions>(configuration.GetSection(PaymentOptions.SectionName));
         services.Configure<YukassaOptions>(configuration.GetSection(YukassaOptions.SectionName));
+        services.Configure<YooMoneyOptions>(configuration.GetSection(YooMoneyOptions.SectionName));
         services.Configure<TelegramOptions>(configuration.GetSection(TelegramOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
 
@@ -55,7 +57,11 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IEmailLinkBuilder, EmailLinkBuilder>();
 
-        services.AddHttpClient<IPaymentProvider, YukassaClient>();
+        var paymentProvider = configuration.GetSection(PaymentOptions.SectionName).Get<PaymentOptions>()?.Provider;
+        if (string.Equals(paymentProvider, "YooMoney", StringComparison.OrdinalIgnoreCase))
+            services.AddSingleton<IPaymentProvider, YooMoneyRedirectPaymentProvider>();
+        else
+            services.AddHttpClient<IPaymentProvider, YukassaClient>();
 
         AddTelegram(services);
 

@@ -50,12 +50,22 @@ services:
       Email__From: ${EMAIL_FROM:-no-reply@vualgryaduschego.ru}
       Email__UseSsl: ${EMAIL_USE_SSL:-true}
       Email__FrontendUrl: ${EMAIL_FRONTEND_URL:-http://localhost:5173}
+      Payment__Provider: ${PAYMENT_PROVIDER:-Yukassa}
       Yukassa__ShopId: ${YUKASSA_SHOP_ID:-}
       Yukassa__SecretKey: ${YUKASSA_SECRET_KEY:-}
       Yukassa__ReturnUrl: ${YUKASSA_RETURN_URL:-http://localhost:5173/payment/success}
       Yukassa__Currency: ${YUKASSA_CURRENCY:-RUB}
       Yukassa__MonthlyPriceAmount: ${YUKASSA_MONTHLY_PRICE_AMOUNT:-300}
       Yukassa__ApiBaseUrl: ${YUKASSA_API_BASE_URL:-https://api.yookassa.ru/v3/}
+      YooMoney__Receiver: ${YOOMONEY_RECEIVER:-}
+      YooMoney__NotificationSecret: ${YOOMONEY_NOTIFICATION_SECRET:-}
+      YooMoney__ReturnUrl: ${YOOMONEY_RETURN_URL:-http://localhost:5173/payment/success}
+      YooMoney__QuickpayUrl: ${YOOMONEY_QUICKPAY_URL:-https://yoomoney.ru/quickpay/confirm}
+      YooMoney__QuickpayForm: ${YOOMONEY_QUICKPAY_FORM:-button}
+      YooMoney__PaymentType: ${YOOMONEY_PAYMENT_TYPE:-AC}
+      YooMoney__CurrencyCode: ${YOOMONEY_CURRENCY_CODE:-643}
+      YooMoney__MonthlyPriceAmount: ${YOOMONEY_MONTHLY_PRICE_AMOUNT:-300}
+      YooMoney__Targets: ${YOOMONEY_TARGETS:-Доступ Future Viewer Pro}
     ports:
       - "5050:8080"
 
