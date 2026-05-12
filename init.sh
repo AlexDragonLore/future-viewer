@@ -182,12 +182,27 @@ EOF
   write_env_line EMAIL_USE_SSL "$(prompt_optional "Use SSL for SMTP (true/false)" "true")"
 
   echo >> "$ENV_FILE"
-  echo "# Optional YooKassa settings. Required only when paid access is enabled." >> "$ENV_FILE"
+  echo "# Payment provider. Use YooMoney for redirect-to-wallet payments." >> "$ENV_FILE"
+  write_env_line PAYMENT_PROVIDER "$(prompt_optional "Payment provider (Yukassa/YooMoney)" "Yukassa")"
+
+  echo >> "$ENV_FILE"
+  echo "# Optional YooKassa settings. Required only when paid access is enabled with YooKassa." >> "$ENV_FILE"
   write_env_line YUKASSA_SHOP_ID "$(prompt_optional "YooKassa shop id (optional)")"
   write_env_line YUKASSA_SECRET_KEY "$(prompt_optional "YooKassa secret key (optional)")"
   write_env_line YUKASSA_CURRENCY "$(prompt_optional "YooKassa currency" "RUB")"
   write_env_line YUKASSA_MONTHLY_PRICE_AMOUNT "$(prompt_optional "Paid access price amount" "300")"
   write_env_line YUKASSA_API_BASE_URL "$(prompt_optional "YooKassa API base URL" "https://api.yookassa.ru/v3/")"
+
+  echo >> "$ENV_FILE"
+  echo "# Optional YooMoney redirect settings. Required when PAYMENT_PROVIDER=YooMoney." >> "$ENV_FILE"
+  write_env_line YOOMONEY_RECEIVER "$(prompt_optional "YooMoney wallet receiver number (optional)")"
+  write_env_line YOOMONEY_NOTIFICATION_SECRET "$(prompt_optional "YooMoney HTTP notification secret (optional)")"
+  write_env_line YOOMONEY_QUICKPAY_URL "$(prompt_optional "YooMoney quickpay URL" "https://yoomoney.ru/quickpay/confirm")"
+  write_env_line YOOMONEY_QUICKPAY_FORM "$(prompt_optional "YooMoney quickpay form" "button")"
+  write_env_line YOOMONEY_PAYMENT_TYPE "$(prompt_optional "YooMoney payment type (AC/PC)" "AC")"
+  write_env_line YOOMONEY_CURRENCY_CODE "$(prompt_optional "YooMoney currency code" "643")"
+  write_env_line YOOMONEY_MONTHLY_PRICE_AMOUNT "$(prompt_optional "YooMoney paid access price amount" "300")"
+  write_env_line YOOMONEY_TARGETS "$(prompt_optional "YooMoney payment target" "Доступ Future Viewer Pro")"
 
   chmod 600 "$ENV_FILE"
 }
@@ -220,6 +235,19 @@ validate_env() {
       ;;
     *)
       fail "AI_PROVIDER '$ai_provider' is not supported. Use OpenAI or DeepSeek."
+      ;;
+  esac
+
+  local payment_provider="${PAYMENT_PROVIDER:-Yukassa}"
+  case "$payment_provider" in
+    Yukassa|yukassa|YooKassa|yookassa)
+      ;;
+    YooMoney|yoomoney)
+      [[ -n "${YOOMONEY_RECEIVER:-}" ]] || fail "YOOMONEY_RECEIVER is required when PAYMENT_PROVIDER=$payment_provider"
+      [[ -n "${YOOMONEY_NOTIFICATION_SECRET:-}" ]] || fail "YOOMONEY_NOTIFICATION_SECRET is required when PAYMENT_PROVIDER=$payment_provider"
+      ;;
+    *)
+      fail "PAYMENT_PROVIDER '$payment_provider' is not supported. Use Yukassa or YooMoney."
       ;;
   esac
 
