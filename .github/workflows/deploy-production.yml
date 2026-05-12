@@ -190,29 +190,40 @@ jobs:
 
           umask 077
           overlay="$(mktemp)"
+          quote_env_value() {
+            local value="$1"
+            value="${value//\\/\\\\}"
+            value="${value//\"/\\\"}"
+            value="${value//\$/\\\$}"
+            value="${value//\`/\\\`}"
+            printf '"%s"' "$value"
+          }
+          write_overlay_line() {
+            printf '%s=%s\n' "$1" "$(quote_env_value "$2")"
+          }
           {
-            printf 'PAYMENT_PROVIDER=%s\n' "$PAYMENT_PROVIDER"
+            write_overlay_line PAYMENT_PROVIDER "$PAYMENT_PROVIDER"
             if [ -n "$YUKASSA_SHOP_ID" ]; then
-              printf 'YUKASSA_SHOP_ID=%s\n' "$YUKASSA_SHOP_ID"
+              write_overlay_line YUKASSA_SHOP_ID "$YUKASSA_SHOP_ID"
             fi
             if [ -n "$YUKASSA_SECRET_KEY" ]; then
-              printf 'YUKASSA_SECRET_KEY=%s\n' "$YUKASSA_SECRET_KEY"
+              write_overlay_line YUKASSA_SECRET_KEY "$YUKASSA_SECRET_KEY"
             fi
-            printf 'YUKASSA_CURRENCY=%s\n' "$YUKASSA_CURRENCY"
-            printf 'YUKASSA_MONTHLY_PRICE_AMOUNT=%s\n' "$YUKASSA_MONTHLY_PRICE_AMOUNT"
-            printf 'YUKASSA_API_BASE_URL=%s\n' "$YUKASSA_API_BASE_URL"
+            write_overlay_line YUKASSA_CURRENCY "$YUKASSA_CURRENCY"
+            write_overlay_line YUKASSA_MONTHLY_PRICE_AMOUNT "$YUKASSA_MONTHLY_PRICE_AMOUNT"
+            write_overlay_line YUKASSA_API_BASE_URL "$YUKASSA_API_BASE_URL"
             if [ -n "$YOOMONEY_RECEIVER" ]; then
-              printf 'YOOMONEY_RECEIVER=%s\n' "$YOOMONEY_RECEIVER"
+              write_overlay_line YOOMONEY_RECEIVER "$YOOMONEY_RECEIVER"
             fi
             if [ -n "$YOOMONEY_NOTIFICATION_SECRET" ]; then
-              printf 'YOOMONEY_NOTIFICATION_SECRET=%s\n' "$YOOMONEY_NOTIFICATION_SECRET"
+              write_overlay_line YOOMONEY_NOTIFICATION_SECRET "$YOOMONEY_NOTIFICATION_SECRET"
             fi
-            printf 'YOOMONEY_QUICKPAY_URL=%s\n' "$YOOMONEY_QUICKPAY_URL"
-            printf 'YOOMONEY_QUICKPAY_FORM=%s\n' "$YOOMONEY_QUICKPAY_FORM"
-            printf 'YOOMONEY_PAYMENT_TYPE=%s\n' "$YOOMONEY_PAYMENT_TYPE"
-            printf 'YOOMONEY_CURRENCY_CODE=%s\n' "$YOOMONEY_CURRENCY_CODE"
-            printf 'YOOMONEY_MONTHLY_PRICE_AMOUNT=%s\n' "$YOOMONEY_MONTHLY_PRICE_AMOUNT"
-            printf 'YOOMONEY_TARGETS=%s\n' "$YOOMONEY_TARGETS"
+            write_overlay_line YOOMONEY_QUICKPAY_URL "$YOOMONEY_QUICKPAY_URL"
+            write_overlay_line YOOMONEY_QUICKPAY_FORM "$YOOMONEY_QUICKPAY_FORM"
+            write_overlay_line YOOMONEY_PAYMENT_TYPE "$YOOMONEY_PAYMENT_TYPE"
+            write_overlay_line YOOMONEY_CURRENCY_CODE "$YOOMONEY_CURRENCY_CODE"
+            write_overlay_line YOOMONEY_MONTHLY_PRICE_AMOUNT "$YOOMONEY_MONTHLY_PRICE_AMOUNT"
+            write_overlay_line YOOMONEY_TARGETS "$YOOMONEY_TARGETS"
           } > "$overlay"
 
           scp \
