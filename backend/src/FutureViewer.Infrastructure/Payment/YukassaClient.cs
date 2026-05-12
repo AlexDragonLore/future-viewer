@@ -84,6 +84,9 @@ public sealed class YukassaClient : IPaymentProvider
         var payment = await response.Content.ReadFromJsonAsync<PaymentResponse>(JsonOptions, ct)
             ?? throw new InvalidOperationException("Yukassa returned empty payment body");
 
+        if (string.IsNullOrWhiteSpace(payment.Confirmation?.ConfirmationUrl))
+            _logger.LogWarning("Yukassa payment {PaymentId} returned without confirmation_url", payment.Id);
+
         return new PaymentCreationResult
         {
             PaymentId = payment.Id,
@@ -204,7 +207,14 @@ public sealed class YukassaClient : IPaymentProvider
     {
         public required string Id { get; init; }
         public required string Status { get; init; }
-        public ConfirmationDto? Confirmation { get; init; }
+        public ConfirmationResponseDto? Confirmation { get; init; }
+    }
+
+    private sealed class ConfirmationResponseDto
+    {
+        public string? Type { get; init; }
+        [JsonPropertyName("confirmation_url")]
+        public string? ConfirmationUrl { get; init; }
     }
 
     private sealed class WebhookEnvelope
