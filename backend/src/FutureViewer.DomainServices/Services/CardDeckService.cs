@@ -5,7 +5,7 @@ using FutureViewer.DomainServices.Interfaces;
 
 namespace FutureViewer.DomainServices.Services;
 
-public sealed class CardDeckService
+public sealed class  CardDeckService
 {
     private readonly ICardDeck _deck;
 

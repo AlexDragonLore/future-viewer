@@ -58,6 +58,39 @@ docker compose up --build
 - Swagger:  http://localhost:5050/swagger
 - Frontend: http://localhost:5173
 
+### Локальный smoke-test оплаты ЮKassa
+
+Для проверки платежного сценария не коммитьте credentials. Передавайте тестовые
+ключи только через env/runtime config. Для Payments API нужны именно credentials
+магазина: `Yukassa__ShopId` и `Yukassa__SecretKey`; payout/gate credentials
+для этого endpoint не подходят и дают `401 invalid_credentials` с описанием
+`Authentication type is not allowed`.
+
+Минимальный локальный прогон:
+
+```bash
+docker compose up -d postgres
+
+Yukassa__ShopId=<test-shop-id> \
+Yukassa__SecretKey=<test-secret-key> \
+Yukassa__ReturnUrl=http://localhost:5174/payment/success \
+ASPNETCORE_URLS=http://localhost:5050 \
+ConnectionStrings__Default='Host=localhost;Port=5432;Database=future_viewer;Username=future_viewer;Password=future_viewer_dev' \
+Cors__AllowedOrigins__0=http://localhost:5174 \
+dotnet run --project backend/src/FutureViewer.Host --no-launch-profile
+
+cd frontend
+VITE_API_URL=http://localhost:5050 npm run dev -- --host 127.0.0.1 --port 5174 --strictPort
+```
+
+Открывайте именно `http://localhost:5174/`, а не `127.0.0.1`, если backend
+разрешает CORS только для `http://localhost:5174`. Затем зарегистрируйте
+тестового пользователя, нажмите `Оплатить доступ` и проверьте редирект на
+confirmation URL ЮKassa. В чисто локальном окружении внешний webhook ЮKassa не
+сможет достучаться до `localhost`; для полной проверки активации нужен публичный
+tunnel/webhook URL или ручной локальный `POST /api/payments/webhook` после
+успешной тестовой оплаты.
+
 > Важно: если реальный `OPENAI_API_KEY` когда-либо попадал в локальный `.env`,
 > shell history, логи или чат, считайте его скомпрометированным и перевыпустите
 > ключ в кабинете OpenAI. Реальные секреты не должны коммититься.
