@@ -59,9 +59,10 @@ public sealed class YukassaClient : IPaymentProvider
                 Type = "redirect",
                 ReturnUrl = _options.ReturnUrl
             },
-            Description = $"Подписка «Вуаль Грядущего» для {userEmail}",
+            Description = $"Разовое продление доступа «Вуаль Грядущего» для {userEmail}",
             Metadata = new Dictionary<string, string>
             {
+                ["access_type"] = "manual_renewal",
                 ["user_id"] = userId.ToString()
             }
         };

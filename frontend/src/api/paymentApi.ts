@@ -7,8 +7,11 @@ export interface PaymentCreation {
 }
 
 export const paymentApi = {
-  async subscribe(): Promise<PaymentCreation> {
+  async createAccessPayment(): Promise<PaymentCreation> {
     const { data } = await httpClient.post<PaymentCreation>('/api/payments/subscribe')
     return data
+  },
+  async subscribe(): Promise<PaymentCreation> {
+    return paymentApi.createAccessPayment()
   },
 }

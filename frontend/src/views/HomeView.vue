@@ -74,9 +74,9 @@ const blocked = computed(() => requiresSubscription.value || freeQuotaExhausted.
 
 const blockMessage = computed(() => {
   if (requiresSubscription.value)
-    return 'Бесплатный доступ открыт только к раскладу «Карта дня». Оформи подписку, чтобы продолжить.'
+    return 'Бесплатный доступ открыт только к раскладу «Карта дня». Оплати доступ, чтобы продолжить.'
   if (freeQuotaExhausted.value)
-    return 'Ты использовал бесплатный расклад на сегодня. Возвращайся завтра или оформи подписку.'
+    return 'Ты использовал бесплатный расклад на сегодня. Возвращайся завтра или оплати доступ.'
   return ''
 })
 
@@ -91,7 +91,7 @@ const canBegin = computed(() => {
 const badgeText = computed(() => {
   if (!auth.isAuthenticated) return null
   if (auth.subscriptionLoading) return '…'
-  if (auth.isSubscribed) return 'Подписка активна'
+  if (auth.isSubscribed) return 'Доступ активен'
   const s = auth.subscription
   if (!s) return null
   const left = Math.max(0, s.freeReadingsDailyLimit - s.freeReadingsUsedToday)
@@ -275,7 +275,7 @@ async function begin() {
 
       <SubscriptionBanner
         v-if="auth.isAuthenticated && !auth.isSubscribed && blocked"
-        :message="requiresSubscription ? 'Расклад требует подписки' : 'Лимит бесплатных раскладов исчерпан'"
+        :message="requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
       />
 
       <div class="payment-info">
@@ -283,7 +283,7 @@ async function begin() {
           <div class="payment-title">{{ paidProduct.title }}</div>
           <p>
             {{ paidProduct.price }} за {{ paidProduct.period }}. Цифровой доступ к безлимитным раскладам
-            активируется в аккаунте после успешной онлайн-оплаты.
+            активируется после успешной онлайн-оплаты. Автосписаний нет — для продления нужно оплатить доступ заново.
           </p>
         </div>
         <RouterLink to="/legal" class="payment-link">Условия оплаты</RouterLink>

@@ -162,10 +162,10 @@ EOF
   write_env_line VITE_MERCHANT_PHONE "$(prompt_optional "Merchant phone" "79967669613")"
   write_env_line VITE_MERCHANT_EMAIL "$(prompt_optional "Merchant email" "duntsev010@mail.ru")"
   write_env_line VITE_MERCHANT_POSTAL_ADDRESS "$(prompt_optional "Merchant postal address" "duntsev010@mail.ru")"
-  write_env_line VITE_PAID_PRODUCT_TITLE "$(prompt_optional "Paid product title" "Подписка Future Viewer Pro")"
+  write_env_line VITE_PAID_PRODUCT_TITLE "$(prompt_optional "Paid product title" "Доступ Future Viewer Pro")"
   write_env_line VITE_PAID_PRODUCT_PRICE "$(prompt_optional "Paid product price label" "300 ₽")"
-  write_env_line VITE_PAID_PRODUCT_PERIOD "$(prompt_optional "Paid product period label" "1 месяц")"
-  write_env_line VITE_PAID_PRODUCT_DESCRIPTION "$(prompt_optional "Paid product description" "Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.")"
+  write_env_line VITE_PAID_PRODUCT_PERIOD "$(prompt_optional "Paid product period label" "30 дней")"
+  write_env_line VITE_PAID_PRODUCT_DESCRIPTION "$(prompt_optional "Paid product description" "Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.")"
 
   echo >> "$ENV_FILE"
   echo "# Optional Telegram settings. Empty token disables bot features." >> "$ENV_FILE"
@@ -182,11 +182,11 @@ EOF
   write_env_line EMAIL_USE_SSL "$(prompt_optional "Use SSL for SMTP (true/false)" "true")"
 
   echo >> "$ENV_FILE"
-  echo "# Optional YooKassa settings. Required only when paid subscriptions are enabled." >> "$ENV_FILE"
+  echo "# Optional YooKassa settings. Required only when paid access is enabled." >> "$ENV_FILE"
   write_env_line YUKASSA_SHOP_ID "$(prompt_optional "YooKassa shop id (optional)")"
   write_env_line YUKASSA_SECRET_KEY "$(prompt_optional "YooKassa secret key (optional)")"
   write_env_line YUKASSA_CURRENCY "$(prompt_optional "YooKassa currency" "RUB")"
-  write_env_line YUKASSA_MONTHLY_PRICE_AMOUNT "$(prompt_optional "Monthly subscription price" "300")"
+  write_env_line YUKASSA_MONTHLY_PRICE_AMOUNT "$(prompt_optional "Paid access price amount" "300")"
   write_env_line YUKASSA_API_BASE_URL "$(prompt_optional "YooKassa API base URL" "https://api.yookassa.ru/v3/")"
 
   chmod 600 "$ENV_FILE"

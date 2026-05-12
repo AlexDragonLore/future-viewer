@@ -73,10 +73,6 @@ public sealed class SubscriptionService
         var user = await _users.GetByIdAsync(userId, ct)
             ?? throw new UnauthorizedException("User not found");
 
-        if (IsSubscriptionActive(user))
-            throw new SubscriptionAlreadyActiveException(
-                "Subscription is already active. It will auto-renew at expiry.");
-
         var result = await _payments.CreateSubscriptionPaymentAsync(userId, user.Email, ct);
 
         return new PaymentCreationDto

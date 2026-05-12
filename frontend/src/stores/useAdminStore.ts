@@ -235,10 +235,10 @@ export const useAdminStore = defineStore('admin', () => {
           subscriptionExpiresAt: detail.subscriptionExpiresAt,
         }
       }
-      userToast.value = 'Подписка обновлена'
+      userToast.value = 'Доступ обновлён'
       return true
     } catch (e) {
-      userError.value = extractApiError(e, 'Не удалось обновить подписку')
+      userError.value = extractApiError(e, 'Не удалось обновить доступ')
       return false
     }
   }

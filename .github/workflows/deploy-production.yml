@@ -36,10 +36,15 @@ jobs:
       VITE_MERCHANT_PHONE: ${{ vars.VITE_MERCHANT_PHONE || '79967669613' }}
       VITE_MERCHANT_EMAIL: ${{ vars.VITE_MERCHANT_EMAIL || 'duntsev010@mail.ru' }}
       VITE_MERCHANT_POSTAL_ADDRESS: ${{ vars.VITE_MERCHANT_POSTAL_ADDRESS || 'duntsev010@mail.ru' }}
-      VITE_PAID_PRODUCT_TITLE: ${{ vars.VITE_PAID_PRODUCT_TITLE || 'Подписка Future Viewer Pro' }}
+      VITE_PAID_PRODUCT_TITLE: ${{ vars.VITE_PAID_PRODUCT_TITLE || 'Доступ Future Viewer Pro' }}
       VITE_PAID_PRODUCT_PRICE: ${{ vars.VITE_PAID_PRODUCT_PRICE || '300 ₽' }}
-      VITE_PAID_PRODUCT_PERIOD: ${{ vars.VITE_PAID_PRODUCT_PERIOD || '1 месяц' }}
-      VITE_PAID_PRODUCT_DESCRIPTION: ${{ vars.VITE_PAID_PRODUCT_DESCRIPTION || 'Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.' }}
+      VITE_PAID_PRODUCT_PERIOD: ${{ vars.VITE_PAID_PRODUCT_PERIOD || '30 дней' }}
+      VITE_PAID_PRODUCT_DESCRIPTION: ${{ vars.VITE_PAID_PRODUCT_DESCRIPTION || 'Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.' }}
+      YUKASSA_SHOP_ID: ${{ secrets.YUKASSA_SHOP_ID }}
+      YUKASSA_SECRET_KEY: ${{ secrets.YUKASSA_SECRET_KEY }}
+      YUKASSA_CURRENCY: ${{ vars.YUKASSA_CURRENCY || 'RUB' }}
+      YUKASSA_MONTHLY_PRICE_AMOUNT: ${{ vars.YUKASSA_MONTHLY_PRICE_AMOUNT || '300' }}
+      YUKASSA_API_BASE_URL: ${{ vars.YUKASSA_API_BASE_URL || 'https://api.yookassa.ru/v3/' }}
     steps:
       - name: Check deploy configuration
         id: config
@@ -159,6 +164,37 @@ jobs:
             /tmp/future-viewer-images.tar.gz \
             "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST:/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
 
+      - name: Upload production env overrides
+        if: steps.config.outputs.deploy_ready == 'true'
+        run: |
+          set -Eeuo pipefail
+          if { [ -z "$YUKASSA_SHOP_ID" ] && [ -n "$YUKASSA_SECRET_KEY" ]; } || { [ -n "$YUKASSA_SHOP_ID" ] && [ -z "$YUKASSA_SECRET_KEY" ]; }; then
+            echo "::warning::Set both YUKASSA_SHOP_ID and YUKASSA_SECRET_KEY secrets for production payments."
+          fi
+
+          umask 077
+          overlay="$(mktemp)"
+          {
+            if [ -n "$YUKASSA_SHOP_ID" ]; then
+              printf 'YUKASSA_SHOP_ID=%s\n' "$YUKASSA_SHOP_ID"
+            fi
+            if [ -n "$YUKASSA_SECRET_KEY" ]; then
+              printf 'YUKASSA_SECRET_KEY=%s\n' "$YUKASSA_SECRET_KEY"
+            fi
+            printf 'YUKASSA_CURRENCY=%s\n' "$YUKASSA_CURRENCY"
+            printf 'YUKASSA_MONTHLY_PRICE_AMOUNT=%s\n' "$YUKASSA_MONTHLY_PRICE_AMOUNT"
+            printf 'YUKASSA_API_BASE_URL=%s\n' "$YUKASSA_API_BASE_URL"
+          } > "$overlay"
+
+          scp \
+            -i ~/.ssh/future_viewer_root \
+            -P "$PRODUCTION_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$overlay" \
+            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST:/tmp/future-viewer-env-overrides-$IMAGE_TAG"
+          rm -f "$overlay"
+
       - name: Run production deploy
         if: steps.config.outputs.deploy_ready == 'true'
         run: |
@@ -172,6 +208,44 @@ jobs:
             "IMAGE_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$APP_DIR"
+          env_file="/opt/fv-app/.env.production"
+          override_file="/tmp/future-viewer-env-overrides-$IMAGE_TAG"
+          if [ -s "$override_file" ]; then
+            install -d -m 700 "$(dirname "$env_file")"
+            if [ ! -f "$env_file" ]; then
+              install -m 600 /dev/null "$env_file"
+            fi
+
+            tmp_env="$(mktemp)"
+            awk -F= '
+              NR == FNR {
+                key = $0
+                sub(/=.*/, "", key)
+                overrides[key] = $0
+                order[++count] = key
+                next
+              }
+              {
+                key = $0
+                sub(/=.*/, "", key)
+                if (key in overrides) {
+                  print overrides[key]
+                  seen[key] = 1
+                  next
+                }
+                print
+              }
+              END {
+                for (i = 1; i <= count; i++) {
+                  key = order[i]
+                  if (!(key in seen)) print overrides[key]
+                }
+              }
+            ' "$override_file" "$env_file" > "$tmp_env"
+            install -m 600 "$tmp_env" "$env_file"
+            rm -f "$tmp_env" "$override_file"
+          fi
+
           docker load -i "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
           FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
             --env-file /opt/fv-app/.env.production \

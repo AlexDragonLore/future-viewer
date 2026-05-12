@@ -156,7 +156,7 @@ const quotaLabel = computed(() => {
         <div class="burger-summary">
           <span v-if="auth.email" class="burger-email">{{ auth.email }}</span>
           <span v-if="quotaLabel" class="burger-quota" :class="{ subscribed: auth.isSubscribed }">
-            {{ auth.isSubscribed ? 'Подписка активна' : `Лимит: ${quotaLabel}` }}
+            {{ auth.isSubscribed ? 'Доступ активен' : `Лимит: ${quotaLabel}` }}
           </span>
         </div>
         <RouterLink to="/glossary" class="burger-link" data-testid="burger-glossary" @click="burgerOpen = false">

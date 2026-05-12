@@ -170,16 +170,25 @@ public sealed class SubscriptionServiceTests
     }
 
     [Fact]
-    public async Task CreatePayment_throws_when_subscription_already_active()
+    public async Task CreatePayment_allows_manual_renewal_when_access_already_active()
     {
         var user = NewUser(SubscriptionStatus.Active, DateTime.UtcNow.AddDays(5));
         var payments = new Mock<IPaymentProvider>();
+        payments.Setup(p => p.CreateSubscriptionPaymentAsync(user.Id, user.Email, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PaymentCreationResult
+            {
+                PaymentId = "pay-renew",
+                ConfirmationUrl = "https://yk/renew",
+                Status = "pending"
+            });
 
         var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, payments.Object, ProcessedPaymentsAcceptAll().Object, Uow());
 
-        await sut.Invoking(s => s.CreatePaymentAsync(user.Id))
-            .Should().ThrowAsync<SubscriptionAlreadyActiveException>();
-        payments.Verify(p => p.CreateSubscriptionPaymentAsync(It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        var result = await sut.CreatePaymentAsync(user.Id);
+
+        result.PaymentId.Should().Be("pay-renew");
+        result.ConfirmationUrl.Should().Be("https://yk/renew");
+        payments.Verify(p => p.CreateSubscriptionPaymentAsync(user.Id, user.Email, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static Mock<IPaymentProvider> PaymentsWithWebhook(

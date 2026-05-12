@@ -3,8 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useProfileStore } from '@/stores/useProfileStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import ScoreBadge from '@/components/ScoreBadge.vue'
+import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
 import TelegramLinkButton from '@/components/TelegramLinkButton.vue'
 import { extractApiError } from '@/api/httpClient'
+import { paidProduct } from '@/content/legal'
 import { FeedbackStatus, type FeedbackInfo } from '@/types'
 
 const store = useProfileStore()
@@ -17,6 +19,17 @@ const lastName = ref('')
 const birthDate = ref('')
 const personalizationError = ref<string | null>(null)
 const personalizationSaved = ref(false)
+const accessExpiresLabel = computed(() => {
+  const expiresAt = auth.subscription?.expiresAt
+  if (!expiresAt) return null
+  return new Date(expiresAt).toLocaleDateString()
+})
+const accessMessage = computed(() =>
+  auth.isSubscribed ? 'Продлить доступ ещё на месяц' : 'Оплатить доступ к полным раскладам',
+)
+const accessButtonLabel = computed(() =>
+  auth.isSubscribed ? 'Продлить доступ' : 'Оплатить доступ',
+)
 
 watch(
   () => store.personalization,
@@ -30,6 +43,9 @@ watch(
 
 onMounted(() => {
   store.loadAll()
+  if (auth.isAuthenticated) {
+    auth.refreshSubscription()
+  }
 })
 
 function statusLabel(status: FeedbackStatus): string {
@@ -100,6 +116,24 @@ async function clearMemory() {
     </div>
 
     <template v-else>
+      <section class="mystic-card p-6 mb-6" data-testid="profile-access">
+        <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Доступ</div>
+        <p class="text-sm text-mystic-silver/80 mb-4">
+          <template v-if="auth.isSubscribed">
+            Платный доступ активен<template v-if="accessExpiresLabel"> до {{ accessExpiresLabel }}</template>.
+            Автосписаний нет: следующий период продлевается только новым платежом.
+          </template>
+          <template v-else>
+            Сейчас включён бесплатный режим. Полный доступ открывается разовым платежом без автосписаний.
+          </template>
+        </p>
+        <SubscriptionBanner
+          :message="accessMessage"
+          :button-label="accessButtonLabel"
+          :price-label="`${paidProduct.price} / ${paidProduct.period}`"
+        />
+      </section>
+
       <section class="mystic-card p-6 mb-6" data-testid="profile-summary">
         <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Рейтинг</div>
         <div v-if="store.summary" class="grid grid-cols-2 md:grid-cols-4 gap-4">

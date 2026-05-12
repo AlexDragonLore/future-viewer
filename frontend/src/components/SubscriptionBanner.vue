@@ -4,6 +4,7 @@ import { paymentApi } from '@/api/paymentApi'
 import { extractApiError } from '@/api/httpClient'
 
 const props = defineProps<{
+  buttonLabel?: string
   message?: string
   priceLabel?: string
 }>()
@@ -15,12 +16,12 @@ const emit = defineEmits<{
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-async function subscribe() {
+async function createPayment() {
   if (loading.value) return
   loading.value = true
   error.value = null
   try {
-    const result = await paymentApi.subscribe()
+    const result = await paymentApi.createAccessPayment()
     if (result.confirmationUrl) {
       window.location.assign(result.confirmationUrl)
     } else {
@@ -39,11 +40,11 @@ async function subscribe() {
 <template>
   <div class="subscription-banner">
     <div class="info">
-      <div class="title">{{ props.message ?? 'Оформи подписку' }}</div>
-      <div class="price">{{ props.priceLabel ?? '300 ₽ / месяц' }} · безлимитные расклады</div>
+      <div class="title">{{ props.message ?? 'Оплати доступ' }}</div>
+      <div class="price">{{ props.priceLabel ?? '300 ₽ / месяц' }} · безлимитные расклады · без автосписаний</div>
     </div>
-    <button class="glow-button" :disabled="loading" @click="subscribe">
-      {{ loading ? '…' : 'Оформить подписку' }}
+    <button class="glow-button" :disabled="loading" @click="createPayment">
+      {{ loading ? '…' : props.buttonLabel ?? 'Оплатить доступ' }}
     </button>
     <div v-if="error" class="error">{{ error }}</div>
   </div>

@@ -116,6 +116,9 @@ Workflow [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-pr
   `git fetch/merge` в production checkout.
 - `PRODUCTION_ROOT_SSH_KEY` — private key пользователя, который может запускать
   Docker/Compose команды и читать `/opt/fv-app/.env.production`.
+- `YUKASSA_SHOP_ID` и `YUKASSA_SECRET_KEY` — опциональные credentials магазина
+  ЮKassa для приёма оплат. Если заданы, workflow обновит эти значения в
+  `/opt/fv-app/.env.production` перед перезапуском compose.
 
 Если эти secrets не заданы, workflow не падает, а пропускает деплой с warning.
 После добавления secrets следующий push в `main`/`master` запустит полный деплой.
@@ -128,6 +131,9 @@ Workflow [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-pr
 - `PRODUCTION_ROOT_USER` — по умолчанию `root`.
 - `PRODUCTION_HEALTH_URL` — health-check URL, по умолчанию
   `https://alex-taro.ru/health`.
+- `YUKASSA_CURRENCY`, `YUKASSA_MONTHLY_PRICE_AMOUNT`, `YUKASSA_API_BASE_URL` —
+  опциональные настройки ЮKassa, по умолчанию `RUB`, `300`,
+  `https://api.yookassa.ru/v3/`.
 
 Текущая production-схема использует два SSH-подключения: `deploy` обновляет git
 checkout, затем `root` загружает готовые images и перезапускает compose. Это

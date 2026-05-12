@@ -50,6 +50,12 @@ services:
       Email__From: ${EMAIL_FROM:-no-reply@vualgryaduschego.ru}
       Email__UseSsl: ${EMAIL_USE_SSL:-true}
       Email__FrontendUrl: ${EMAIL_FRONTEND_URL:-http://localhost:5173}
+      Yukassa__ShopId: ${YUKASSA_SHOP_ID:-}
+      Yukassa__SecretKey: ${YUKASSA_SECRET_KEY:-}
+      Yukassa__ReturnUrl: ${YUKASSA_RETURN_URL:-http://localhost:5173/payment/success}
+      Yukassa__Currency: ${YUKASSA_CURRENCY:-RUB}
+      Yukassa__MonthlyPriceAmount: ${YUKASSA_MONTHLY_PRICE_AMOUNT:-300}
+      Yukassa__ApiBaseUrl: ${YUKASSA_API_BASE_URL:-https://api.yookassa.ru/v3/}
     ports:
       - "5050:8080"
 
@@ -70,10 +76,10 @@ services:
       VITE_MERCHANT_PHONE: ${VITE_MERCHANT_PHONE:-79967669613}
       VITE_MERCHANT_EMAIL: ${VITE_MERCHANT_EMAIL:-duntsev010@mail.ru}
       VITE_MERCHANT_POSTAL_ADDRESS: ${VITE_MERCHANT_POSTAL_ADDRESS:-duntsev010@mail.ru}
-      VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-Подписка Future Viewer Pro}
+      VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-Доступ Future Viewer Pro}
       VITE_PAID_PRODUCT_PRICE: ${VITE_PAID_PRODUCT_PRICE:-300 ₽}
-      VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-1 месяц}
-      VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.}
+      VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-30 дней}
+      VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.}
     ports:
       - "5173:5173"
     volumes:

@@ -17,15 +17,15 @@ export const merchant = {
 }
 
 export const paidProduct = {
-  title: envValue('VITE_PAID_PRODUCT_TITLE', 'Подписка Future Viewer Pro'),
+  title: envValue('VITE_PAID_PRODUCT_TITLE', 'Доступ Future Viewer Pro'),
   price: envValue('VITE_PAID_PRODUCT_PRICE', '300 ₽'),
-  period: envValue('VITE_PAID_PRODUCT_PERIOD', '1 месяц'),
+  period: envValue('VITE_PAID_PRODUCT_PERIOD', '30 дней'),
   description: envValue(
     'VITE_PAID_PRODUCT_DESCRIPTION',
-    'Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.',
+    'Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.',
   ),
   included: [
-    'безлимитное создание раскладов на период действия подписки',
+    'безлимитное создание раскладов на оплаченный период доступа',
     'расклады «Карта дня», «Три карты» и «Кельтский крест»',
     'AI-интерпретация расклада по вопросу пользователя',
     'сохранение истории раскладов в личном кабинете',

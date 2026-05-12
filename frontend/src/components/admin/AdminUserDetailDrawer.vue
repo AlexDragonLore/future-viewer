@@ -175,7 +175,7 @@ async function unlinkTelegram(): Promise<void> {
       </section>
 
       <section class="section">
-        <h4>Подписка</h4>
+        <h4>Доступ</h4>
         <div class="grid grid-cols-2 gap-3">
           <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
             <span>Статус</span>
@@ -202,7 +202,7 @@ async function unlinkTelegram(): Promise<void> {
           data-testid="admin-user-sub-save"
           @click="saveSubscription"
         >
-          {{ savingSub ? '…' : 'Сохранить подписку' }}
+          {{ savingSub ? '…' : 'Сохранить доступ' }}
         </button>
       </section>
 

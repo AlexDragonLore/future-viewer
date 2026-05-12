@@ -33,7 +33,7 @@ function onRow(u: AdminUserListItem): void {
             <th>Email</th>
             <th class="mobile-hide">Создан</th>
             <th class="mobile-hide">Админ</th>
-            <th>Подписка</th>
+            <th>Доступ</th>
             <th class="num">Читок</th>
             <th class="num mobile-hide">Фидбеков</th>
             <th class="num">Баллов</th>
@@ -87,7 +87,7 @@ function onRow(u: AdminUserListItem): void {
         </div>
         <div class="mobile-card-meta mono">{{ new Date(u.createdAt).toLocaleDateString() }}</div>
         <div class="mobile-card-grid">
-          <span>Подписка</span>
+          <span>Доступ</span>
           <span>
             <span class="badge" :class="{ active: u.subscriptionStatus === SubscriptionStatusValue.Active }">
               {{ statusLabel(u.subscriptionStatus) }}

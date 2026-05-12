@@ -211,7 +211,7 @@ describe('HomeView', () => {
       canCreateFreeReading: true,
     })
     const { wrapper } = await mountHome()
-    expect(wrapper.text()).toContain('Подписка активна')
+    expect(wrapper.text()).toContain('Доступ активен')
   })
 
   it('blocks free authenticated user from multi-card spread', async () => {

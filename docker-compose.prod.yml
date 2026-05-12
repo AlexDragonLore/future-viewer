@@ -73,10 +73,10 @@ services:
         VITE_MERCHANT_PHONE: ${VITE_MERCHANT_PHONE:-79967669613}
         VITE_MERCHANT_EMAIL: ${VITE_MERCHANT_EMAIL:-duntsev010@mail.ru}
         VITE_MERCHANT_POSTAL_ADDRESS: ${VITE_MERCHANT_POSTAL_ADDRESS:-duntsev010@mail.ru}
-        VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-Подписка Future Viewer Pro}
+        VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-Доступ Future Viewer Pro}
         VITE_PAID_PRODUCT_PRICE: ${VITE_PAID_PRODUCT_PRICE:-300 ₽}
-        VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-1 месяц}
-        VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer.}
+        VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-30 дней}
+        VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.}
     restart: unless-stopped
     depends_on:
       - backend
