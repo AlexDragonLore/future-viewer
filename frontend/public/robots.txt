@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /auth
+Disallow: /verify-email
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /payment/
+Disallow: /feedback/
+Disallow: /history
+Disallow: /reading
+Disallow: /result
+Disallow: /achievements
+Disallow: /profile
+
+Sitemap: https://alex-taro.ru/sitemap.xml

@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Veil of Future">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="42%" r="72%">
+      <stop offset="0%" stop-color="#4a2b78"/>
+      <stop offset="54%" stop-color="#160d31"/>
+      <stop offset="100%" stop-color="#07030f"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="142" y1="70" x2="384" y2="442">
+      <stop offset="0%" stop-color="#fff4c7"/>
+      <stop offset="44%" stop-color="#f5c26b"/>
+      <stop offset="100%" stop-color="#9f6424"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <path d="M256 56l45 141 155 59-155 59-45 141-45-141-155-59 155-59 45-141z" fill="url(#gold)"/>
+  <circle cx="256" cy="256" r="58" fill="#0b0618" stroke="#f5c26b" stroke-width="16"/>
+  <path d="M154 256c45-61 159-61 204 0-45 61-159 61-204 0z" fill="none" stroke="#f8df9b" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="18" fill="#f8df9b"/>
+</svg>

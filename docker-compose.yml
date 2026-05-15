@@ -79,6 +79,11 @@ services:
       - backend
     environment:
       VITE_API_URL: http://localhost:5050
+      VITE_SITE_URL: ${VITE_SITE_URL:-http://localhost:5173}
+      VITE_GOOGLE_SITE_VERIFICATION: ${VITE_GOOGLE_SITE_VERIFICATION:-}
+      VITE_YANDEX_VERIFICATION: ${VITE_YANDEX_VERIFICATION:-}
+      VITE_YANDEX_METRICA_ID: ${VITE_YANDEX_METRICA_ID:-}
+      VITE_GOOGLE_ANALYTICS_ID: ${VITE_GOOGLE_ANALYTICS_ID:-}
       VITE_MERCHANT_SERVICE_NAME: ${VITE_MERCHANT_SERVICE_NAME:-Future Viewer}
       VITE_MERCHANT_OWNER_NAME: ${VITE_MERCHANT_OWNER_NAME:-Дунецев Александр Дмитриевич}
       VITE_MERCHANT_TAX_STATUS: ${VITE_MERCHANT_TAX_STATUS:-самозанятый, плательщик налога на профессиональный доход}

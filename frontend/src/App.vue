@@ -25,13 +25,13 @@ onMounted(() => {
       </RouterView>
       <SiteFooter />
     </div>
-    <div class="screen-vignette pointer-events-none fixed inset-0 z-20"></div>
+    <div class="screen-vignette pointer-events-none fixed inset-0 z-[5]"></div>
   </div>
 </template>
 
 <style>
 .screen-vignette {
-  box-shadow: inset 0 0 200px 60px rgba(0, 0, 0, 0.7);
+  box-shadow: inset 0 0 140px 36px rgba(0, 0, 0, 0.42);
 }
 
 .fade-enter-active,
@@ -45,7 +45,7 @@ onMounted(() => {
 
 @media (max-width: 640px) {
   .screen-vignette {
-    box-shadow: inset 0 0 48px 8px rgba(0, 0, 0, 0.18);
+    box-shadow: inset 0 0 36px 6px rgba(0, 0, 0, 0.12);
   }
 }
 </style>

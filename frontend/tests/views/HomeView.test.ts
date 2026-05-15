@@ -48,6 +48,8 @@ async function mountHome() {
       { path: '/reading', name: 'reading', component: { template: '<div>reading</div>' } },
       { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
       { path: '/history', name: 'history', component: { template: '<div>hist</div>' } },
+      { path: '/glossary', name: 'glossary', component: { template: '<div>glossary</div>' } },
+      { path: '/legal', name: 'legal', component: { template: '<div>legal</div>' } },
     ],
   })
   router.push('/')

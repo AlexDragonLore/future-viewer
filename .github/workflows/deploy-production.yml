@@ -29,6 +29,11 @@ jobs:
       PRODUCTION_ROOT_SSH_KEY: ${{ secrets.PRODUCTION_ROOT_SSH_KEY }}
       PRODUCTION_HEALTH_URL: ${{ vars.PRODUCTION_HEALTH_URL || 'https://alex-taro.ru/health' }}
       VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
+      VITE_SITE_URL: ${{ vars.VITE_SITE_URL || 'https://alex-taro.ru' }}
+      VITE_GOOGLE_SITE_VERIFICATION: ${{ vars.VITE_GOOGLE_SITE_VERIFICATION || '' }}
+      VITE_YANDEX_VERIFICATION: ${{ vars.VITE_YANDEX_VERIFICATION || '' }}
+      VITE_YANDEX_METRICA_ID: ${{ vars.VITE_YANDEX_METRICA_ID || '' }}
+      VITE_GOOGLE_ANALYTICS_ID: ${{ vars.VITE_GOOGLE_ANALYTICS_ID || '' }}
       VITE_MERCHANT_SERVICE_NAME: ${{ vars.VITE_MERCHANT_SERVICE_NAME || 'Future Viewer' }}
       VITE_MERCHANT_OWNER_NAME: ${{ vars.VITE_MERCHANT_OWNER_NAME || 'Дунецев Александр Дмитриевич' }}
       VITE_MERCHANT_TAX_STATUS: ${{ vars.VITE_MERCHANT_TAX_STATUS || 'самозанятый, плательщик налога на профессиональный доход' }}
@@ -89,6 +94,11 @@ jobs:
           set -Eeuo pipefail
           docker build \
             --build-arg "VITE_API_URL=$VITE_API_URL" \
+            --build-arg "VITE_SITE_URL=$VITE_SITE_URL" \
+            --build-arg "VITE_GOOGLE_SITE_VERIFICATION=$VITE_GOOGLE_SITE_VERIFICATION" \
+            --build-arg "VITE_YANDEX_VERIFICATION=$VITE_YANDEX_VERIFICATION" \
+            --build-arg "VITE_YANDEX_METRICA_ID=$VITE_YANDEX_METRICA_ID" \
+            --build-arg "VITE_GOOGLE_ANALYTICS_ID=$VITE_GOOGLE_ANALYTICS_ID" \
             --build-arg "VITE_MERCHANT_SERVICE_NAME=$VITE_MERCHANT_SERVICE_NAME" \
             --build-arg "VITE_MERCHANT_OWNER_NAME=$VITE_MERCHANT_OWNER_NAME" \
             --build-arg "VITE_MERCHANT_TAX_STATUS=$VITE_MERCHANT_TAX_STATUS" \

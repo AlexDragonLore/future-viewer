@@ -1,0 +1,76 @@
+{
+  "siteName": "Вуаль Грядущего",
+  "defaultLocale": "ru_RU",
+  "siteUrl": "https://alex-taro.ru",
+  "defaultImage": "/og/veil-of-future-og.png",
+  "defaultTitle": "Вуаль Грядущего — онлайн Таро с AI-интерпретацией",
+  "defaultDescription": "Онлайн-расклады Таро с AI-интерпретацией: карта дня, три карты и Кельтский крест. Задайте вопрос и получите понятный разбор.",
+  "indexableRoutes": [
+    {
+      "name": "home",
+      "path": "/",
+      "title": "Вуаль Грядущего — онлайн Таро с AI-интерпретацией",
+      "description": "Онлайн-расклады Таро с AI-интерпретацией: карта дня, три карты и Кельтский крест. Задайте вопрос и получите понятный разбор.",
+      "priority": 1,
+      "changefreq": "weekly",
+      "type": "website"
+    },
+    {
+      "name": "glossary",
+      "path": "/glossary",
+      "title": "Глоссарий Таро — значения 78 карт | Вуаль Грядущего",
+      "description": "Значения 78 карт Таро, ключевые слова, прямые и перевернутые положения, колоды и расклады в одном справочнике.",
+      "priority": 0.9,
+      "changefreq": "weekly",
+      "type": "article"
+    },
+    {
+      "name": "about",
+      "path": "/about",
+      "title": "О сервисе | Вуаль Грядущего",
+      "description": "Вуаль Грядущего — онлайн-сервис Таро с AI-интерпретациями, личным кабинетом, историей раскладов и прозрачными правилами работы.",
+      "priority": 0.7,
+      "changefreq": "monthly",
+      "type": "article"
+    },
+    {
+      "name": "privacy",
+      "path": "/privacy",
+      "title": "Политика конфиденциальности | Вуаль Грядущего",
+      "description": "Как Вуаль Грядущего обрабатывает email, данные профиля, вопросы к раскладам, обратную связь, Telegram-связку и платежные данные.",
+      "priority": 0.5,
+      "changefreq": "monthly",
+      "type": "article"
+    },
+    {
+      "name": "legal",
+      "path": "/legal",
+      "title": "Оплата и оферта | Вуаль Грядущего",
+      "description": "Условия оплаты цифрового доступа Future Viewer Pro, порядок предоставления услуги, контакты исполнителя и публичная оферта.",
+      "priority": 0.5,
+      "changefreq": "monthly",
+      "type": "article"
+    }
+  ],
+  "noindexRoutes": [
+    { "name": "auth", "path": "/auth", "title": "Вход | Вуаль Грядущего" },
+    { "name": "forgot-password", "path": "/forgot-password", "title": "Восстановление пароля | Вуаль Грядущего" },
+    { "name": "verify-email", "path": "/verify-email", "title": "Подтверждение email | Вуаль Грядущего" },
+    { "name": "reset-password", "path": "/reset-password", "title": "Смена пароля | Вуаль Грядущего" },
+    { "name": "payment-success", "path": "/payment/success", "title": "Проверка оплаты | Вуаль Грядущего" },
+    { "name": "leaderboard", "path": "/leaderboard", "title": "Лидерборд | Вуаль Грядущего" },
+    { "name": "glossary-card", "path": "/glossary/:id", "title": "Карта Таро | Вуаль Грядущего" },
+    { "name": "reading", "path": "/reading", "title": "Расклад | Вуаль Грядущего" },
+    { "name": "result", "path": "/result", "title": "Результат расклада | Вуаль Грядущего" },
+    { "name": "history", "path": "/history", "title": "История раскладов | Вуаль Грядущего" },
+    { "name": "reading-detail", "path": "/reading/:id", "title": "Детали расклада | Вуаль Грядущего" },
+    { "name": "feedback", "path": "/feedback/:token", "title": "Обратная связь | Вуаль Грядущего" },
+    { "name": "achievements", "path": "/achievements", "title": "Достижения | Вуаль Грядущего" },
+    { "name": "profile", "path": "/profile", "title": "Профиль | Вуаль Грядущего" },
+    { "name": "admin", "path": "/admin", "title": "Админ-панель | Вуаль Грядущего" },
+    { "name": "admin-users", "path": "/admin/users", "title": "Пользователи | Вуаль Грядущего" },
+    { "name": "admin-user-detail", "path": "/admin/users/:id", "title": "Пользователь | Вуаль Грядущего" },
+    { "name": "admin-feedbacks", "path": "/admin/feedbacks", "title": "Фидбек | Вуаль Грядущего" },
+    { "name": "admin-stats", "path": "/admin/stats", "title": "Статистика | Вуаль Грядущего" }
+  ]
+}
