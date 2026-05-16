@@ -9,6 +9,7 @@ const seoPath = path.join(root, 'src/seo/routes.json')
 const seo = JSON.parse(await readFile(seoPath, 'utf8'))
 const baseHtml = await readFile(path.join(dist, 'index.html'), 'utf8')
 const today = new Date().toISOString().slice(0, 10)
+const iconAssetVersion = '20260516'
 
 function cleanSiteUrl(value) {
   const raw = value && value.trim() ? value.trim() : seo.siteUrl
@@ -101,10 +102,10 @@ function managedHead(route, { index }) {
   if (jsonLd) {
     lines.push(`    <script type="application/ld+json">${jsonLd.replaceAll('</script', '<\\/script')}</script>`)
   }
-  lines.push('    <link rel="manifest" href="/site.webmanifest" />')
-  lines.push('    <link rel="icon" href="/favicon.ico" sizes="any" />')
-  lines.push('    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />')
-  lines.push('    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />')
+  lines.push(`    <link rel="manifest" href="/site.webmanifest?v=${iconAssetVersion}" />`)
+  lines.push(`    <link rel="icon" href="/favicon.ico?v=${iconAssetVersion}" sizes="any" />`)
+  lines.push(`    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=${iconAssetVersion}" />`)
+  lines.push(`    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=${iconAssetVersion}" />`)
   lines.push('<!-- seo:managed:end -->')
   return lines.join('\n')
 }
