@@ -44,4 +44,14 @@ describe('applyRouteSeo', () => {
     expect(meta('meta[name="robots"]')?.content).toBe('noindex, nofollow')
     expect(meta('meta[property="og:url"]')?.content).toBe('https://alex-taro.ru/auth')
   })
+
+  it('keeps leaderboard out of the index with a self canonical URL', () => {
+    applyRouteSeo(route('leaderboard', '/leaderboard', true))
+
+    expect(document.title).toContain('Лидерборд')
+    expect(meta('meta[name="robots"]')?.content).toBe('noindex, nofollow')
+    expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(
+      'https://alex-taro.ru/leaderboard',
+    )
+  })
 })

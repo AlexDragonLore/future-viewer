@@ -34,11 +34,11 @@ function routeOutputPath(routePath) {
   return path.join(dist, routePath.replace(/^\/+/, ''), 'index.html')
 }
 
-function managedHead(route, { index }) {
+function managedHead(route, { index, canonicalPath = route?.path }) {
   const siteUrl = cleanSiteUrl(process.env.VITE_SITE_URL)
   const title = route?.title ?? seo.defaultTitle
   const description = route?.description ?? seo.defaultDescription
-  const canonical = absoluteUrl(siteUrl, index ? route.path : route.path.replace(/:[^/]+/g, ''))
+  const canonical = canonicalPath ? absoluteUrl(siteUrl, canonicalPath.replace(/:[^/]+/g, '')) : null
   const image = absoluteUrl(siteUrl, seo.defaultImage)
   const robots = index
     ? 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
@@ -78,13 +78,21 @@ function managedHead(route, { index }) {
     `    <title>${escapeHtml(title)}</title>`,
     `    <meta name="description" content="${escapeHtml(description)}" />`,
     `    <meta name="robots" content="${escapeHtml(robots)}" />`,
-    `    <link rel="canonical" href="${escapeHtml(canonical)}" />`,
+  ]
+  if (canonical) {
+    lines.push(`    <link rel="canonical" href="${escapeHtml(canonical)}" />`)
+  }
+  lines.push(
     `    <meta property="og:site_name" content="${escapeHtml(seo.siteName)}" />`,
     `    <meta property="og:locale" content="${escapeHtml(seo.defaultLocale)}" />`,
     `    <meta property="og:type" content="${escapeHtml(route?.type ?? 'website')}" />`,
     `    <meta property="og:title" content="${escapeHtml(title)}" />`,
     `    <meta property="og:description" content="${escapeHtml(description)}" />`,
-    `    <meta property="og:url" content="${escapeHtml(canonical)}" />`,
+  )
+  if (canonical) {
+    lines.push(`    <meta property="og:url" content="${escapeHtml(canonical)}" />`)
+  }
+  lines.push(
     `    <meta property="og:image" content="${escapeHtml(image)}" />`,
     '    <meta property="og:image:width" content="1200" />',
     '    <meta property="og:image:height" content="630" />',
@@ -92,7 +100,7 @@ function managedHead(route, { index }) {
     `    <meta name="twitter:title" content="${escapeHtml(title)}" />`,
     `    <meta name="twitter:description" content="${escapeHtml(description)}" />`,
     `    <meta name="twitter:image" content="${escapeHtml(image)}" />`,
-  ]
+  )
   if (googleVerification) {
     lines.push(`    <meta name="google-site-verification" content="${escapeHtml(googleVerification)}" />`)
   }
@@ -127,12 +135,16 @@ for (const route of seo.indexableRoutes) {
   await writeHtml(routeOutputPath(route.path), route, { index: true })
 }
 
+for (const route of seo.noindexRoutes.filter((route) => !route.path.includes(':'))) {
+  await writeHtml(routeOutputPath(route.path), route, { index: false })
+}
+
 await writeHtml(path.join(dist, 'noindex.html'), {
-  path: '/',
+  path: null,
   title: seo.defaultTitle,
   description: seo.defaultDescription,
   type: 'website',
-}, { index: false })
+}, { index: false, canonicalPath: null })
 
 const siteUrl = cleanSiteUrl(process.env.VITE_SITE_URL)
 const sitemap = [
@@ -155,18 +167,6 @@ const robots = [
   'User-agent: *',
   'Allow: /',
   'Disallow: /api/',
-  'Disallow: /admin',
-  'Disallow: /auth',
-  'Disallow: /verify-email',
-  'Disallow: /forgot-password',
-  'Disallow: /reset-password',
-  'Disallow: /payment/',
-  'Disallow: /feedback/',
-  'Disallow: /history',
-  'Disallow: /reading',
-  'Disallow: /result',
-  'Disallow: /achievements',
-  'Disallow: /profile',
   '',
   `Sitemap: ${absoluteUrl(siteUrl, '/sitemap.xml')}`,
   '',
