@@ -225,8 +225,8 @@ async function begin() {
           <strong>{{ currentDeckMeta.label }}</strong>
         </div>
         <p>{{ currentDeckMeta.shortDescription }}</p>
-        <RouterLink :to="`/glossary#deck-${currentDeckMeta.anchorId}`" class="blurb-link">
-          Подробнее в глоссарии →
+        <RouterLink :to="currentDeckMeta.seoPath" class="blurb-link">
+          Подробнее о колоде →
         </RouterLink>
       </div>
 
@@ -247,10 +247,10 @@ async function begin() {
         <div v-if="currentSpreadMeta" class="spread-blurb" data-testid="home-spread-blurb">
           <p>{{ currentSpreadMeta.shortDescription }}</p>
           <RouterLink
-            :to="`/glossary#spread-${currentSpreadMeta.anchorId}`"
+            :to="currentSpreadMeta.seoPath"
             class="blurb-link"
           >
-            Подробнее в глоссарии →
+            Подробнее о раскладе →
           </RouterLink>
         </div>
       </div>
@@ -337,9 +337,10 @@ async function begin() {
         <RouterLink to="/legal" class="payment-link">Условия оплаты</RouterLink>
       </div>
 
-      <div class="home-links flex justify-between text-xs text-mystic-silver/50">
+      <div class="home-links flex flex-wrap items-center gap-3 justify-between text-xs text-mystic-silver/50">
         <RouterLink v-if="!auth.isAuthenticated" to="/auth" class="hover:text-mystic-accent transition">Войти / Регистрация</RouterLink>
         <RouterLink v-else to="/history" class="hover:text-mystic-accent transition">История раскладов</RouterLink>
+        <RouterLink to="/faq" class="hover:text-mystic-accent transition">FAQ</RouterLink>
         <span v-if="auth.email">{{ auth.email }}</span>
       </div>
     </section>

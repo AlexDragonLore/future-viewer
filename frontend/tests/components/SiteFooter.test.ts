@@ -17,9 +17,11 @@ async function mountFooter() {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
+      { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/about', name: 'about', component: { template: '<div>about</div>' } },
       { path: '/privacy', name: 'privacy', component: { template: '<div>privacy</div>' } },
       { path: '/legal', name: 'legal', component: { template: '<div>legal</div>' } },
+      { path: '/faq', name: 'faq', component: { template: '<div>faq</div>' } },
     ],
   })
   router.push('/about')
@@ -41,6 +43,8 @@ describe('SiteFooter', () => {
     expect(wrapper.find('a[href="/about"]').exists()).toBe(true)
     expect(wrapper.find('a[href="/privacy"]').exists()).toBe(true)
     expect(wrapper.find('a[href="/legal"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/faq"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/"]').text()).toContain('Вуаль Грядущего')
     expect(wrapper.text()).not.toContain('Ozon')
     expect(wrapper.find('.about-overlay').exists()).toBe(false)
   })

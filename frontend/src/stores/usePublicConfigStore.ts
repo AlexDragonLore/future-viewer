@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { publicApi } from '@/api/publicApi'
+import { isLocalStaticPreview } from '@/utils/runtime'
 
 export const usePublicConfigStore = defineStore('publicConfig', () => {
   const supportEmail = ref<string>('')
@@ -8,6 +9,10 @@ export const usePublicConfigStore = defineStore('publicConfig', () => {
 
   async function load() {
     if (loaded.value) return
+    if (isLocalStaticPreview()) {
+      loaded.value = true
+      return
+    }
     try {
       const config = await publicApi.getConfig()
       supportEmail.value = config.supportEmail ?? ''

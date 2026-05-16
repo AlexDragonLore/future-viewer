@@ -4,6 +4,7 @@ export interface SpreadMeta {
   type: SpreadType
   label: string
   anchorId: string
+  seoPath: string
   cardCount: number
   shortDescription: string
   longDescription: string
@@ -14,6 +15,7 @@ export const SPREADS_META: SpreadMeta[] = [
     type: SpreadType.SingleCard,
     label: 'Карта дня',
     anchorId: 'single-card',
+    seoPath: '/tarot/spreads/karta-dnya',
     cardCount: 1,
     shortDescription:
       'Одна карта — один фокус дня: ключевой образ, с которым стоит идти в ближайшие часы.',
@@ -24,6 +26,7 @@ export const SPREADS_META: SpreadMeta[] = [
     type: SpreadType.ThreeCard,
     label: 'Три карты',
     anchorId: 'three-card',
+    seoPath: '/tarot/spreads/tri-karty',
     cardCount: 3,
     shortDescription:
       'Прошлое → Настоящее → Будущее: динамика ситуации в трёх образах, классический «мини-расклад».',
@@ -34,6 +37,7 @@ export const SPREADS_META: SpreadMeta[] = [
     type: SpreadType.CelticCross,
     label: 'Кельтский крест',
     anchorId: 'celtic-cross',
+    seoPath: '/tarot/spreads/keltskiy-krest',
     cardCount: 10,
     shortDescription:
       'Десять позиций: ситуация, вызов, сознательное и подсознательное, прошлое, будущее, влияние, страхи, окружение, итог.',

@@ -1,4 +1,10 @@
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import {
+  SEO_CONTENT_ROUTES,
+  buildStructuredDataForRoute,
+  findSeoContentRouteByPath,
+  type SeoContentRoute,
+} from '@/data/tarotSeoCatalog.js'
 import seoData from './routes.json'
 
 interface SeoRoute {
@@ -7,6 +13,8 @@ interface SeoRoute {
   title: string
   description?: string
   type?: string
+  contentKind?: string
+  slug?: string
 }
 
 interface SeoData {
@@ -23,6 +31,7 @@ interface SeoData {
 }
 
 const config = seoData as SeoData
+const indexableRoutes = [...config.indexableRoutes, ...SEO_CONTENT_ROUTES]
 
 function cleanSiteUrl(value: string | undefined): string {
   const fallback = config.siteUrl
@@ -39,6 +48,16 @@ function absoluteUrl(path: string): string {
 function routeByName(routes: SeoRoute[], name: unknown): SeoRoute | undefined {
   if (typeof name !== 'string') return undefined
   return routes.find((route) => route.name === name)
+}
+
+function normalizePath(path: string): string {
+  if (path === '/') return '/'
+  return path.replace(/\/+$/, '')
+}
+
+function routeByPath(routes: SeoRoute[], path: string): SeoRoute | undefined {
+  const normalized = normalizePath(path)
+  return routes.find((route) => normalizePath(route.path) === normalized)
 }
 
 function setMeta(selector: string, create: () => HTMLMetaElement, content: string | null) {
@@ -95,10 +114,41 @@ function setVerificationTags() {
   setMetaName('yandex-verification', typeof yandex === 'string' && yandex.trim() ? yandex.trim() : null)
 }
 
+function setStructuredData(route: SeoRoute | undefined, index: boolean) {
+  const id = 'seo-managed-jsonld'
+  let el = document.head.querySelector<HTMLScriptElement>(`script#${id}`)
+  if (!route || !index) {
+    el?.remove()
+    return
+  }
+
+  const contentRoute =
+    findSeoContentRouteByPath(route.path) ??
+    (route.contentKind ? (route as SeoContentRoute) : undefined)
+  const data = buildStructuredDataForRoute(contentRoute as SeoContentRoute, {
+    siteUrl: cleanSiteUrl(import.meta.env.VITE_SITE_URL),
+    siteName: config.siteName,
+    defaultImage: config.defaultImage,
+  })
+
+  if (data.length === 0) {
+    el?.remove()
+    return
+  }
+
+  if (!el) {
+    el = document.createElement('script')
+    el.id = id
+    el.type = 'application/ld+json'
+    document.head.appendChild(el)
+  }
+  el.textContent = JSON.stringify(data)
+}
+
 export function applyRouteSeo(route: RouteLocationNormalizedLoaded) {
   if (typeof document === 'undefined') return
 
-  const indexRoute = routeByName(config.indexableRoutes, route.name)
+  const indexRoute = routeByName(indexableRoutes, route.name) ?? routeByPath(indexableRoutes, route.path)
   const noindexRoute = routeByName(config.noindexRoutes, route.name)
   const shouldIndex = !!indexRoute && route.meta.noindex !== true
   const seoRoute = indexRoute ?? noindexRoute
@@ -128,4 +178,5 @@ export function applyRouteSeo(route: RouteLocationNormalizedLoaded) {
   setMetaName('twitter:description', description)
   setMetaName('twitter:image', image)
   setVerificationTags()
+  setStructuredData(seoRoute, shouldIndex)
 }

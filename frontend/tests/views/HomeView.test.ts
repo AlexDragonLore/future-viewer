@@ -49,6 +49,9 @@ async function mountHome() {
       { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
       { path: '/history', name: 'history', component: { template: '<div>hist</div>' } },
       { path: '/glossary', name: 'glossary', component: { template: '<div>glossary</div>' } },
+      { path: '/tarot/decks/:slug', name: 'tarot-deck-seo', component: { template: '<div>deck</div>' } },
+      { path: '/tarot/spreads/:slug', name: 'tarot-spread-seo', component: { template: '<div>spread</div>' } },
+      { path: '/faq', name: 'faq', component: { template: '<div>faq</div>' } },
       { path: '/legal', name: 'legal', component: { template: '<div>legal</div>' } },
     ],
   })
@@ -319,23 +322,21 @@ describe('HomeView', () => {
     expect(buttons[0].classes()).toContain('active')
   })
 
-  it('renders current deck blurb with link to glossary anchor', async () => {
+  it('renders current deck blurb with link to the SEO deck page', async () => {
     const { wrapper } = await mountHome()
     const blurb = wrapper.find('[data-testid="home-deck-blurb"]')
     expect(blurb.exists()).toBe(true)
     expect(blurb.text()).toContain('Rider–Waite–Smith')
-    expect(blurb.find('a').attributes('href')).toContain('#deck-rws')
+    expect(blurb.find('a').attributes('href')).toBe('/tarot/decks/rider-waite-smith')
   })
 
   it('renders spread blurb that updates when spread changes', async () => {
     const { wrapper } = await mountHome()
     const blurb = wrapper.find('[data-testid="home-spread-blurb"]')
     expect(blurb.exists()).toBe(true)
-    expect(blurb.find('a').attributes('href')).toContain('#spread-three-card')
+    expect(blurb.find('a').attributes('href')).toBe('/tarot/spreads/tri-karty')
     const buttons = wrapper.findAll('.spread-option')
     await buttons[0].trigger('click')
-    expect(wrapper.find('[data-testid="home-spread-blurb"] a').attributes('href')).toContain(
-      '#spread-single-card',
-    )
+    expect(wrapper.find('[data-testid="home-spread-blurb"] a').attributes('href')).toBe('/tarot/spreads/karta-dnya')
   })
 })

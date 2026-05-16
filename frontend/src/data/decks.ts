@@ -4,6 +4,7 @@ export interface DeckMeta {
   value: DeckType
   label: string
   anchorId: string
+  seoPath: string
   shortDescription: string
   longDescription: string
 }
@@ -13,6 +14,7 @@ export const DECKS: DeckMeta[] = [
     value: DeckType.RWS,
     label: 'Rider–Waite–Smith',
     anchorId: 'rws',
+    seoPath: '/tarot/decks/rider-waite-smith',
     shortDescription:
       'Классика XX века: ясная символика и понятные сюжеты на каждой карте — универсальный язык современного Таро.',
     longDescription:
@@ -22,6 +24,7 @@ export const DECKS: DeckMeta[] = [
     value: DeckType.Thoth,
     label: 'Thoth',
     anchorId: 'thoth',
+    seoPath: '/tarot/decks/thoth',
     shortDescription:
       'Оккультная колода Алистера Кроули и Фриды Харрис — астрология, каббала и герметизм в каждом штрихе.',
     longDescription:
@@ -31,6 +34,7 @@ export const DECKS: DeckMeta[] = [
     value: DeckType.Marseille,
     label: 'Marseille',
     anchorId: 'marseille',
+    seoPath: '/tarot/decks/marseille',
     shortDescription:
       'Историческая школа XVII–XVIII веков: лаконичные Младшие Арканы, геометрия и чистый символ без драматических сцен.',
     longDescription:
@@ -40,6 +44,7 @@ export const DECKS: DeckMeta[] = [
     value: DeckType.ViscontiSforza,
     label: 'Visconti–Sforza',
     anchorId: 'visconti-sforza',
+    seoPath: '/tarot/decks/visconti-sforza',
     shortDescription:
       'Ренессансное Таро XV века: золото, миниатюра, придворный дух — самая ранняя известная колода Таро.',
     longDescription:
@@ -49,6 +54,7 @@ export const DECKS: DeckMeta[] = [
     value: DeckType.ModernWitch,
     label: 'Modern Witch',
     anchorId: 'modern-witch',
+    seoPath: '/tarot/decks/modern-witch',
     shortDescription:
       'Современный взгляд: разнообразие, инклюзивность и практики городской ведьмы — Таро XXI века.',
     longDescription:

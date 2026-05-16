@@ -13,7 +13,9 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
     <span class="footer-separator">·</span>
     <RouterLink to="/privacy" class="about-link">Конфиденциальность</RouterLink>
     <span class="footer-separator">·</span>
-    <span class="footer-muted">Вуаль Грядущего</span>
+    <RouterLink to="/faq" class="about-link">FAQ</RouterLink>
+    <span class="footer-separator">·</span>
+    <RouterLink to="/" class="footer-brand-link">Вуаль Грядущего</RouterLink>
     <template v-if="supportEmail">
       <span class="footer-separator">·</span>
       <span class="footer-muted footer-support">
@@ -51,6 +53,23 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
   min-width: 0;
   color: rgba(224, 212, 186, 0.42);
 }
+.footer-brand-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: rgba(224, 212, 186, 0.58);
+  text-decoration: none;
+  transition:
+    color 0.3s ease,
+    text-shadow 0.3s ease;
+  touch-action: manipulation;
+}
+.footer-brand-link:hover {
+  color: rgba(245, 194, 107, 0.92);
+  text-shadow: 0 0 10px rgba(245, 194, 107, 0.45);
+}
 .footer-support {
   display: inline-flex;
   flex-wrap: wrap;
@@ -58,6 +77,10 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
   gap: 0.25rem;
 }
 .about-link {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
   color: #f5c26b;
   background: transparent;
   border: none;
@@ -66,16 +89,22 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-size: 0.75rem;
-  padding: 0.2rem 0.25rem;
+  padding: 0 0.45rem;
   transition: text-shadow 0.3s ease;
   white-space: nowrap;
+  touch-action: manipulation;
 }
 .about-link:hover {
   text-shadow: 0 0 12px rgba(245, 194, 107, 0.8);
 }
 .support-link {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
   color: #f5c26b;
   text-decoration: none;
+  touch-action: manipulation;
   transition: text-shadow 0.3s ease;
 }
 .support-link:hover {
@@ -92,7 +121,18 @@ const { supportEmail } = storeToRefs(usePublicConfigStore())
     display: none;
   }
   .about-link {
+    width: min(100%, 22rem);
+    border: 1px solid rgba(245, 194, 107, 0.22);
+    border-radius: 999px;
+    background: rgba(245, 194, 107, 0.05);
     font-size: 0.68rem;
+  }
+  .footer-brand-link {
+    width: min(100%, 22rem);
+  }
+  .support-link {
+    min-height: 2.75rem;
+    padding: 0 0.45rem;
   }
 }
 </style>

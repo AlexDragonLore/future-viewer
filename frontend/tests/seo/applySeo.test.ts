@@ -58,4 +58,18 @@ describe('applyRouteSeo', () => {
       'https://alex-taro.ru/leaderboard',
     )
   })
+
+  it('applies indexable metadata for generated tarot content routes', () => {
+    applyRouteSeo(route('tarot-card-seo', '/tarot/cards/shut'))
+
+    expect(document.title).toContain('Шут')
+    expect(meta('meta[name="robots"]')?.content).toContain('index, follow')
+    expect(meta('meta[property="og:url"]')?.content).toBe('https://alex-taro.ru/tarot/cards/shut')
+    expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(
+      'https://alex-taro.ru/tarot/cards/shut',
+    )
+    expect(document.head.querySelector<HTMLScriptElement>('script#seo-managed-jsonld')?.textContent).toContain(
+      'BreadcrumbList',
+    )
+  })
 })

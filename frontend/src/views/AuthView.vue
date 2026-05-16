@@ -43,11 +43,11 @@ function getAuthError(e: unknown) {
 }
 
 async function submit() {
-  busy.value = true
   error.value = null
   errorHint.value = null
   info.value = null
   needsVerification.value = false
+  busy.value = true
   try {
     if (mode.value === 'login') {
       await auth.login(email.value, password.value)
@@ -76,10 +76,10 @@ async function submit() {
 }
 
 async function resendVerification() {
-  resendBusy.value = true
   error.value = null
   errorHint.value = null
   info.value = null
+  resendBusy.value = true
   try {
     await auth.resendVerification(email.value)
     info.value = 'Письмо отправлено повторно. Проверьте ящик.'
@@ -136,14 +136,14 @@ async function resendVerification() {
         </button>
       </form>
 
-      <div class="text-center text-xs text-mystic-silver/60 mt-6 space-y-2">
+      <div class="auth-secondary-actions">
         <div>
-          <button class="underline hover:text-mystic-accent" @click="mode = mode === 'login' ? 'register' : 'login'; info = null; error = null; errorHint = null; needsVerification = false">
+          <button class="auth-secondary-action" @click="mode = mode === 'login' ? 'register' : 'login'; info = null; error = null; errorHint = null; needsVerification = false">
             {{ mode === 'login' ? 'Создать аккаунт' : 'У меня уже есть аккаунт' }}
           </button>
         </div>
         <div v-if="mode === 'login'">
-          <router-link to="/forgot-password" class="underline hover:text-mystic-accent">
+          <router-link to="/forgot-password" class="auth-secondary-action">
             Забыли пароль?
           </router-link>
         </div>
@@ -166,6 +166,32 @@ async function resendVerification() {
   margin-top: 0.35rem;
   color: rgba(224, 212, 186, 0.72);
   font-size: 0.78rem;
+}
+.auth-secondary-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+  text-align: center;
+  font-size: 0.78rem;
+  color: rgba(224, 212, 186, 0.72);
+}
+.auth-secondary-action {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  min-width: 11rem;
+  padding: 0 0.9rem;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  touch-action: manipulation;
+  transition: color 0.2s ease;
+}
+.auth-secondary-action:hover {
+  color: #f5c26b;
 }
 @media (max-width: 640px) {
   .auth-page {

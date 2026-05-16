@@ -4,6 +4,7 @@ import { useGlossaryStore } from '@/stores/useGlossaryStore'
 import { CardSuit } from '@/types'
 import { DECKS } from '@/data/decks'
 import { SPREADS_META } from '@/data/spreads'
+import { findTarotSeoCardById } from '@/data/tarotSeoCatalog.js'
 import { versionedCardImage } from '@/utils/assets'
 
 const store = useGlossaryStore()
@@ -24,6 +25,11 @@ const filtered = computed(() => {
   if (filter.value === 'all') return store.cards
   return store.cards.filter((c) => c.suit === filter.value)
 })
+
+function cardSeoPath(id: number): string {
+  const seoCard = findTarotSeoCardById(id)
+  return seoCard ? `/tarot/cards/${seoCard.slug}` : `/glossary/${id}`
+}
 
 onMounted(() => store.loadAll())
 </script>
@@ -50,6 +56,7 @@ onMounted(() => store.loadAll())
         <li v-for="d in DECKS" :id="`deck-${d.anchorId}`" :key="d.value" class="info-card">
           <h3>{{ d.label }}</h3>
           <p>{{ d.longDescription }}</p>
+          <RouterLink :to="d.seoPath" class="info-link">Страница колоды</RouterLink>
         </li>
       </ul>
     </section>
@@ -61,6 +68,7 @@ onMounted(() => store.loadAll())
         <li v-for="s in SPREADS_META" :id="`spread-${s.anchorId}`" :key="s.type" class="info-card">
           <h3>{{ s.label }} <span class="muted">· {{ s.cardCount }} карт(ы)</span></h3>
           <p>{{ s.longDescription }}</p>
+          <RouterLink :to="s.seoPath" class="info-link">Как читать расклад</RouterLink>
         </li>
       </ul>
     </section>
@@ -88,7 +96,7 @@ onMounted(() => store.loadAll())
 
       <ul v-else class="card-grid">
         <li v-for="card in filtered" :key="card.id">
-          <RouterLink :to="{ name: 'glossary-card', params: { id: card.id } }" class="card-tile">
+          <RouterLink :to="cardSeoPath(card.id)" class="card-tile">
             <img
               v-if="card.imagePath"
               :src="versionedCardImage(card.imagePath)"
@@ -159,6 +167,7 @@ onMounted(() => store.loadAll())
   margin: 0;
 }
 .info-card {
+  position: relative;
   padding: 1.25rem;
   border: 1px solid rgba(245, 194, 107, 0.2);
   border-radius: 12px;
@@ -181,6 +190,35 @@ onMounted(() => store.loadAll())
   color: rgba(224, 212, 186, 0.8);
   line-height: 1.6;
   font-size: 0.9rem;
+}
+.info-link {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 1rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid rgba(245, 194, 107, 0.34);
+  border-radius: 8px;
+  background: rgba(245, 194, 107, 0.08);
+  color: #f5c26b;
+  font-family: 'Cinzel', serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-align: center;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.info-link:hover {
+  border-color: rgba(245, 194, 107, 0.68);
+  background: rgba(245, 194, 107, 0.14);
+  box-shadow: 0 0 18px rgba(245, 194, 107, 0.16);
 }
 .suit-chip {
   padding: 0.45rem 1rem;

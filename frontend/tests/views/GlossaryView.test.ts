@@ -18,7 +18,12 @@ async function mountGlossary() {
   setActivePinia(createPinia())
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/glossary', name: 'glossary', component: GlossaryView }],
+    routes: [
+      { path: '/glossary', name: 'glossary', component: GlossaryView },
+      { path: '/tarot/decks/:slug', name: 'tarot-deck-seo', component: { template: '<div>deck</div>' } },
+      { path: '/tarot/spreads/:slug', name: 'tarot-spread-seo', component: { template: '<div>spread</div>' } },
+      { path: '/tarot/cards/:slug', name: 'tarot-card-seo', component: { template: '<div>card</div>' } },
+    ],
   })
   router.push('/glossary')
   await router.isReady()

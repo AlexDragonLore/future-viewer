@@ -1,12 +1,21 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  FAQ_ITEMS,
+  SEO_CONTENT_ROUTES,
+  buildStructuredDataForRoute,
+  findTarotSeoCardBySlug,
+  findTarotSeoDeckBySlug,
+  findTarotSeoSpreadBySlug,
+} from '../src/data/tarotSeoCatalog.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const dist = path.join(root, 'dist')
 const seoPath = path.join(root, 'src/seo/routes.json')
 
 const seo = JSON.parse(await readFile(seoPath, 'utf8'))
+const indexableRoutes = [...seo.indexableRoutes, ...SEO_CONTENT_ROUTES]
 const baseHtml = await readFile(path.join(dist, 'index.html'), 'utf8')
 const today = new Date().toISOString().slice(0, 10)
 const iconAssetVersion = '20260516'
@@ -45,33 +54,35 @@ function managedHead(route, { index, canonicalPath = route?.path }) {
     : 'noindex, nofollow'
   const googleVerification = process.env.VITE_GOOGLE_SITE_VERIFICATION?.trim() || seo.googleSiteVerification?.trim()
   const yandexVerification = process.env.VITE_YANDEX_VERIFICATION?.trim() || seo.yandexVerification?.trim()
-  const jsonLd = index
-    ? JSON.stringify(
-        [
-          {
-            '@context': 'https://schema.org',
-            '@type': 'WebSite',
-            name: seo.siteName,
-            url: siteUrl,
-            inLanguage: 'ru-RU',
-          },
-          {
-            '@context': 'https://schema.org',
-            '@type': 'Organization',
-            name: seo.siteName,
-            url: siteUrl,
-            logo: absoluteUrl(siteUrl, '/icons/icon-512.png'),
-            contactPoint: {
-              '@type': 'ContactPoint',
-              contactType: 'customer support',
-              availableLanguage: 'Russian',
-            },
-          },
-        ],
-        null,
-        0,
-      )
-    : null
+  const siteStructuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      name: seo.siteName,
+      url: siteUrl,
+      inLanguage: 'ru-RU',
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: seo.siteName,
+      url: siteUrl,
+      logo: absoluteUrl(siteUrl, '/icons/icon-512.png'),
+      contactPoint: {
+        '@type': 'ContactPoint',
+        contactType: 'customer support',
+        availableLanguage: 'Russian',
+      },
+    },
+  ]
+  const routeStructuredData = index
+    ? buildStructuredDataForRoute(route, {
+        siteUrl,
+        siteName: seo.siteName,
+        defaultImage: seo.defaultImage,
+      })
+    : []
+  const jsonLd = index ? JSON.stringify([...siteStructuredData, ...routeStructuredData], null, 0) : null
 
   const lines = [
     '<!-- seo:managed:start -->',
@@ -126,12 +137,95 @@ function injectHead(html, route, options) {
   )
 }
 
-async function writeHtml(outputPath, route, options) {
-  await mkdir(path.dirname(outputPath), { recursive: true })
-  await writeFile(outputPath, injectHead(baseHtml, route, options), 'utf8')
+function listItems(values) {
+  return values.map((value) => `<li>${escapeHtml(value)}</li>`).join('')
 }
 
-for (const route of seo.indexableRoutes) {
+function staticSeoContent(route, index) {
+  if (!index) return ''
+
+  if (route.contentKind === 'card') {
+    const card = findTarotSeoCardBySlug(route.slug)
+    if (!card) return ''
+    const related = card.relatedSlugs
+      .map((slug) => findTarotSeoCardBySlug(slug))
+      .filter(Boolean)
+      .map((relatedCard) => `<li><a href="/tarot/cards/${escapeHtml(relatedCard.slug)}">${escapeHtml(relatedCard.name)}</a></li>`)
+      .join('')
+    return `
+      <main class="seo-static-fallback">
+        <h1>${escapeHtml(card.name)}: значение карты Таро</h1>
+        <p>${escapeHtml(card.summary)}.</p>
+        <h2>Прямое положение</h2>
+        <p>${escapeHtml(card.upright)}</p>
+        <h2>Перевернутое положение</h2>
+        <p>${escapeHtml(card.reversed)}</p>
+        <h2>Ключевые темы</h2>
+        <ul>${listItems(card.uprightKeywords)}</ul>
+        ${related ? `<h2>Связанные карты</h2><ul>${related}</ul>` : ''}
+      </main>
+    `
+  }
+
+  if (route.contentKind === 'spread') {
+    const spread = findTarotSeoSpreadBySlug(route.slug)
+    if (!spread) return ''
+    return `
+      <main class="seo-static-fallback">
+        <h1>${escapeHtml(spread.label)}: расклад Таро</h1>
+        <p>${escapeHtml(spread.description)}</p>
+        <h2>Позиции карт</h2>
+        <ol>${listItems(spread.positions)}</ol>
+        <h2>Когда использовать</h2>
+        <ul>${listItems(spread.bestFor)}</ul>
+      </main>
+    `
+  }
+
+  if (route.contentKind === 'deck') {
+    const deck = findTarotSeoDeckBySlug(route.slug)
+    if (!deck) return ''
+    return `
+      <main class="seo-static-fallback">
+        <h1>${escapeHtml(deck.label)}: колода Таро</h1>
+        <p>${escapeHtml(deck.description)}</p>
+        <h2>Подходит для</h2>
+        <ul>${listItems(deck.bestFor)}</ul>
+      </main>
+    `
+  }
+
+  if (route.contentKind === 'faq') {
+    return `
+      <main class="seo-static-fallback">
+        <h1>FAQ по Таро и онлайн-раскладам</h1>
+        ${FAQ_ITEMS.map((item) => `<section><h2>${escapeHtml(item.question)}</h2><p>${escapeHtml(item.answer)}</p></section>`).join('')}
+      </main>
+    `
+  }
+
+  return `
+    <main class="seo-static-fallback">
+      <h1>${escapeHtml(route.title)}</h1>
+      <p>${escapeHtml(route.description ?? seo.defaultDescription)}</p>
+    </main>
+  `
+}
+
+function injectStaticFallback(html, route, options) {
+  const fallback = staticSeoContent(route, options.index).trim()
+  const cleaned = html.replace(/<div id="app">[\s\S]*?<\/div>/m, '<div id="app"></div>')
+  if (!fallback) return cleaned
+  return cleaned.replace('<div id="app"></div>', `<div id="app">\n${fallback}\n    </div>`)
+}
+
+async function writeHtml(outputPath, route, options) {
+  await mkdir(path.dirname(outputPath), { recursive: true })
+  const withHead = injectHead(baseHtml, route, options)
+  await writeFile(outputPath, injectStaticFallback(withHead, route, options), 'utf8')
+}
+
+for (const route of indexableRoutes) {
   await writeHtml(routeOutputPath(route.path), route, { index: true })
 }
 
@@ -150,7 +244,7 @@ const siteUrl = cleanSiteUrl(process.env.VITE_SITE_URL)
 const sitemap = [
   '<?xml version="1.0" encoding="UTF-8"?>',
   '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-  ...seo.indexableRoutes.flatMap((route) => [
+  ...indexableRoutes.flatMap((route) => [
     '  <url>',
     `    <loc>${escapeHtml(absoluteUrl(siteUrl, route.path))}</loc>`,
     `    <lastmod>${today}</lastmod>`,

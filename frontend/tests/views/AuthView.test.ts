@@ -62,7 +62,7 @@ describe('AuthView', () => {
 
   it('toggles to register mode', async () => {
     const { wrapper } = await mountAuth()
-    await wrapper.find('button.underline').trigger('click')
+    await wrapper.find('button.auth-secondary-action').trigger('click')
     expect(wrapper.text()).toContain('Регистрация')
     expect(wrapper.text()).toContain('Создать')
   })
@@ -123,7 +123,7 @@ describe('AuthView', () => {
       message: 'Network Error',
     })
     const { wrapper } = await mountAuth()
-    await wrapper.find('button.underline').trigger('click')
+    await wrapper.find('button.auth-secondary-action').trigger('click')
     await wrapper.find('input[type="email"]').setValue('new@x.com')
     await wrapper.find('input[type="password"]').setValue('password1')
     await wrapper.find('form').trigger('submit.prevent')
@@ -137,7 +137,7 @@ describe('AuthView', () => {
   it('calls register in register mode', async () => {
     registerMock.mockResolvedValue({ email: 'new@x.com', userId: 'u', verificationRequired: true })
     const { wrapper } = await mountAuth()
-    await wrapper.find('button.underline').trigger('click')
+    await wrapper.find('button.auth-secondary-action').trigger('click')
     await wrapper.find('input[type="email"]').setValue('new@x.com')
     await wrapper.find('input[type="password"]').setValue('password1')
     await wrapper.find('form').trigger('submit.prevent')
@@ -149,7 +149,7 @@ describe('AuthView', () => {
     registerMock.mockResolvedValue({ email: 'new@x.com', userId: 'u', verificationRequired: false })
     loginMock.mockResolvedValue({ accessToken: 't', email: 'new@x.com', expiresAt: '', userId: 'u', isAdmin: false })
     const { wrapper, router } = await mountAuth()
-    await wrapper.find('button.underline').trigger('click')
+    await wrapper.find('button.auth-secondary-action').trigger('click')
     await wrapper.find('input[type="email"]').setValue('new@x.com')
     await wrapper.find('input[type="password"]').setValue('password1')
     await wrapper.find('form').trigger('submit.prevent')
