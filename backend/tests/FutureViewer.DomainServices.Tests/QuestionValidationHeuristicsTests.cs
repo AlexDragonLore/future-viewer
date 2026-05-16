@@ -17,6 +17,7 @@ public sealed class QuestionValidationHeuristicsTests
 
         result.Should().NotBeNull();
         result!.Status.Should().Be(QuestionValidationStatus.Rejected);
+        result.SuggestedQuestion.Should().NotBeNullOrWhiteSpace();
     }
 
     [Theory]

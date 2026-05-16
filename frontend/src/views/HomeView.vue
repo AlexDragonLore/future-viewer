@@ -11,6 +11,7 @@ import { findDeckMeta } from '@/data/decks'
 import { SPREADS_META, findSpreadMeta } from '@/data/spreads'
 import { extractApiError } from '@/api/httpClient'
 import { readingApi } from '@/api/readingApi'
+import { unlockAudio } from '@/composables/useAudio'
 import type { AxiosError } from 'axios'
 
 const router = useRouter()
@@ -31,17 +32,62 @@ const spreadType = ref<SpreadType>(SpreadType.ThreeCard)
 const currentDeckMeta = computed(() => findDeckMeta(deck.current))
 const currentSpreadMeta = computed(() => findSpreadMeta(spreadType.value))
 
+function buildFallbackSuggestion(source: string) {
+  const trimmed = source.trim()
+  if (!trimmed) return 'На что мне сейчас стоит обратить внимание?'
+  if (trimmed.length <= 40) return `Что мне важно понять про тему «${trimmed}»?`
+  return 'Какой следующий шаг мне стоит увидеть в этой ситуации?'
+}
+
+function ensureSuggestion(suggestedQuestion: string | null | undefined, source = question.value) {
+  return suggestedQuestion?.trim() || buildFallbackSuggestion(source)
+}
+
+function readPendingPayload() {
+  const pending = sessionStorage.getItem('fv_pending')
+  if (!pending) return null
+  try {
+    return JSON.parse(pending) as { question?: string; spreadType?: SpreadType }
+  } catch {
+    return null
+  }
+}
+
+function restorePendingPayload(payload: { question?: string; spreadType?: SpreadType } | null) {
+  if (!payload) return
+  question.value = payload.question ?? ''
+  if (payload.spreadType) spreadType.value = payload.spreadType
+}
+
 onMounted(async () => {
+  const pendingPayload = readPendingPayload()
+  const readingError = sessionStorage.getItem('fv_reading_error')
+  if (readingError) {
+    sessionStorage.removeItem('fv_reading_error')
+    sessionStorage.removeItem('fv_pending')
+    restorePendingPayload(pendingPayload)
+    try {
+      const parsed = JSON.parse(readingError) as { message?: string; suggestedQuestion?: string | null }
+      validationMessage.value = parsed.message ?? null
+      validationSuggestion.value = ensureSuggestion(parsed.suggestedQuestion, pendingPayload?.question ?? question.value)
+    } catch {
+      validationMessage.value = null
+      validationSuggestion.value = ensureSuggestion(null, pendingPayload?.question ?? question.value)
+    }
+  }
+
   const validation = sessionStorage.getItem('fv_question_validation')
   if (validation) {
     sessionStorage.removeItem('fv_question_validation')
+    sessionStorage.removeItem('fv_pending')
+    restorePendingPayload(pendingPayload)
     try {
       const parsed = JSON.parse(validation) as { message?: string; suggestedQuestion?: string | null }
       validationMessage.value = parsed.message ?? null
-      validationSuggestion.value = parsed.suggestedQuestion ?? null
+      validationSuggestion.value = ensureSuggestion(parsed.suggestedQuestion, pendingPayload?.question ?? question.value)
     } catch {
       validationMessage.value = null
-      validationSuggestion.value = null
+      validationSuggestion.value = ensureSuggestion(null, pendingPayload?.question ?? question.value)
     }
   }
 
@@ -108,6 +154,7 @@ function applySuggestion() {
 
 async function begin() {
   if (!canBegin.value) return
+  unlockAudio()
   introError.value = null
   validationMessage.value = null
   validationSuggestion.value = null
@@ -138,11 +185,12 @@ async function begin() {
     const code = err.response?.data?.error
     if (code === 'question_needs_rewrite' || code === 'question_rejected') {
       validationMessage.value = extractApiError(e, 'Вопрос нужно уточнить')
-      validationSuggestion.value = err.response?.data?.suggestedQuestion ?? null
+      validationSuggestion.value = ensureSuggestion(err.response?.data?.suggestedQuestion, pending.question)
       sessionStorage.removeItem('fv_pending')
       return
     }
     validationMessage.value = extractApiError(e, 'Не удалось проверить вопрос')
+    validationSuggestion.value = ensureSuggestion(null, pending.question)
     sessionStorage.removeItem('fv_pending')
     return
   } finally {
@@ -306,7 +354,10 @@ async function begin() {
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
 .spread-option:hover {
   border-color: rgba(245, 194, 107, 0.6);

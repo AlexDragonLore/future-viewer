@@ -15,6 +15,39 @@ export const useReadingStore = defineStore('reading', () => {
   const streamingText = ref('')
   const streamingDone = ref(false)
   const cardsReady = ref(false)
+  let streamBuffer = ''
+  let streamFlushRaf: number | null = null
+
+  function flushStreamBuffer() {
+    streamFlushRaf = null
+    if (!streamBuffer) return
+    streamingText.value += streamBuffer
+    streamBuffer = ''
+  }
+
+  function appendStreamingChunk(delta: string) {
+    streamBuffer += delta
+    if (streamFlushRaf !== null) return
+
+    if (typeof requestAnimationFrame === 'undefined') {
+      flushStreamBuffer()
+      return
+    }
+
+    streamFlushRaf = requestAnimationFrame(flushStreamBuffer)
+  }
+
+  function cancelStreamFlush() {
+    if (streamFlushRaf !== null && typeof cancelAnimationFrame !== 'undefined') {
+      cancelAnimationFrame(streamFlushRaf)
+    }
+    streamFlushRaf = null
+    streamBuffer = ''
+  }
+
+  function isAbortError(e: unknown) {
+    return e instanceof Error && e.name === 'AbortError'
+  }
 
   async function loadSpreads() {
     if (spreads.value.length > 0) return
@@ -39,10 +72,11 @@ export const useReadingStore = defineStore('reading', () => {
     }
   }
 
-  function createStream(spreadType: SpreadType, question: string) {
+  function createStream(spreadType: SpreadType, question: string, signal?: AbortSignal) {
     loading.value = true
     error.value = null
     current.value = null
+    cancelStreamFlush()
     streamingText.value = ''
     streamingDone.value = false
     cardsReady.value = false
@@ -64,17 +98,24 @@ export const useReadingStore = defineStore('reading', () => {
           resolveCards(reading)
         },
         onChunk: (delta) => {
-          streamingText.value += delta
+          appendStreamingChunk(delta)
         },
         onDone: () => {
+          flushStreamBuffer()
           streamingDone.value = true
           if (current.value) {
             current.value = { ...current.value, interpretation: streamingText.value }
           }
           void useAuthStore().refreshSubscription()
         },
-      })
+      }, signal)
       .catch((e) => {
+        flushStreamBuffer()
+        if (isAbortError(e)) {
+          if (!cardsReady.value) rejectCards(e)
+          throw e
+        }
+
         const msg = extractApiError(e, 'Не удалось создать расклад')
         error.value = msg
         const text = streamingText.value ? `${streamingText.value}\n\n> ${msg}` : msg
@@ -96,6 +137,7 @@ export const useReadingStore = defineStore('reading', () => {
   function reset() {
     current.value = null
     error.value = null
+    cancelStreamFlush()
     streamingText.value = ''
     streamingDone.value = false
     cardsReady.value = false

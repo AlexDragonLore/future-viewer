@@ -51,6 +51,7 @@ describe('ResultView', () => {
     vi.useFakeTimers()
   })
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.useRealTimers()
   })
 
@@ -74,6 +75,63 @@ describe('ResultView', () => {
     await vi.advanceTimersByTimeAsync(18 * sample.interpretation!.length + 20)
     await flushPromises()
     expect(wrapper.text()).toContain('The stars align.')
+  })
+
+  it('keeps following streamed interpretation while new text is typed', async () => {
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 2400 })
+    Object.defineProperty(document.body, 'scrollHeight', { configurable: true, value: 2400 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 700 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 })
+
+    await mountResult({ ...sample, interpretation: null })
+    const store = useReadingStore()
+    store.current = { ...sample, interpretation: null }
+    store.cardsReady = true
+    store.streamingDone = false
+    store.streamingText = 'Первая строка интерпретации. Вторая строка появляется ниже.'
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(1200)
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'end', inline: 'nearest', behavior: 'auto' })
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('does not force-scroll when the user has scrolled away from the stream tail', async () => {
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 4200 })
+    Object.defineProperty(document.body, 'scrollHeight', { configurable: true, value: 4200 })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 700 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 })
+
+    await mountResult({ ...sample, interpretation: null })
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(80)
+    scrollIntoView.mockClear()
+    scrollTo.mockClear()
+    window.dispatchEvent(new WheelEvent('wheel'))
+    window.dispatchEvent(new Event('scroll'))
+
+    const store = useReadingStore()
+    store.current = { ...sample, interpretation: null }
+    store.cardsReady = true
+    store.streamingDone = false
+    store.streamingText = 'Новый фрагмент интерпретации.'
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(80)
+
+    expect(scrollIntoView).not.toHaveBeenCalled()
+    expect(scrollTo).not.toHaveBeenCalled()
   })
 
   it('clicking "новый расклад" resets store and navigates home', async () => {

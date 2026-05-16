@@ -36,6 +36,9 @@ const compact = computed(() => w.value < 90)
             :alt="card.cardName"
             class="card-img"
             decoding="async"
+            loading="eager"
+            :width="Math.round(w)"
+            :height="h"
             draggable="false"
           />
           <div v-else class="card-image" aria-hidden="true">✵</div>
@@ -51,6 +54,8 @@ const compact = computed(() => w.value < 90)
 .card-flip {
   perspective: 1200px;
   will-change: transform;
+  contain: layout paint style;
+  transform: translateZ(0);
 }
 
 .card-inner {
@@ -59,6 +64,7 @@ const compact = computed(() => w.value < 90)
   height: 100%;
   transform-style: preserve-3d;
   transition: transform 0.8s cubic-bezier(0.3, 0.9, 0.2, 1);
+  will-change: transform;
 }
 
 .card-inner.is-flipped {
@@ -124,6 +130,7 @@ const compact = computed(() => w.value < 90)
   border-radius: 11px;
   display: block;
   user-select: none;
+  transform: translateZ(0);
 }
 
 .card-name-overlay {
@@ -177,5 +184,11 @@ const compact = computed(() => w.value < 90)
 }
 .card-flip.compact .card-face {
   border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-inner {
+    transition-duration: 0.01ms;
+  }
 }
 </style>

@@ -74,6 +74,16 @@ public sealed class ExceptionHandlerMiddleware
             ctx.Response.StatusCode = StatusCodes.Status402PaymentRequired;
             await ctx.Response.WriteAsJsonAsync(new { error = "subscription_required", message = ex.Message });
         }
+        catch (InvalidOperationException ex) when (IsAiConfigurationException(ex))
+        {
+            _logger.LogError(ex, "AI provider is not configured");
+            ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            await ctx.Response.WriteAsJsonAsync(new
+            {
+                error = "ai_not_configured",
+                message = "AI-провайдер не настроен. Для локальной генерации укажи OpenAI:ApiKey или DeepSeek:ApiKey."
+            });
+        }
         catch (DomainException ex)
         {
             ctx.Response.StatusCode = StatusCodes.Status400BadRequest;
@@ -85,5 +95,12 @@ public sealed class ExceptionHandlerMiddleware
             ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
             await ctx.Response.WriteAsJsonAsync(new { error = "internal_error" });
         }
+    }
+
+    private static bool IsAiConfigurationException(InvalidOperationException ex)
+    {
+        return ex.Message.Contains(":ApiKey is not configured", StringComparison.Ordinal) ||
+               ex.Message.Contains(":Model is not configured", StringComparison.Ordinal) ||
+               ex.Message.Contains("AI:Provider", StringComparison.Ordinal);
     }
 }

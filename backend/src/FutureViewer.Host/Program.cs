@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Services
 builder.Services.AddDomainServices();
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration, builder.Environment.IsDevelopment());
 builder.Services.Configure<SupportOptions>(builder.Configuration.GetSection(SupportOptions.SectionName));
 
 // JWT auth

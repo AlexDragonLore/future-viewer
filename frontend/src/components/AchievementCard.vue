@@ -49,7 +49,12 @@ const iconComponent = computed(() => iconForAchievement(props.achievement.code))
   border-radius: 14px;
   border: 1px solid rgba(245, 194, 107, 0.2);
   background: linear-gradient(180deg, rgba(42, 18, 72, 0.45), rgba(19, 8, 42, 0.45));
-  transition: all 0.3s ease;
+  transition:
+    opacity 0.25s ease,
+    filter 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.25s ease;
 }
 .achievement-card.locked {
   opacity: 0.55;

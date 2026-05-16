@@ -5,7 +5,8 @@ defineEmits<{ (e: 'shuffle'): void }>()
 
 <template>
   <button
-    class="deck-button breathe"
+    class="deck-button"
+    :class="{ breathe: !disabled }"
     :disabled="disabled"
     @click="$emit('shuffle')"
     :style="{ width: (size ?? 140) + 'px', height: ((size ?? 140) * 1.65) + 'px' }"
@@ -27,6 +28,7 @@ defineEmits<{ (e: 'shuffle'): void }>()
   cursor: pointer;
   position: relative;
   padding: 0;
+  transform: translateZ(0);
 }
 
 .deck-button:disabled {

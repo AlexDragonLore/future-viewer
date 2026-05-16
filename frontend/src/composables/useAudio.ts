@@ -1,15 +1,47 @@
 let ctx: AudioContext | null = null
+let unlocked = false
 
-function getCtx(): AudioContext {
-  if (!ctx) ctx = new AudioContext()
-  if (ctx.state === 'suspended') ctx.resume()
+type AudioContextConstructor = new () => AudioContext
+
+function getCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  if (!ctx) {
+    const AudioCtor = window.AudioContext
+      ?? (window as Window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext
+    if (!AudioCtor) return null
+    ctx = new AudioCtor()
+  }
+  if (ctx.state === 'suspended') void ctx.resume()
   return ctx
+}
+
+export function unlockAudio() {
+  try {
+    const ac = getCtx()
+    if (!ac || unlocked) return
+
+    if (ac.state === 'suspended') void ac.resume()
+
+    const buffer = ac.createBuffer(1, 1, ac.sampleRate)
+    const source = ac.createBufferSource()
+    const gain = ac.createGain()
+    gain.gain.value = 0.0001
+    source.buffer = buffer
+    source.connect(gain)
+    gain.connect(ac.destination)
+    source.start()
+    source.stop(ac.currentTime + 0.01)
+    unlocked = true
+  } catch {
+    // Браузер может разрешить AudioContext только после следующего жеста.
+  }
 }
 
 /** Мистический тон при переворачивании карты */
 export function playCardFlip() {
   try {
     const ac = getCtx()
+    if (!ac) return
     const now = ac.currentTime
 
     const osc = ac.createOscillator()
@@ -35,6 +67,7 @@ export function playCardFlip() {
 export function playShuffle() {
   try {
     const ac = getCtx()
+    if (!ac) return
     const now = ac.currentTime
     const duration = 0.6
 
@@ -74,6 +107,7 @@ export function playShuffle() {
 export function playDeal() {
   try {
     const ac = getCtx()
+    if (!ac) return
     const now = ac.currentTime
     const duration = 0.15
 
@@ -110,6 +144,7 @@ export function playDeal() {
 export function playReveal() {
   try {
     const ac = getCtx()
+    if (!ac) return
     const now = ac.currentTime
     // Минорный аккорд Am: A2 C3 E3
     const freqs = [110, 130.81, 164.81]

@@ -124,7 +124,10 @@ onMounted(() => store.loadAll())
   padding: 0.3rem 0.75rem;
   border-radius: 999px;
   border: 1px solid rgba(245, 194, 107, 0.25);
-  transition: all 0.2s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 .section-nav a:hover {
   color: #f5c26b;
@@ -187,7 +190,10 @@ onMounted(() => store.loadAll())
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 .suit-chip:hover {
   border-color: rgba(245, 194, 107, 0.6);
@@ -212,7 +218,11 @@ onMounted(() => store.loadAll())
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.25);
   text-decoration: none;
-  transition: all 0.25s ease;
+  transition:
+    border-color 0.22s ease,
+    background-color 0.22s ease,
+    box-shadow 0.22s ease,
+    transform 0.22s ease;
 }
 .card-tile:hover {
   border-color: rgba(245, 194, 107, 0.6);

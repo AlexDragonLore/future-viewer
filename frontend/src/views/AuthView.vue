@@ -13,14 +13,39 @@ const mode = ref<'login' | 'register'>('login')
 const email = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
+const errorHint = ref<string | null>(null)
 const busy = ref(false)
 const info = ref<string | null>(null)
 const needsVerification = ref(false)
 const resendBusy = ref(false)
 
+function getAuthError(e: unknown) {
+  if (axios.isAxiosError(e)) {
+    const status = e.response?.status
+    const data = e.response?.data as { error?: string; message?: string } | undefined
+    if (!e.response || e.message === 'Network Error') {
+      return {
+        message: 'Не удалось связаться с локальным API.',
+        hint: 'Проверь, что backend запущен, подожди несколько секунд и попробуй снова.',
+      }
+    }
+    if (status === 401 || data?.error === 'unauthorized' || data?.message === 'Invalid credentials') {
+      return { message: 'Неверный email или пароль', hint: 'Проверь почту и пароль или восстанови доступ.' }
+    }
+    if (status === 403 && data?.error === 'email_not_verified') {
+      return { message: 'Подтвердите почту, чтобы войти.', hint: 'Можно отправить письмо повторно.' }
+    }
+    if (status === 409 && data?.error === 'conflict') {
+      return { message: 'Аккаунт с такой почтой уже существует.', hint: 'Переключись на вход и войди с этим email.' }
+    }
+  }
+  return { message: extractApiError(e), hint: 'Проверь данные и попробуй ещё раз.' }
+}
+
 async function submit() {
   busy.value = true
   error.value = null
+  errorHint.value = null
   info.value = null
   needsVerification.value = false
   try {
@@ -39,7 +64,9 @@ async function submit() {
       }
     }
   } catch (e) {
-    error.value = extractApiError(e)
+    const authError = getAuthError(e)
+    error.value = authError.message
+    errorHint.value = authError.hint
     if (axios.isAxiosError(e) && e.response?.status === 403 && e.response?.data?.error === 'email_not_verified') {
       needsVerification.value = true
     }
@@ -51,12 +78,15 @@ async function submit() {
 async function resendVerification() {
   resendBusy.value = true
   error.value = null
+  errorHint.value = null
   info.value = null
   try {
     await auth.resendVerification(email.value)
     info.value = 'Письмо отправлено повторно. Проверьте ящик.'
   } catch (e) {
-    error.value = extractApiError(e)
+    const authError = getAuthError(e)
+    error.value = authError.message
+    errorHint.value = authError.hint
   } finally {
     resendBusy.value = false
   }
@@ -87,7 +117,10 @@ async function resendVerification() {
           minlength="8"
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 focus:outline-none focus:border-mystic-accent"
         />
-        <div v-if="error" class="text-sm text-red-300">{{ error }}</div>
+        <div v-if="error" class="auth-error">
+          <p>{{ error }}</p>
+          <p v-if="errorHint" class="auth-error-hint">{{ errorHint }}</p>
+        </div>
         <div v-if="info" class="text-sm text-mystic-accent">{{ info }}</div>
         <button
           v-if="needsVerification"
@@ -105,7 +138,7 @@ async function resendVerification() {
 
       <div class="text-center text-xs text-mystic-silver/60 mt-6 space-y-2">
         <div>
-          <button class="underline hover:text-mystic-accent" @click="mode = mode === 'login' ? 'register' : 'login'; info = null; error = null; needsVerification = false">
+          <button class="underline hover:text-mystic-accent" @click="mode = mode === 'login' ? 'register' : 'login'; info = null; error = null; errorHint = null; needsVerification = false">
             {{ mode === 'login' ? 'Создать аккаунт' : 'У меня уже есть аккаунт' }}
           </button>
         </div>
@@ -120,6 +153,20 @@ async function resendVerification() {
 </template>
 
 <style scoped>
+.auth-error {
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 0.75rem;
+  background: rgba(127, 29, 29, 0.16);
+  padding: 0.75rem 0.85rem;
+  color: #fca5a5;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+.auth-error-hint {
+  margin-top: 0.35rem;
+  color: rgba(224, 212, 186, 0.72);
+  font-size: 0.78rem;
+}
 @media (max-width: 640px) {
   .auth-page {
     align-items: flex-start;

@@ -19,7 +19,8 @@ public static class InfrastructureServiceExtensions
 {
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        bool useDevelopmentAiFallbacks = false)
     {
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
         services.Configure<AIOptions>(configuration.GetSection(AIOptions.SectionName));
@@ -51,7 +52,14 @@ public static class InfrastructureServiceExtensions
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<AIChatClientFactory>();
         services.AddSingleton<IAIInterpreter, OpenAIInterpreter>();
-        services.AddSingleton<IAIQuestionValidator, QuestionValidationInterpreter>();
+        var aiProvider = configuration.GetSection(AIOptions.SectionName)[nameof(AIOptions.Provider)] ?? "OpenAI";
+        var hasConfiguredAiKey = aiProvider.Equals("DeepSeek", StringComparison.OrdinalIgnoreCase)
+            ? !string.IsNullOrWhiteSpace(configuration.GetSection(DeepSeekOptions.SectionName)[nameof(DeepSeekOptions.ApiKey)])
+            : !string.IsNullOrWhiteSpace(configuration.GetSection(OpenAIOptions.SectionName)[nameof(OpenAIOptions.ApiKey)]);
+        if (useDevelopmentAiFallbacks && !hasConfiguredAiKey)
+            services.AddSingleton<IAIQuestionValidator, DevelopmentQuestionValidator>();
+        else
+            services.AddSingleton<IAIQuestionValidator, QuestionValidationInterpreter>();
         services.AddSingleton<IAIMemoryExtractor, MemoryExtractionInterpreter>();
         services.AddSingleton<IFeedbackScorer, FeedbackScoringInterpreter>();
         services.AddSingleton<IEmailSender, SmtpEmailSender>();

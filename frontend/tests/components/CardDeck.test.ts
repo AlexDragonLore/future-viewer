@@ -15,6 +15,11 @@ describe('CardDeck', () => {
     expect(wrapper.emitted('shuffle')).toBeUndefined()
   })
 
+  it('pauses idle breathe animation while disabled', () => {
+    const wrapper = mount(CardDeck, { props: { disabled: true } })
+    expect(wrapper.classes()).not.toContain('breathe')
+  })
+
   it('applies size prop to dimensions', () => {
     const wrapper = mount(CardDeck, { props: { size: 200 } })
     const btn = wrapper.element as HTMLElement

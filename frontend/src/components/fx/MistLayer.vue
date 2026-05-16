@@ -1,27 +1,51 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import gsap from 'gsap'
+
+const props = withDefaults(defineProps<{ active?: boolean }>(), {
+  active: true,
+})
 
 const blob1 = ref<SVGCircleElement | null>(null)
 const blob2 = ref<SVGCircleElement | null>(null)
 const blob3 = ref<SVGCircleElement | null>(null)
+let tweens: gsap.core.Tween[] = []
 
-onMounted(() => {
+function stopMist() {
+  tweens.forEach((tween) => tween.kill())
+  tweens = []
+}
+
+function startMist() {
+  stopMist()
+  if (!props.active) return
+
   if (blob1.value) {
-    gsap.to(blob1.value, { attr: { cx: '+=80', cy: '+=40' }, duration: 22, repeat: -1, yoyo: true, ease: 'sine.inOut' })
+    tweens.push(gsap.to(blob1.value, { attr: { cx: '+=80', cy: '+=40' }, duration: 24, repeat: -1, yoyo: true, ease: 'sine.inOut' }))
   }
   if (blob2.value) {
-    gsap.to(blob2.value, { attr: { cx: '-=60', cy: '+=50' }, duration: 18, repeat: -1, yoyo: true, ease: 'sine.inOut' })
+    tweens.push(gsap.to(blob2.value, { attr: { cx: '-=60', cy: '+=50' }, duration: 22, repeat: -1, yoyo: true, ease: 'sine.inOut' }))
   }
   if (blob3.value) {
-    gsap.to(blob3.value, { attr: { cx: '+=40', cy: '-=60' }, duration: 26, repeat: -1, yoyo: true, ease: 'sine.inOut' })
+    tweens.push(gsap.to(blob3.value, { attr: { cx: '+=40', cy: '-=60' }, duration: 28, repeat: -1, yoyo: true, ease: 'sine.inOut' }))
   }
+}
+
+onMounted(() => {
+  startMist()
+  watch(
+    () => props.active,
+    () => startMist(),
+  )
 })
+
+onBeforeUnmount(() => stopMist())
 </script>
 
 <template>
   <svg
-    class="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-40"
+    class="mist-layer fixed inset-0 w-full h-full pointer-events-none z-0"
+    :class="{ 'is-inactive': !active }"
     preserveAspectRatio="xMidYMid slice"
     viewBox="0 0 1920 1080"
   >
@@ -49,3 +73,14 @@ onMounted(() => {
     </g>
   </svg>
 </template>
+
+<style scoped>
+.mist-layer {
+  opacity: 0.34;
+  transition: opacity 0.25s ease;
+}
+
+.mist-layer.is-inactive {
+  opacity: 0;
+}
+</style>

@@ -50,7 +50,10 @@ const activeTab = computed(() => route.name?.toString() ?? '')
   text-transform: uppercase;
   color: rgba(224, 212, 186, 0.7);
   border: 1px solid rgba(245, 194, 107, 0.2);
-  transition: all 0.2s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 .admin-tab:hover {
   color: rgba(245, 194, 107, 0.9);

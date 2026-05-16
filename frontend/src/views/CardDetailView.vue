@@ -149,7 +149,10 @@ function variantNoteFor(deck: DeckType): string | null {
   background: rgba(0, 0, 0, 0.2);
   color: inherit;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background-color 0.2s ease;
 }
 .deck-tab:hover {
   border-color: rgba(245, 194, 107, 0.55);

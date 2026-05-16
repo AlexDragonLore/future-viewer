@@ -5,6 +5,18 @@ namespace FutureViewer.DomainServices.Services;
 
 public static partial class QuestionValidationHeuristics
 {
+    public static string BuildFallbackSuggestion(string question)
+    {
+        var trimmed = question.Trim();
+        if (trimmed.Length == 0)
+            return "На что мне сейчас стоит обратить внимание?";
+
+        if (trimmed.Length <= 40)
+            return $"Что мне важно понять про тему \"{trimmed}\"?";
+
+        return "Какой следующий шаг мне стоит увидеть в этой ситуации?";
+    }
+
     public static QuestionValidationResult? TryValidate(string question)
     {
         var trimmed = question.Trim();
@@ -13,10 +25,14 @@ public static partial class QuestionValidationHeuristics
 
         var normalized = WhitespaceRegex().Replace(trimmed.ToLowerInvariant(), " ");
         if (LooksLikeGibberish(normalized))
-            return Rejected("Вопрос выглядит как случайный набор символов.");
+            return Rejected(
+                "Вопрос выглядит как случайный набор символов.",
+                "На что мне сейчас стоит обратить внимание?");
 
         if (DangerousRegex().IsMatch(normalized))
-            return Rejected("Этот вопрос требует медицинского, юридического, финансового или опасного совета.");
+            return Rejected(
+                "Этот вопрос требует медицинского, юридического, финансового или опасного совета.",
+                "Как мне бережно позаботиться о себе и выбрать следующий безопасный шаг?");
 
         if (ExactFactRegex().IsMatch(normalized))
             return NeedsRewrite(

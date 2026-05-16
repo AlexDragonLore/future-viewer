@@ -112,4 +112,33 @@ describe('useReadingStore', () => {
     expect(store.current?.interpretation).toContain('Partial interpretation')
     expect(store.current?.interpretation).toContain('stream broke')
   })
+
+  it('createStream forwards abort signal to the streaming api', async () => {
+    const controller = new AbortController()
+    createStreamMock.mockImplementation(async (_type, _question, _deckType, handlers, signal) => {
+      handlers.onCards(sampleReading)
+      handlers.onDone()
+      expect(signal).toBe(controller.signal)
+    })
+
+    const store = useReadingStore()
+    const { donePromise } = store.createStream(SpreadType.SingleCard, 'q', controller.signal)
+
+    await expect(donePromise).resolves.toBeUndefined()
+    expect(createStreamMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('createStream does not surface raw internal_error from failed responses', async () => {
+    createStreamMock.mockRejectedValue(Object.assign(new Error('internal_error'), {
+      response: { data: { error: 'internal_error' } },
+    }))
+
+    const store = useReadingStore()
+    const { cardsPromise, donePromise } = store.createStream(SpreadType.SingleCard, 'q')
+
+    await expect(cardsPromise).rejects.toThrow('internal_error')
+    await expect(donePromise).rejects.toThrow('internal_error')
+    expect(store.error).toBe('Не удалось создать расклад')
+    expect(store.streamingText).toBe('Не удалось создать расклад')
+  })
 })

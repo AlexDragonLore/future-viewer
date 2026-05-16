@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios'
 
 export const httpClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000'),
+  baseURL: import.meta.env.VITE_API_URL || '',
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -32,11 +32,12 @@ httpClient.interceptors.response.use(
 export function extractApiError(e: unknown, fallback = 'Что-то пошло не так'): string {
   const err = e as AxiosError<{ message?: string; error?: string; details?: string[] }>
   const data = err?.response?.data
+  const rawInternalError = data?.error === 'internal_error'
   if (data) {
     if (Array.isArray(data.details) && data.details.length > 0) return data.details.join('; ')
     if (typeof data.message === 'string' && data.message) return data.message
-    if (typeof data.error === 'string' && data.error) return data.error
+    if (typeof data.error === 'string' && data.error && data.error !== 'internal_error') return data.error
   }
-  if (err?.message) return err.message
+  if (err?.message && !rawInternalError) return err.message
   return fallback
 }

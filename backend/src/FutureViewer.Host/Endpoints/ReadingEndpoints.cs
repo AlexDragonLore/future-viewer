@@ -112,11 +112,13 @@ public static class ReadingEndpoints
             var code = validation.Status == QuestionValidationStatus.NeedsRewrite
                 ? "question_needs_rewrite"
                 : "question_rejected";
+            var suggestedQuestion = validation.SuggestedQuestion
+                ?? QuestionValidationHeuristics.BuildFallbackSuggestion(request.Question);
 
             throw new DomainServices.Exceptions.QuestionValidationException(
                 code,
                 validation.Reason,
-                validation.SuggestedQuestion);
+                suggestedQuestion);
         }).RequireAuthorization();
 
         group.MapGet("/{id:guid}", async (

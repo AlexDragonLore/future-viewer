@@ -235,8 +235,10 @@ public sealed class ReadingService
         var code = validation.Status == QuestionValidationStatus.NeedsRewrite
             ? "question_needs_rewrite"
             : "question_rejected";
+        var suggestedQuestion = validation.SuggestedQuestion
+            ?? QuestionValidationHeuristics.BuildFallbackSuggestion(question);
 
-        throw new QuestionValidationException(code, validation.Reason, validation.SuggestedQuestion);
+        throw new QuestionValidationException(code, validation.Reason, suggestedQuestion);
     }
 
     private async Task RememberAsync(

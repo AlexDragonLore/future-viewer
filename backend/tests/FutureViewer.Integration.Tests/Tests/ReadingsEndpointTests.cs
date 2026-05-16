@@ -114,6 +114,20 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
+    public async Task Post_validate_question_returns_fallback_suggestion_for_rejected_question()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings/validate-question",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "rejected" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        body!["error"].ToString().Should().Be("question_rejected");
+        body["suggestedQuestion"].ToString().Should().Contain("rejected");
+    }
+
+    [Fact]
     public async Task Post_reading_without_token_returns_unauthorized()
     {
         var client = _fixture.CreateClient();

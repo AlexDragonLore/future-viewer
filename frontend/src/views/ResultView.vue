@@ -24,11 +24,50 @@ const cardWidth = computed(() => {
 })
 
 const displayed = ref('')
+const renderedHtml = ref('')
+const streamTail = ref<HTMLElement | null>(null)
 let rafId: number | null = null
+let markdownRafId: number | null = null
+let scrollRafId: number | null = null
 let lastTick = 0
+let shouldFollowStream = true
+let userScrollIntent = false
+let userScrollIntentTimer: ReturnType<typeof setTimeout> | null = null
 
 const hasActiveStream = computed(() => store.streamingText.length > 0 || store.loading || store.cardsReady)
 const targetText = computed(() => store.streamingText || reading.value?.interpretation || '')
+
+function distanceFromBottom() {
+  const scroller = document.scrollingElement ?? document.documentElement
+  return scroller.scrollHeight - (window.scrollY + window.innerHeight)
+}
+
+function onScroll() {
+  if (!userScrollIntent) return
+  shouldFollowStream = distanceFromBottom() <= 360
+}
+
+function refreshFollowAfterUserScroll() {
+  shouldFollowStream = distanceFromBottom() <= 360
+}
+
+function markUserScrollIntent() {
+  userScrollIntent = true
+  if (userScrollIntentTimer) clearTimeout(userScrollIntentTimer)
+  userScrollIntentTimer = setTimeout(() => {
+    userScrollIntent = false
+  }, 900)
+  refreshFollowAfterUserScroll()
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(refreshFollowAfterUserScroll)
+  }
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) {
+    markUserScrollIntent()
+  }
+}
 
 function tick(now: number) {
   rafId = null
@@ -67,6 +106,49 @@ function cancelTick() {
   }
 }
 
+function renderMarkdown() {
+  markdownRafId = null
+  renderedHtml.value = marked.parse(displayed.value) as string
+}
+
+function scheduleMarkdownRender() {
+  if (markdownRafId !== null) return
+  if (typeof requestAnimationFrame === 'undefined') {
+    renderMarkdown()
+    return
+  }
+  markdownRafId = requestAnimationFrame(renderMarkdown)
+}
+
+function cancelMarkdownRender() {
+  if (markdownRafId !== null && typeof cancelAnimationFrame !== 'undefined') {
+    cancelAnimationFrame(markdownRafId)
+  }
+  markdownRafId = null
+}
+
+function scheduleAutoScroll() {
+  if (!streaming.value || scrollRafId !== null || !shouldFollowStream) return
+  if (typeof requestAnimationFrame === 'undefined') return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = null
+    const tail = streamTail.value
+    if (tail && typeof tail.scrollIntoView === 'function') {
+      tail.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' })
+      return
+    }
+    const scroller = document.scrollingElement ?? document.documentElement
+    window.scrollTo({ top: scroller.scrollHeight, behavior: 'auto' })
+  })
+}
+
+function cancelAutoScroll() {
+  if (scrollRafId !== null && typeof cancelAnimationFrame !== 'undefined') {
+    cancelAnimationFrame(scrollRafId)
+  }
+  scrollRafId = null
+}
+
 watch(
   targetText,
   (text) => {
@@ -86,24 +168,34 @@ watch(
   },
 )
 
-const typedHtml = computed(() => marked.parse(displayed.value) as string)
 const streaming = computed(() => (hasActiveStream.value && !store.streamingDone) || displayed.value.length < targetText.value.length)
 
-watch(displayed, async () => {
-  if (!streaming.value) return
-  await nextTick()
-  const doc = document.documentElement
-  const nearBottom = window.innerHeight + window.scrollY >= doc.scrollHeight - 240
-  if (nearBottom) window.scrollTo({ top: doc.scrollHeight, behavior: 'auto' })
-})
+watch(displayed, () => {
+  scheduleMarkdownRender()
+  nextTick(() => scheduleAutoScroll())
+}, { immediate: true })
 
 onMounted(() => {
+  shouldFollowStream = true
+  window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('wheel', markUserScrollIntent, { passive: true })
+  window.addEventListener('touchmove', markUserScrollIntent, { passive: true })
+  window.addEventListener('keydown', onKeydown)
   if (!reading.value) {
     router.replace({ name: 'home' })
   }
 })
 
-onBeforeUnmount(() => cancelTick())
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('wheel', markUserScrollIntent)
+  window.removeEventListener('touchmove', markUserScrollIntent)
+  window.removeEventListener('keydown', onKeydown)
+  if (userScrollIntentTimer) clearTimeout(userScrollIntentTimer)
+  cancelTick()
+  cancelMarkdownRender()
+  cancelAutoScroll()
+})
 
 function again() {
   store.reset()
@@ -133,7 +225,7 @@ function again() {
 
     <section class="mystic-card max-w-2xl w-full p-5 sm:p-8 mb-8">
       <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Интерпретация</div>
-      <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="typedHtml" /><span v-if="streaming" class="caret">▮</span>
+      <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="renderedHtml" /><span v-if="streaming" class="caret">▮</span><span ref="streamTail" class="stream-tail" aria-hidden="true"></span>
     </section>
 
     <button class="glow-button" @click="again">Новый расклад</button>

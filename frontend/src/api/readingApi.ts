@@ -85,7 +85,7 @@ export const readingApi = {
     }
 
     if (!response.ok || !response.body) {
-      let message = `Stream failed: ${response.status} ${response.statusText}`
+      let message = 'Не удалось создать расклад'
       let code: string | undefined
       let suggestedQuestion: string | null | undefined
       try {
@@ -93,7 +93,7 @@ export const readingApi = {
         code = errBody?.error
         suggestedQuestion = errBody?.suggestedQuestion
         if (errBody?.message) message = errBody.message
-        else if (errBody?.error) message = errBody.error
+        else if (errBody?.error && errBody.error !== 'internal_error') message = errBody.error
       } catch {
         // body not JSON — keep default message
       }

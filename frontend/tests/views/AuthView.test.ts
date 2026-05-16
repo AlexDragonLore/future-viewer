@@ -5,11 +5,18 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 
 const loginMock = vi.fn()
 const registerMock = vi.fn()
+const statusMock = vi.fn()
 
 vi.mock('@/api/authApi', () => ({
   authApi: {
     login: (...args: [string, string]) => loginMock(...args),
     register: (...args: [string, string]) => registerMock(...args),
+  },
+}))
+
+vi.mock('@/api/subscriptionApi', () => ({
+  subscriptionApi: {
+    status: (...args: []) => statusMock(...args),
   },
 }))
 
@@ -37,6 +44,15 @@ describe('AuthView', () => {
     localStorage.clear()
     loginMock.mockReset()
     registerMock.mockReset()
+    statusMock.mockReset()
+    statusMock.mockResolvedValue({
+      status: 0,
+      expiresAt: null,
+      isActive: false,
+      freeReadingsUsedToday: 0,
+      freeReadingsDailyLimit: 1,
+      canCreateFreeReading: true,
+    })
   })
 
   it('starts in login mode', async () => {
@@ -84,6 +100,38 @@ describe('AuthView', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.text()).toContain('Bad email; Bad pw')
+  })
+
+  it('localizes invalid credential errors', async () => {
+    loginMock.mockRejectedValue({
+      isAxiosError: true,
+      response: { status: 401, data: { error: 'unauthorized', message: 'Invalid credentials' } },
+      message: 'Request failed',
+    })
+    const { wrapper } = await mountAuth()
+    await wrapper.find('input[type="email"]').setValue('u@x.com')
+    await wrapper.find('input[type="password"]').setValue('password1')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Неверный email или пароль')
+    expect(wrapper.text()).not.toContain('Invalid credentials')
+  })
+
+  it('shows a startup hint when registration cannot reach the local API', async () => {
+    registerMock.mockRejectedValue({
+      isAxiosError: true,
+      message: 'Network Error',
+    })
+    const { wrapper } = await mountAuth()
+    await wrapper.find('button.underline').trigger('click')
+    await wrapper.find('input[type="email"]').setValue('new@x.com')
+    await wrapper.find('input[type="password"]').setValue('password1')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Не удалось связаться с локальным API.')
+    expect(wrapper.text()).toContain('backend запущен')
+    expect(wrapper.text()).not.toContain('Network Error')
   })
 
   it('calls register in register mode', async () => {

@@ -129,7 +129,11 @@ async function runNotifications(): Promise<void> {
   border-radius: 0.4rem;
   color: rgba(224, 212, 186, 0.9);
   font-size: 0.85rem;
-  transition: all 0.2s ease;
+  transition:
+    color 0.2s ease,
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    opacity 0.2s ease;
 }
 .admin-btn:hover:not(:disabled) {
   background: rgba(245, 194, 107, 0.1);

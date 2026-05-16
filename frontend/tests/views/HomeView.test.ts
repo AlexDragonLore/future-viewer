@@ -194,6 +194,72 @@ describe('HomeView', () => {
     )
   })
 
+  it('adds a fallback suggestion when validator rejects without one', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'u@x.com')
+    validateQuestionMock.mockRejectedValue({
+      response: {
+        data: {
+          error: 'question_rejected',
+          message: 'Вопрос не связан с реальной жизненной ситуацией.',
+          suggestedQuestion: null,
+        },
+      },
+    })
+    const { wrapper } = await mountHome()
+    await wrapper.findAll('.spread-option')[0].trigger('click')
+    await wrapper.find('textarea').setValue('тест')
+    await wrapper.find('.glow-button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
+      'Вопрос не связан с реальной жизненной ситуацией.',
+    )
+    expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
+      'Что мне важно понять про тему «тест»?',
+    )
+  })
+
+  it('restores pending question and shows reading creation errors from reading screen', async () => {
+    sessionStorage.setItem('fv_pending', JSON.stringify({
+      spreadType: SpreadType.SingleCard,
+      question: 'тест',
+    }))
+    sessionStorage.setItem('fv_reading_error', JSON.stringify({
+      message: 'AI-провайдер не настроен.',
+    }))
+
+    const { wrapper } = await mountHome()
+
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toBe('тест')
+    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain('AI-провайдер не настроен.')
+    expect(sessionStorage.getItem('fv_pending')).toBeNull()
+    expect(sessionStorage.getItem('fv_reading_error')).toBeNull()
+  })
+
+  it('restores pending question and adds fallback suggestion for reading validation errors', async () => {
+    sessionStorage.setItem('fv_pending', JSON.stringify({
+      spreadType: SpreadType.SingleCard,
+      question: 'тест',
+    }))
+    sessionStorage.setItem('fv_question_validation', JSON.stringify({
+      message: 'Вопрос не связан с реальной жизненной ситуацией.',
+      suggestedQuestion: null,
+    }))
+
+    const { wrapper } = await mountHome()
+
+    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toBe('тест')
+    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
+      'Вопрос не связан с реальной жизненной ситуацией.',
+    )
+    expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
+      'Что мне важно понять про тему «тест»?',
+    )
+    expect(sessionStorage.getItem('fv_pending')).toBeNull()
+    expect(sessionStorage.getItem('fv_question_validation')).toBeNull()
+  })
+
   it('shows subscription badge with remaining free quota when authenticated', async () => {
     localStorage.setItem('fv_token', 'test-token')
     localStorage.setItem('fv_email', 'u@x.com')

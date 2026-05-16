@@ -17,6 +17,11 @@ describe('extractApiError', () => {
     expect(extractApiError(err)).toBe('conflict')
   })
 
+  it('does not expose raw internal_error to users', () => {
+    const err = { response: { data: { error: 'internal_error' } } }
+    expect(extractApiError(err, 'Не удалось создать расклад')).toBe('Не удалось создать расклад')
+  })
+
   it('falls back to axios message', () => {
     const err = { message: 'Network Error' }
     expect(extractApiError(err)).toBe('Network Error')
