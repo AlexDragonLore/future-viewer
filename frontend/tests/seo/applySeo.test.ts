@@ -35,6 +35,7 @@ describe('applyRouteSeo', () => {
     expect(meta('meta[name="google-site-verification"]')?.content).toBe(
       'wIruS4kUKqmhYfO04Yq8VUay-fwhwo1iGnYvyL_LQMg',
     )
+    expect(meta('meta[name="yandex-verification"]')?.content).toBe('3e5ca7086b4b140e')
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(
       'https://alex-taro.ru/glossary',
     )
