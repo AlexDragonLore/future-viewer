@@ -13,6 +13,8 @@ interface SeoData {
   siteName: string
   defaultLocale: string
   siteUrl: string
+  googleSiteVerification?: string
+  yandexVerification?: string
   defaultImage: string
   defaultTitle: string
   defaultDescription: string
@@ -87,8 +89,8 @@ function setCanonical(url: string) {
 }
 
 function setVerificationTags() {
-  const google = import.meta.env.VITE_GOOGLE_SITE_VERIFICATION
-  const yandex = import.meta.env.VITE_YANDEX_VERIFICATION
+  const google = import.meta.env.VITE_GOOGLE_SITE_VERIFICATION || config.googleSiteVerification
+  const yandex = import.meta.env.VITE_YANDEX_VERIFICATION || config.yandexVerification
   setMetaName('google-site-verification', typeof google === 'string' && google.trim() ? google.trim() : null)
   setMetaName('yandex-verification', typeof yandex === 'string' && yandex.trim() ? yandex.trim() : null)
 }

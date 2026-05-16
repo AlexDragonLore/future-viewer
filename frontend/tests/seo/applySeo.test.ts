@@ -32,6 +32,9 @@ describe('applyRouteSeo', () => {
     expect(document.title).toContain('Глоссарий Таро')
     expect(meta('meta[name="robots"]')?.content).toContain('index, follow')
     expect(meta('meta[property="og:title"]')?.content).toContain('Глоссарий Таро')
+    expect(meta('meta[name="google-site-verification"]')?.content).toBe(
+      'wIruS4kUKqmhYfO04Yq8VUay-fwhwo1iGnYvyL_LQMg',
+    )
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe(
       'https://alex-taro.ru/glossary',
     )

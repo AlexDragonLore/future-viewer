@@ -43,8 +43,8 @@ function managedHead(route, { index, canonicalPath = route?.path }) {
   const robots = index
     ? 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1'
     : 'noindex, nofollow'
-  const googleVerification = process.env.VITE_GOOGLE_SITE_VERIFICATION?.trim()
-  const yandexVerification = process.env.VITE_YANDEX_VERIFICATION?.trim()
+  const googleVerification = process.env.VITE_GOOGLE_SITE_VERIFICATION?.trim() || seo.googleSiteVerification?.trim()
+  const yandexVerification = process.env.VITE_YANDEX_VERIFICATION?.trim() || seo.yandexVerification?.trim()
   const jsonLd = index
     ? JSON.stringify(
         [
