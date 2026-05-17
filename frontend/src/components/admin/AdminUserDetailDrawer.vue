@@ -13,6 +13,8 @@ const auth = useAuthStore()
 const statusInput = ref<SubscriptionStatusValue>(SubscriptionStatusValue.None)
 const expiresInput = ref<string>('')
 const savingSub = ref(false)
+const tarotPlusCreditsInput = ref<number>(0)
+const savingTarotPlusCredits = ref(false)
 const savingAdmin = ref(false)
 const deleting = ref(false)
 const achievementCodeInput = ref<string>('')
@@ -39,6 +41,7 @@ watch(
     if (!u) return
     statusInput.value = u.subscriptionStatus
     expiresInput.value = u.subscriptionExpiresAt ? u.subscriptionExpiresAt.slice(0, 16) : ''
+    tarotPlusCreditsInput.value = u.tarotPlusCredits
   },
   { immediate: true },
 )
@@ -64,6 +67,18 @@ async function saveSubscription(): Promise<void> {
     })
   } finally {
     savingSub.value = false
+  }
+}
+
+async function saveTarotPlusCredits(): Promise<void> {
+  if (!store.selectedUser) return
+  savingTarotPlusCredits.value = true
+  try {
+    await store.setUserTarotPlusCredits(store.selectedUser.id, {
+      credits: Math.max(0, Number(tarotPlusCreditsInput.value) || 0),
+    })
+  } finally {
+    savingTarotPlusCredits.value = false
   }
 }
 
@@ -207,6 +222,35 @@ async function unlinkTelegram(): Promise<void> {
       </section>
 
       <section class="section">
+        <h4>Таро+</h4>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="text-sm">
+            <span class="text-mystic-muted">Сессий:</span>
+            {{ store.selectedUser.totalTarotPlusSessions }}
+          </div>
+          <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
+            <span>Кредиты</span>
+            <input
+              v-model.number="tarotPlusCreditsInput"
+              type="number"
+              min="0"
+              max="100"
+              class="admin-input"
+              data-testid="admin-user-tarot-plus-credits"
+            />
+          </label>
+        </div>
+        <button
+          class="admin-btn primary mt-2"
+          :disabled="savingTarotPlusCredits"
+          data-testid="admin-user-tarot-plus-credits-save"
+          @click="saveTarotPlusCredits"
+        >
+          {{ savingTarotPlusCredits ? '…' : 'Сохранить кредиты' }}
+        </button>
+      </section>
+
+      <section class="section">
         <h4>Telegram</h4>
         <p v-if="store.selectedUser.telegramChatId" class="text-sm">
           chatId: <span class="mono">{{ store.selectedUser.telegramChatId }}</span>
@@ -244,6 +288,7 @@ async function unlinkTelegram(): Promise<void> {
         <h4>Статистика</h4>
         <div class="grid grid-cols-3 gap-2 text-sm">
           <div><span class="text-mystic-muted">Читок:</span> {{ store.selectedUser.totalReadings }}</div>
+          <div><span class="text-mystic-muted">Таро+:</span> {{ store.selectedUser.totalTarotPlusSessions }}</div>
           <div><span class="text-mystic-muted">Фидбеков:</span> {{ store.selectedUser.totalFeedbacks }}</div>
           <div><span class="text-mystic-muted">Баллов:</span> {{ store.selectedUser.totalScore }}</div>
         </div>
@@ -256,6 +301,19 @@ async function unlinkTelegram(): Promise<void> {
             <span class="mono">{{ r.id.slice(0, 8) }}</span>
             <span class="text-mystic-muted"> · {{ new Date(r.createdAt).toLocaleDateString() }} · </span>
             <span class="truncate">{{ r.question }}</span>
+          </li>
+        </ul>
+        <p v-else class="text-mystic-muted text-sm">—</p>
+      </section>
+
+      <section class="section">
+        <h4>Последние Таро+ ({{ store.selectedUser.recentTarotPlusSessions.length }})</h4>
+        <ul v-if="store.selectedUser.recentTarotPlusSessions.length > 0" class="list">
+          <li v-for="s in store.selectedUser.recentTarotPlusSessions" :key="s.id">
+            <span class="mono">{{ s.id.slice(0, 8) }}</span>
+            <span class="text-mystic-muted"> · status={{ s.status }} · </span>
+            <span>{{ s.routeLabel }}</span>
+            <span class="text-mystic-muted"> · {{ new Date(s.createdAt).toLocaleDateString() }}</span>
           </li>
         </ul>
         <p v-else class="text-mystic-muted text-sm">—</p>

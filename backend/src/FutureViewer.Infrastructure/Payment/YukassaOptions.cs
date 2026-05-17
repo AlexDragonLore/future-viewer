@@ -9,5 +9,6 @@ public sealed class YukassaOptions
     public string ReturnUrl { get; set; } = "http://localhost:5173/payment/success";
     public string Currency { get; set; } = "RUB";
     public decimal MonthlyPriceAmount { get; set; } = 300m;
+    public decimal TarotPlusPriceAmount { get; set; } = 100m;
     public string ApiBaseUrl { get; set; } = "https://api.yookassa.ru/v3/";
 }

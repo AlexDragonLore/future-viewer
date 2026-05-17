@@ -20,6 +20,7 @@ function buildRouter(): Router {
       { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/glossary', name: 'glossary', component: { template: '<div>glossary</div>' } },
       { path: '/history', name: 'history', component: { template: '<div>history</div>' } },
+      { path: '/tarot-plus', name: 'tarot-plus', component: { template: '<div>tarot plus</div>' } },
       { path: '/leaderboard', name: 'leaderboard', component: { template: '<div>leaderboard</div>' } },
       { path: '/achievements', name: 'achievements', component: { template: '<div>achievements</div>' } },
       { path: '/profile', name: 'profile', component: { template: '<div>profile</div>' } },
@@ -49,6 +50,7 @@ describe('SiteHeader', () => {
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
       canCreateFreeReading: true,
+      tarotPlusCredits: 0,
     })
   })
 
@@ -72,6 +74,7 @@ describe('SiteHeader', () => {
     const { wrapper } = await mountHeader()
     expect(wrapper.find('[data-testid="user-button"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="nav-history"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nav-tarot-plus"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('someone@example.com')
   })
 
@@ -94,6 +97,7 @@ describe('SiteHeader', () => {
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
       canCreateFreeReading: true,
+      tarotPlusCredits: 1,
     })
     const { wrapper } = await mountHeader()
     const quota = wrapper.find('[data-testid="header-quota"]')
@@ -134,6 +138,7 @@ describe('SiteHeader', () => {
     const { wrapper } = await mountHeader()
     await wrapper.find('[data-testid="burger-button"]').trigger('click')
     expect(wrapper.find('[data-testid="burger-history"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="burger-tarot-plus"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="burger-achievements"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="burger-profile"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="burger-logout"]').exists()).toBe(true)

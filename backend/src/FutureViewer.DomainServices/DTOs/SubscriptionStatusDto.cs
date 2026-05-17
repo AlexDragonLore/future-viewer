@@ -10,4 +10,5 @@ public sealed class SubscriptionStatusDto
     public required int FreeReadingsUsedToday { get; init; }
     public required int FreeReadingsDailyLimit { get; init; }
     public required bool CanCreateFreeReading { get; init; }
+    public required int TarotPlusCredits { get; init; }
 }

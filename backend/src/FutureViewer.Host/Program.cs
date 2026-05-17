@@ -81,6 +81,7 @@ app.MapAuth();
 app.MapCards();
 app.MapSubscription();
 app.MapPayments();
+app.MapTarotPlus();
 app.MapFeedbacks();
 app.MapProfile();
 app.MapLeaderboard();

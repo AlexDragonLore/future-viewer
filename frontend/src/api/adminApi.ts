@@ -4,6 +4,7 @@ import type {
   AdminFeedbackListResponse,
   AdminGrantedAchievement,
   AdminStats,
+  AdminTarotPlusListResponse,
   AdminTelegramLinkResult,
   AdminUserDetail,
   AdminUserListItem,
@@ -13,6 +14,8 @@ import type {
   FeedbackSearchFilters,
   RunNotificationsResult,
   SetSubscriptionPayload,
+  SetTarotPlusCreditsPayload,
+  TarotPlusSearchFilters,
   UpdateAdminFeedbackPayload,
   UserSearchFilters,
 } from '@/types/admin'
@@ -84,6 +87,11 @@ export const adminApi = {
     return data
   },
 
+  async setUserTarotPlusCredits(id: string, payload: SetTarotPlusCreditsPayload): Promise<AdminUserDetail> {
+    const { data } = await httpClient.put<AdminUserDetail>(`/api/admin/users/${id}/tarot-plus-credits`, payload)
+    return data
+  },
+
   async grantAchievement(id: string, code: string): Promise<AdminGrantedAchievement> {
     const { data } = await httpClient.post<AdminGrantedAchievement>(
       `/api/admin/users/${id}/achievements`,
@@ -117,6 +125,18 @@ export const adminApi = {
 
   async getStats(): Promise<AdminStats> {
     const { data } = await httpClient.get<AdminStats>('/api/admin/stats')
+    return data
+  },
+
+  async listTarotPlusSessions(filters: TarotPlusSearchFilters = {}): Promise<AdminTarotPlusListResponse> {
+    const { data } = await httpClient.get<AdminTarotPlusListResponse>('/api/admin/tarot-plus', {
+      params: {
+        userId: filters.userId || undefined,
+        status: filters.status ?? undefined,
+        page: filters.page ?? 1,
+        pageSize: filters.pageSize ?? 20,
+      },
+    })
     return data
   },
 }

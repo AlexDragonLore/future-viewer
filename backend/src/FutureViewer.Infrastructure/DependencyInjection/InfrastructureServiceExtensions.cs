@@ -26,6 +26,7 @@ public static class InfrastructureServiceExtensions
         services.Configure<AIOptions>(configuration.GetSection(AIOptions.SectionName));
         services.Configure<OpenAIOptions>(configuration.GetSection(OpenAIOptions.SectionName));
         services.Configure<DeepSeekOptions>(configuration.GetSection(DeepSeekOptions.SectionName));
+        services.Configure<TarotPlusAIOptions>(configuration.GetSection(TarotPlusAIOptions.SectionName));
         services.Configure<PaymentOptions>(configuration.GetSection(PaymentOptions.SectionName));
         services.Configure<YukassaOptions>(configuration.GetSection(YukassaOptions.SectionName));
         services.Configure<YooMoneyOptions>(configuration.GetSection(YooMoneyOptions.SectionName));
@@ -46,6 +47,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IAchievementRepository, AchievementRepository>();
         services.AddScoped<ILeaderboardRepository, LeaderboardRepository>();
         services.AddScoped<IUserMemoryRepository, UserMemoryRepository>();
+        services.AddScoped<ITarotPlusSessionRepository, TarotPlusSessionRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
@@ -62,6 +64,17 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IAIQuestionValidator, QuestionValidationInterpreter>();
         services.AddSingleton<IAIMemoryExtractor, MemoryExtractionInterpreter>();
         services.AddSingleton<IFeedbackScorer, FeedbackScoringInterpreter>();
+        var tarotPlusSection = configuration.GetSection(TarotPlusAIOptions.SectionName);
+        var tarotPlusProvider = tarotPlusSection[nameof(TarotPlusAIOptions.Provider)] ?? "DeepSeek";
+        var tarotPlusApiKey = tarotPlusSection[nameof(TarotPlusAIOptions.ApiKey)];
+        var hasConfiguredTarotPlusKey = !string.IsNullOrWhiteSpace(tarotPlusApiKey)
+            || !string.IsNullOrWhiteSpace(configuration.GetSection(DeepSeekOptions.SectionName)[nameof(DeepSeekOptions.ApiKey)]);
+        if (string.Equals(tarotPlusProvider, "Development", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(tarotPlusProvider, "Local", StringComparison.OrdinalIgnoreCase)
+            || useDevelopmentAiFallbacks && !hasConfiguredTarotPlusKey)
+            services.AddSingleton<ITarotPlusAI, DevelopmentTarotPlusAI>();
+        else
+            services.AddSingleton<ITarotPlusAI, TarotPlusAI>();
         services.AddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IEmailLinkBuilder, EmailLinkBuilder>();
 

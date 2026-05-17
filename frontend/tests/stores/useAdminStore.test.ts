@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { FeedbackStatus } from '@/types'
-import type { AdminFeedback } from '@/types/admin'
+import { FeedbackStatus, TarotPlusRoute, TarotPlusSessionStatus } from '@/types'
+import type { AdminFeedback, AdminTarotPlusSession } from '@/types/admin'
 
 const listMock = vi.fn()
 const createMock = vi.fn()
@@ -10,6 +10,8 @@ const updateMock = vi.fn()
 const deleteMock = vi.fn()
 const runNotificationsMock = vi.fn()
 const getStatsMock = vi.fn()
+const listTarotPlusSessionsMock = vi.fn()
+const setUserTarotPlusCreditsMock = vi.fn()
 
 vi.mock('@/api/adminApi', () => ({
   adminApi: {
@@ -20,6 +22,8 @@ vi.mock('@/api/adminApi', () => ({
     deleteFeedback: (...args: unknown[]) => deleteMock(...args),
     runNotifications: (...args: unknown[]) => runNotificationsMock(...args),
     getStats: (...args: unknown[]) => getStatsMock(...args),
+    listTarotPlusSessions: (...args: unknown[]) => listTarotPlusSessionsMock(...args),
+    setUserTarotPlusCredits: (...args: unknown[]) => setUserTarotPlusCreditsMock(...args),
   },
 }))
 
@@ -45,6 +49,31 @@ function buildFeedback(overrides: Partial<AdminFeedback> = {}): AdminFeedback {
   }
 }
 
+function buildTarotPlus(overrides: Partial<AdminTarotPlusSession> = {}): AdminTarotPlusSession {
+  return {
+    id: 'tp-1',
+    userId: 'u-1',
+    userEmail: 'a@b.com',
+    status: TarotPlusSessionStatus.Paid,
+    route: TarotPlusRoute.GeneralLife,
+    routeLabel: 'Жизненный обзор',
+    coreRequest: 'Core request',
+    previewText: 'Preview',
+    hasReport: false,
+    answerCount: 3,
+    intakeAnswerCount: 0,
+    followUpsLeft: 2,
+    priceRub: 100,
+    paymentId: 'pay-1',
+    paidAt: '2026-05-16T10:00:00Z',
+    aiModel: 'fake',
+    createdAt: '2026-05-16T09:00:00Z',
+    updatedAt: '2026-05-16T10:00:00Z',
+    expiresAt: '2026-06-16T09:00:00Z',
+    ...overrides,
+  }
+}
+
 describe('useAdminStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -55,6 +84,8 @@ describe('useAdminStore', () => {
     deleteMock.mockReset()
     runNotificationsMock.mockReset()
     getStatsMock.mockReset()
+    listTarotPlusSessionsMock.mockReset()
+    setUserTarotPlusCreditsMock.mockReset()
   })
 
   it('loadFeedbacks populates list and total', async () => {
@@ -119,6 +150,10 @@ describe('useAdminStore', () => {
       activeSubscriptions: 3,
       readingsToday: 5,
       readingsThisWeek: 25,
+      tarotPlusSessionsTotal: 4,
+      tarotPlusPaidSessions: 3,
+      tarotPlusReportsReady: 2,
+      tarotPlusCreatedThisWeek: 1,
       pendingFeedbacksToNotify: 1,
       scoredFeedbacksThisMonth: 12,
     })
@@ -135,5 +170,14 @@ describe('useAdminStore', () => {
     await store.loadStats()
     expect(store.stats).toBeNull()
     expect(store.statsError).toBeTruthy()
+  })
+
+  it('loadTarotPlusSessions populates list and total', async () => {
+    listTarotPlusSessionsMock.mockResolvedValue({ items: [buildTarotPlus()], total: 1 })
+    const store = useAdminStore()
+    await store.loadTarotPlusSessions()
+    expect(store.tarotPlusSessions).toHaveLength(1)
+    expect(store.tarotPlusTotal).toBe(1)
+    expect(store.tarotPlusError).toBeNull()
   })
 })

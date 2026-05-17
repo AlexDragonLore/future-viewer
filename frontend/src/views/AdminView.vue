@@ -10,6 +10,7 @@ const tabs = [
   { name: 'admin-feedbacks', label: 'Фидбеки', testId: 'admin-tab-feedbacks' },
   { name: 'admin-users', label: 'Пользователи', testId: 'admin-tab-users' },
   { name: 'admin-stats', label: 'Статистика', testId: 'admin-tab-stats' },
+  { name: 'admin-tarot-plus', label: 'Таро+', testId: 'admin-tab-tarot-plus' },
 ]
 
 const activeTab = computed(() => route.name?.toString() ?? '')

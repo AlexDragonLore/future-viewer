@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -43,28 +44,47 @@ public sealed class YukassaClient : IPaymentProvider
         string userEmail,
         CancellationToken ct = default)
     {
+        return await CreatePaymentAsync(new PaymentCreateRequest
+        {
+            UserId = userId,
+            UserEmail = userEmail,
+            ProductType = PaymentProductType.Subscription,
+            AmountRub = _options.MonthlyPriceAmount,
+            Description = $"Разовое продление доступа «Вуаль Грядущего» для {userEmail}"
+        }, ct);
+    }
+
+    public async Task<PaymentCreationResult> CreatePaymentAsync(
+        PaymentCreateRequest paymentRequest,
+        CancellationToken ct = default)
+    {
         if (string.IsNullOrWhiteSpace(_options.ShopId) || string.IsNullOrWhiteSpace(_options.SecretKey))
             throw new InvalidOperationException("Yukassa credentials are not configured");
+        EnsureExpectedAmount(paymentRequest);
+
+        var metadata = new Dictionary<string, string>
+        {
+            ["product_type"] = ToMetadataProductType(paymentRequest.ProductType),
+            ["user_id"] = paymentRequest.UserId.ToString()
+        };
+        if (paymentRequest.TarotPlusSessionId is { } sessionId)
+            metadata["tarot_plus_session_id"] = sessionId.ToString();
 
         var request = new CreatePaymentRequest
         {
             Amount = new AmountDto
             {
-                Value = _options.MonthlyPriceAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
+                Value = paymentRequest.AmountRub.ToString("F2", CultureInfo.InvariantCulture),
                 Currency = _options.Currency
             },
             Capture = true,
             Confirmation = new ConfirmationDto
             {
                 Type = "redirect",
-                ReturnUrl = _options.ReturnUrl
+                ReturnUrl = BuildReturnUrl(paymentRequest.ReturnPath)
             },
-            Description = $"Разовое продление доступа «Вуаль Грядущего» для {userEmail}",
-            Metadata = new Dictionary<string, string>
-            {
-                ["access_type"] = "manual_renewal",
-                ["user_id"] = userId.ToString()
-            }
+            Description = paymentRequest.Description,
+            Metadata = metadata
         };
 
         using var message = new HttpRequestMessage(HttpMethod.Post, "payments")
@@ -113,23 +133,33 @@ public sealed class YukassaClient : IPaymentProvider
         var payment = await response.Content.ReadFromJsonAsync<PaymentDetailResponse>(JsonOptions, ct);
         if (payment is null) return null;
 
+        var productType = ReadProductType(payment.Metadata);
+        var expectedAmount = ExpectedAmount(productType);
+
         if (payment.Amount is null
             || !decimal.TryParse(payment.Amount.Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var paidAmount)
-            || paidAmount < _options.MonthlyPriceAmount
+            || paidAmount < expectedAmount
             || !string.Equals(payment.Amount.Currency, _options.Currency, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning(
                 "Yukassa payment {PaymentId} rejected: amount/currency mismatch (got {Amount} {Currency}, expected {ExpectedAmount} {ExpectedCurrency})",
-                payment.Id, payment.Amount?.Value, payment.Amount?.Currency, _options.MonthlyPriceAmount, _options.Currency);
+                payment.Id, payment.Amount?.Value, payment.Amount?.Currency, expectedAmount, _options.Currency);
             return null;
         }
 
         Guid? userId = null;
+        Guid? tarotPlusSessionId = null;
         if (payment.Metadata is not null
             && payment.Metadata.TryGetValue("user_id", out var userIdStr)
             && Guid.TryParse(userIdStr, out var parsed))
         {
             userId = parsed;
+        }
+        if (payment.Metadata is not null
+            && payment.Metadata.TryGetValue("tarot_plus_session_id", out var sessionIdStr)
+            && Guid.TryParse(sessionIdStr, out var sessionId))
+        {
+            tarotPlusSessionId = sessionId;
         }
 
         return new PaymentVerification
@@ -137,7 +167,9 @@ public sealed class YukassaClient : IPaymentProvider
             PaymentId = payment.Id,
             Status = payment.Status,
             Paid = payment.Paid,
-            UserId = userId
+            UserId = userId,
+            ProductType = productType,
+            TarotPlusSessionId = tarotPlusSessionId
         };
     }
 
@@ -158,18 +190,28 @@ public sealed class YukassaClient : IPaymentProvider
             };
 
             Guid? userId = null;
+            Guid? tarotPlusSessionId = null;
+            var productType = ReadProductType(envelope.Object.Metadata);
             if (envelope.Object.Metadata is not null
                 && envelope.Object.Metadata.TryGetValue("user_id", out var userIdStr)
                 && Guid.TryParse(userIdStr, out var parsed))
             {
                 userId = parsed;
             }
+            if (envelope.Object.Metadata is not null
+                && envelope.Object.Metadata.TryGetValue("tarot_plus_session_id", out var sessionIdStr)
+                && Guid.TryParse(sessionIdStr, out var sessionId))
+            {
+                tarotPlusSessionId = sessionId;
+            }
 
             return new PaymentWebhookEvent
             {
                 Type = type,
                 PaymentId = envelope.Object.Id,
-                UserId = userId
+                UserId = userId,
+                ProductType = productType,
+                TarotPlusSessionId = tarotPlusSessionId
             };
         }
         catch (JsonException ex)
@@ -177,6 +219,51 @@ public sealed class YukassaClient : IPaymentProvider
             _logger.LogWarning(ex, "Failed to parse Yukassa webhook body");
             return null;
         }
+    }
+
+    private decimal ExpectedAmount(PaymentProductType productType) =>
+        productType == PaymentProductType.TarotPlusSession
+            ? _options.TarotPlusPriceAmount
+            : _options.MonthlyPriceAmount;
+
+    private void EnsureExpectedAmount(PaymentCreateRequest request)
+    {
+        var expectedAmount = ExpectedAmount(request.ProductType);
+        if (request.AmountRub != expectedAmount)
+            throw new InvalidOperationException(
+                $"Yukassa {request.ProductType} amount must be {expectedAmount.ToString("F2", CultureInfo.InvariantCulture)} {_options.Currency}");
+    }
+
+    private static string ToMetadataProductType(PaymentProductType productType) =>
+        productType == PaymentProductType.TarotPlusSession ? "tarot_plus_session" : "subscription";
+
+    private static PaymentProductType ReadProductType(IReadOnlyDictionary<string, string>? metadata)
+    {
+        if (metadata is not null
+            && metadata.TryGetValue("product_type", out var value)
+            && string.Equals(value, "tarot_plus_session", StringComparison.OrdinalIgnoreCase))
+        {
+            return PaymentProductType.TarotPlusSession;
+        }
+
+        return PaymentProductType.Subscription;
+    }
+
+    private string BuildReturnUrl(string? returnPath)
+    {
+        if (string.IsNullOrWhiteSpace(returnPath))
+            return _options.ReturnUrl;
+
+        if (!Uri.TryCreate(_options.ReturnUrl, UriKind.Absolute, out var baseUri))
+            return _options.ReturnUrl;
+
+        var builder = new UriBuilder(baseUri)
+        {
+            Path = returnPath.StartsWith('/') ? returnPath : "/" + returnPath,
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return builder.Uri.ToString();
     }
 
     private sealed class CreatePaymentRequest

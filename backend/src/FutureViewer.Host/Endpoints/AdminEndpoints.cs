@@ -19,6 +19,7 @@ public static class AdminEndpoints
         MapAchievementEndpoints(group);
         MapTelegramEndpoints(group);
         MapStatsEndpoints(group);
+        MapTarotPlusEndpoints(group);
 
         return app;
     }
@@ -29,6 +30,34 @@ public static class AdminEndpoints
         {
             var stats = await service.GetStatsAsync(ct);
             return Results.Ok(stats);
+        });
+    }
+
+    private static void MapTarotPlusEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/tarot-plus", async (
+            Guid? userId,
+            TarotPlusSessionStatus? status,
+            int? page,
+            int? pageSize,
+            AdminService service,
+            CancellationToken ct) =>
+        {
+            var result = await service.SearchTarotPlusSessionsAsync(userId, status, page ?? 1, pageSize ?? 20, ct);
+            return Results.Ok(new { items = result.Items, total = result.Total });
+        });
+
+        group.MapPut("/users/{id:guid}/tarot-plus-credits", async (
+            Guid id,
+            SetTarotPlusCreditsBody body,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            if (body is null) return Results.BadRequest();
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            var dto = await service.SetTarotPlusCreditsAsync(actorId, actorEmail, id, body.Credits, ct);
+            return Results.Ok(dto);
         });
     }
 
@@ -291,6 +320,11 @@ public static class AdminEndpoints
     {
         public SubscriptionStatus Status { get; init; }
         public DateTime? ExpiresAt { get; init; }
+    }
+
+    public sealed class SetTarotPlusCreditsBody
+    {
+        public int Credits { get; init; }
     }
 
     public sealed class GrantAchievementBody

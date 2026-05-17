@@ -375,6 +375,111 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.ToTable("tarot_cards", (string)null);
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.TarotPlusSession", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AiModel")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("ai_model");
+
+                    b.Property<string>("AnswersJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answers_json");
+
+                    b.Property<string>("CoreRequest")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("core_request");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DrawnCardsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("drawn_cards_json");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("FollowUpsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("followups_json");
+
+                    b.Property<int>("FollowUpsLeft")
+                        .HasColumnType("integer")
+                        .HasColumnName("followups_left");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<string>("PaymentId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("payment_id");
+
+                    b.Property<string>("PreviewText")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("preview_text");
+
+                    b.Property<decimal>("PriceRub")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("price_rub");
+
+                    b.Property<string>("ReportMarkdown")
+                        .HasColumnType("text")
+                        .HasColumnName("report_markdown");
+
+                    b.Property<int>("Route")
+                        .HasColumnType("integer")
+                        .HasColumnName("route");
+
+                    b.Property<string>("SafetyFlagsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("safety_flags_json");
+
+                    b.Property<string>("SelectedSpreadsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("selected_spreads_json");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("tarot_plus_sessions", (string)null);
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -382,13 +487,13 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
                     b.Property<DateOnly?>("BirthDate")
                         .HasColumnType("date")
                         .HasColumnName("birth_date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -449,6 +554,12 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("subscription_status");
 
+                    b.Property<int>("TarotPlusCredits")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("tarot_plus_credits");
+
                     b.Property<long?>("TelegramChatId")
                         .HasColumnType("bigint")
                         .HasColumnName("telegram_chat_id");
@@ -476,6 +587,35 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.UserAchievement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AchievementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("achievement_id");
+
+                    b.Property<DateTime>("UnlockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unlocked_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AchievementId");
+
+                    b.HasIndex("UserId", "AchievementId")
+                        .IsUnique();
+
+                    b.ToTable("user_achievements", (string)null);
                 });
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.UserMemoryRule", b =>
@@ -508,35 +648,6 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "CreatedAt");
 
                     b.ToTable("user_memory_rules", (string)null);
-                });
-
-            modelBuilder.Entity("FutureViewer.Domain.Entities.UserAchievement", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AchievementId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("achievement_id");
-
-                    b.Property<DateTime>("UnlockedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("unlocked_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AchievementId");
-
-                    b.HasIndex("UserId", "AchievementId")
-                        .IsUnique();
-
-                    b.ToTable("user_achievements", (string)null);
                 });
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.DeckVariant", b =>
@@ -598,6 +709,17 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.TarotPlusSession", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.User", "User")
+                        .WithMany("TarotPlusSessions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.UserAchievement", b =>
                 {
                     b.HasOne("FutureViewer.Domain.Entities.Achievement", "Achievement")
@@ -654,6 +776,8 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("MemoryRules");
 
                     b.Navigation("Readings");
+
+                    b.Navigation("TarotPlusSessions");
                 });
 #pragma warning restore 612, 618
         }

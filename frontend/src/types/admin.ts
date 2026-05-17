@@ -1,4 +1,11 @@
-import type { DeckType, FeedbackStatus, SpreadType, SubscriptionStatusValue } from '@/types'
+import type {
+  DeckType,
+  FeedbackStatus,
+  SpreadType,
+  SubscriptionStatusValue,
+  TarotPlusRoute,
+  TarotPlusSessionStatus,
+} from '@/types'
 
 export interface AdminFeedback {
   id: string
@@ -67,7 +74,9 @@ export interface AdminUserListItem {
   subscriptionStatus: SubscriptionStatusValue
   subscriptionExpiresAt: string | null
   telegramChatId: number | null
+  tarotPlusCredits: number
   totalReadings: number
+  totalTarotPlusSessions: number
   totalFeedbacks: number
   totalScore: number
 }
@@ -102,10 +111,13 @@ export interface AdminUserDetail {
   yukassaSubscriptionId: string | null
   telegramChatId: number | null
   hasTelegramLinkToken: boolean
+  tarotPlusCredits: number
   totalReadings: number
+  totalTarotPlusSessions: number
   totalFeedbacks: number
   totalScore: number
   recentReadings: AdminReadingSummary[]
+  recentTarotPlusSessions: AdminTarotPlusSession[]
   recentFeedbacks: AdminFeedback[]
   achievements: AdminAchievement[]
 }
@@ -119,6 +131,10 @@ export interface UserSearchFilters {
 export interface SetSubscriptionPayload {
   status: SubscriptionStatusValue
   expiresAt?: string | null
+}
+
+export interface SetTarotPlusCreditsPayload {
+  credits: number
 }
 
 export interface AdminGrantedAchievement {
@@ -142,6 +158,44 @@ export interface AdminStats {
   activeSubscriptions: number
   readingsToday: number
   readingsThisWeek: number
+  tarotPlusSessionsTotal: number
+  tarotPlusPaidSessions: number
+  tarotPlusReportsReady: number
+  tarotPlusCreatedThisWeek: number
   pendingFeedbacksToNotify: number
   scoredFeedbacksThisMonth: number
+}
+
+export interface AdminTarotPlusSession {
+  id: string
+  userId: string
+  userEmail: string | null
+  status: TarotPlusSessionStatus
+  route: TarotPlusRoute
+  routeLabel: string
+  coreRequest: string
+  previewText: string | null
+  hasReport: boolean
+  answerCount: number
+  intakeAnswerCount: number
+  followUpsLeft: number
+  priceRub: number
+  paymentId: string | null
+  paidAt: string | null
+  aiModel: string | null
+  createdAt: string
+  updatedAt: string
+  expiresAt: string
+}
+
+export interface AdminTarotPlusListResponse {
+  items: AdminTarotPlusSession[]
+  total: number
+}
+
+export interface TarotPlusSearchFilters {
+  userId?: string | null
+  status?: TarotPlusSessionStatus | null
+  page?: number
+  pageSize?: number
 }

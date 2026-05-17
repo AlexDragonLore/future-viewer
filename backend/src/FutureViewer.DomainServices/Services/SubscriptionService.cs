@@ -10,6 +10,7 @@ public sealed class SubscriptionService
 {
     public const int FreeDailyLimit = 1;
     public const int SubscriptionDurationDays = 30;
+    public const int TarotPlusCreditsPerSubscriptionPayment = 1;
 
     private readonly IUserRepository _users;
     private readonly IReadingRepository _readings;
@@ -64,7 +65,8 @@ public sealed class SubscriptionService
             IsActive = isActive,
             FreeReadingsUsedToday = usedToday,
             FreeReadingsDailyLimit = FreeDailyLimit,
-            CanCreateFreeReading = isActive || usedToday < FreeDailyLimit
+            CanCreateFreeReading = isActive || usedToday < FreeDailyLimit,
+            TarotPlusCredits = user.TarotPlusCredits
         };
     }
 
@@ -94,25 +96,49 @@ public sealed class SubscriptionService
         if (verified is null) return false;
         if (!verified.Paid) return false;
         if (!string.Equals(verified.Status, "succeeded", StringComparison.OrdinalIgnoreCase)) return false;
+        if (verified.ProductType != PaymentProductType.Subscription) return false;
+        if (verified.UserId is null) return false;
+
+        try
+        {
+            return await _uow.ExecuteInTransactionAsync(async innerCt =>
+            {
+                if (!await _processedPayments.TryRecordAsync(verified.PaymentId, verified.UserId.Value, innerCt))
+                    return false;
+
+                if (!await ProcessPaymentSucceededAsync(verified, innerCt))
+                    throw new SubscriptionWebhookRejectedException();
+
+                return true;
+            }, ct);
+        }
+        catch (SubscriptionWebhookRejectedException)
+        {
+            return false;
+        }
+    }
+
+    public async Task<bool> ProcessPaymentSucceededAsync(
+        PaymentVerification verified,
+        CancellationToken ct = default)
+    {
+        if (!verified.Paid) return false;
+        if (!string.Equals(verified.Status, "succeeded", StringComparison.OrdinalIgnoreCase)) return false;
+        if (verified.ProductType != PaymentProductType.Subscription) return false;
         if (verified.UserId is null) return false;
 
         var user = await _users.GetByIdAsync(verified.UserId.Value, ct);
         if (user is null) return false;
 
-        return await _uow.ExecuteInTransactionAsync(async innerCt =>
-        {
-            if (!await _processedPayments.TryRecordAsync(verified.PaymentId, user.Id, innerCt))
-                return false;
+        var now = DateTime.UtcNow;
+        var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;
+        user.SubscriptionStatus = SubscriptionStatus.Active;
+        user.SubscriptionExpiresAt = currentExpiry.AddDays(SubscriptionDurationDays);
+        user.YukassaSubscriptionId = verified.PaymentId;
+        user.TarotPlusCredits += TarotPlusCreditsPerSubscriptionPayment;
 
-            var now = DateTime.UtcNow;
-            var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;
-            user.SubscriptionStatus = SubscriptionStatus.Active;
-            user.SubscriptionExpiresAt = currentExpiry.AddDays(SubscriptionDurationDays);
-            user.YukassaSubscriptionId = verified.PaymentId;
-
-            await _users.UpdateAsync(user, innerCt);
-            return true;
-        }, ct);
+        await _users.UpdateAsync(user, ct);
+        return true;
     }
 
     private static bool IsSubscriptionActive(User user)
@@ -122,5 +148,9 @@ public sealed class SubscriptionService
         if (user.SubscriptionExpiresAt is null)
             return false;
         return user.SubscriptionExpiresAt.Value > DateTime.UtcNow;
+    }
+
+    private sealed class SubscriptionWebhookRejectedException : Exception
+    {
     }
 }

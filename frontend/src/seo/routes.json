@@ -60,6 +60,13 @@
     { "name": "verify-email", "path": "/verify-email", "title": "Подтверждение email | Вуаль Грядущего" },
     { "name": "reset-password", "path": "/reset-password", "title": "Смена пароля | Вуаль Грядущего" },
     { "name": "payment-success", "path": "/payment/success", "title": "Проверка оплаты | Вуаль Грядущего" },
+    {
+      "name": "tarot-plus",
+      "path": "/tarot-plus",
+      "title": "Таро+ Жизненный компас | Вуаль Грядущего",
+      "description": "Персональная Таро+ сессия: уточняющие вопросы, несколько раскладов и рекомендации на 7, 30 и 90 дней."
+    },
+    { "name": "tarot-plus-session", "path": "/tarot-plus/:id", "title": "Таро+ сессия | Вуаль Грядущего" },
     { "name": "leaderboard", "path": "/leaderboard", "title": "Лидерборд | Вуаль Грядущего" },
     { "name": "glossary-card", "path": "/glossary/:id", "title": "Карта Таро | Вуаль Грядущего" },
     { "name": "reading", "path": "/reading", "title": "Расклад | Вуаль Грядущего" },
@@ -73,6 +80,7 @@
     { "name": "admin-users", "path": "/admin/users", "title": "Пользователи | Вуаль Грядущего" },
     { "name": "admin-user-detail", "path": "/admin/users/:id", "title": "Пользователь | Вуаль Грядущего" },
     { "name": "admin-feedbacks", "path": "/admin/feedbacks", "title": "Фидбек | Вуаль Грядущего" },
-    { "name": "admin-stats", "path": "/admin/stats", "title": "Статистика | Вуаль Грядущего" }
+    { "name": "admin-stats", "path": "/admin/stats", "title": "Статистика | Вуаль Грядущего" },
+    { "name": "admin-tarot-plus", "path": "/admin/tarot-plus", "title": "Таро+ в админке | Вуаль Грядущего" }
   ]
 }

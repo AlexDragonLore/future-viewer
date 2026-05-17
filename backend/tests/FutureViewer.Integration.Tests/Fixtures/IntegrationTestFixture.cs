@@ -70,6 +70,14 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             if (scorerDescriptor is not null) services.Remove(scorerDescriptor);
             services.AddSingleton<IFeedbackScorer, StubFeedbackScorer>();
 
+            var tarotPlusAiDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ITarotPlusAI));
+            if (tarotPlusAiDescriptor is not null) services.Remove(tarotPlusAiDescriptor);
+            services.AddSingleton<ITarotPlusAI, StubTarotPlusAI>();
+
+            foreach (var paymentDescriptor in services.Where(d => d.ServiceType == typeof(IPaymentProvider)).ToList())
+                services.Remove(paymentDescriptor);
+            services.AddSingleton<IPaymentProvider, StubPaymentProvider>();
+
             var emailDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IEmailSender));
             if (emailDescriptor is not null) services.Remove(emailDescriptor);
             services.AddSingleton<IEmailSender>(EmailSender);

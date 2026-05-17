@@ -26,7 +26,7 @@ public static class PaymentEndpoints
 
         group.MapPost("/webhook", async (
             HttpContext ctx,
-            SubscriptionService service,
+            PaymentWebhookService service,
             CancellationToken ct) =>
         {
             if (ctx.Request.ContentLength is long cl && cl > WebhookMaxBytes)

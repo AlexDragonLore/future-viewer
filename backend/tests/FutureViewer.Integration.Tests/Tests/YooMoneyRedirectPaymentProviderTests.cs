@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using FluentAssertions;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.Infrastructure.Payment;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -19,13 +20,13 @@ public sealed class YooMoneyRedirectPaymentProviderTests
         var result = await provider.CreateSubscriptionPaymentAsync(userId, "user@example.com");
 
         result.Status.Should().Be("pending");
-        result.PaymentId.Should().StartWith($"fv:{userId:N}:");
+        result.PaymentId.Should().StartWith($"fv:sub:{userId:N}:");
         result.ConfirmationUrl.Should().StartWith("https://yoomoney.ru/quickpay/confirm?");
         result.ConfirmationUrl.Should().Contain("receiver=4100111111111111");
         result.ConfirmationUrl.Should().Contain("quickpay-form=button");
         result.ConfirmationUrl.Should().Contain("paymentType=AC");
         result.ConfirmationUrl.Should().Contain("sum=300.00");
-        result.ConfirmationUrl.Should().Contain($"label=fv%3A{userId:N}%3A");
+        result.ConfirmationUrl.Should().Contain($"label=fv%3Asub%3A{userId:N}%3A");
         result.ConfirmationUrl.Should().Contain("successURL=http%3A%2F%2Flocalhost%3A5173%2Fpayment%2Fsuccess");
     }
 
@@ -44,11 +45,13 @@ public sealed class YooMoneyRedirectPaymentProviderTests
         evt!.Type.Should().Be(FutureViewer.DomainServices.Interfaces.PaymentWebhookEventType.PaymentSucceeded);
         evt.PaymentId.Should().Be(operationId);
         evt.UserId.Should().Be(userId);
+        evt.ProductType.Should().Be(PaymentProductType.Subscription);
 
         verification.Should().NotBeNull();
         verification!.PaymentId.Should().Be(operationId);
         verification.Paid.Should().BeTrue();
         verification.UserId.Should().Be(userId);
+        verification.ProductType.Should().Be(PaymentProductType.Subscription);
     }
 
     [Fact]
@@ -83,6 +86,7 @@ public sealed class YooMoneyRedirectPaymentProviderTests
             NotificationSecret = "secret123",
             ReturnUrl = "http://localhost:5173/payment/success",
             MonthlyPriceAmount = 300m,
+            TarotPlusPriceAmount = 100m,
             Targets = "Future Viewer Pro"
         });
 
@@ -107,7 +111,7 @@ public sealed class YooMoneyRedirectPaymentProviderTests
             ["datetime"] = "2026-05-12T20:00:00Z",
             ["sender"] = "",
             ["codepro"] = "false",
-            ["label"] = $"fv:{userId:N}:abc123",
+            ["label"] = $"fv:sub:{userId:N}:abc123",
             ["unaccepted"] = "false"
         };
 

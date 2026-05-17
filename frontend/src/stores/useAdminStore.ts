@@ -6,13 +6,16 @@ import type { FeedbackStatus } from '@/types'
 import type {
   AdminFeedback,
   AdminStats,
+  AdminTarotPlusSession,
   AdminUserDetail,
   AdminUserListItem,
   CreateAdminFeedbackPayload,
   CreateSyntheticFeedbackPayload,
   SetSubscriptionPayload,
+  SetTarotPlusCreditsPayload,
   UpdateAdminFeedbackPayload,
 } from '@/types/admin'
+import type { TarotPlusSessionStatus } from '@/types'
 
 export const useAdminStore = defineStore('admin', () => {
   const feedbacks = ref<AdminFeedback[]>([])
@@ -41,6 +44,15 @@ export const useAdminStore = defineStore('admin', () => {
   const stats = ref<AdminStats | null>(null)
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
+
+  const tarotPlusSessions = ref<AdminTarotPlusSession[]>([])
+  const tarotPlusTotal = ref(0)
+  const tarotPlusPage = ref(1)
+  const tarotPlusPageSize = ref(20)
+  const tarotPlusUserFilter = ref<string | null>(null)
+  const tarotPlusStatusFilter = ref<TarotPlusSessionStatus | null>(null)
+  const tarotPlusLoading = ref(false)
+  const tarotPlusError = ref<string | null>(null)
 
   async function loadFeedbacks(): Promise<void> {
     feedbackLoading.value = true
@@ -233,12 +245,33 @@ export const useAdminStore = defineStore('admin', () => {
           ...users.value[idx],
           subscriptionStatus: detail.subscriptionStatus,
           subscriptionExpiresAt: detail.subscriptionExpiresAt,
+          tarotPlusCredits: detail.tarotPlusCredits,
         }
       }
       userToast.value = 'Доступ обновлён'
       return true
     } catch (e) {
       userError.value = extractApiError(e, 'Не удалось обновить доступ')
+      return false
+    }
+  }
+
+  async function setUserTarotPlusCredits(id: string, payload: SetTarotPlusCreditsPayload): Promise<boolean> {
+    userError.value = null
+    try {
+      const detail = await adminApi.setUserTarotPlusCredits(id, payload)
+      selectedUser.value = detail
+      const idx = users.value.findIndex((u) => u.id === id)
+      if (idx >= 0) {
+        users.value[idx] = {
+          ...users.value[idx],
+          tarotPlusCredits: detail.tarotPlusCredits,
+        }
+      }
+      userToast.value = 'Кредиты Таро+ обновлены'
+      return true
+    } catch (e) {
+      userError.value = extractApiError(e, 'Не удалось обновить кредиты Таро+')
       return false
     }
   }
@@ -330,6 +363,39 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
+  async function loadTarotPlusSessions(): Promise<void> {
+    tarotPlusLoading.value = true
+    tarotPlusError.value = null
+    try {
+      const result = await adminApi.listTarotPlusSessions({
+        userId: tarotPlusUserFilter.value,
+        status: tarotPlusStatusFilter.value,
+        page: tarotPlusPage.value,
+        pageSize: tarotPlusPageSize.value,
+      })
+      tarotPlusSessions.value = result.items
+      tarotPlusTotal.value = result.total
+    } catch (e) {
+      tarotPlusError.value = extractApiError(e, 'Не удалось загрузить Таро+ сессии')
+    } finally {
+      tarotPlusLoading.value = false
+    }
+  }
+
+  function setTarotPlusPage(page: number): void {
+    tarotPlusPage.value = Math.max(1, page)
+  }
+
+  function setTarotPlusUserFilter(value: string | null): void {
+    tarotPlusUserFilter.value = value && value.trim() !== '' ? value.trim() : null
+    tarotPlusPage.value = 1
+  }
+
+  function setTarotPlusStatusFilter(value: TarotPlusSessionStatus | null): void {
+    tarotPlusStatusFilter.value = value
+    tarotPlusPage.value = 1
+  }
+
   return {
     feedbacks,
     feedbackTotal,
@@ -369,6 +435,7 @@ export const useAdminStore = defineStore('admin', () => {
     setUserAdmin,
     deleteUser,
     setUserSubscription,
+    setUserTarotPlusCredits,
     grantAchievement,
     revokeAchievement,
     recheckAchievements,
@@ -379,5 +446,17 @@ export const useAdminStore = defineStore('admin', () => {
     statsLoading,
     statsError,
     loadStats,
+    tarotPlusSessions,
+    tarotPlusTotal,
+    tarotPlusPage,
+    tarotPlusPageSize,
+    tarotPlusUserFilter,
+    tarotPlusStatusFilter,
+    tarotPlusLoading,
+    tarotPlusError,
+    loadTarotPlusSessions,
+    setTarotPlusPage,
+    setTarotPlusUserFilter,
+    setTarotPlusStatusFilter,
   }
 })

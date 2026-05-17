@@ -101,6 +101,96 @@ export interface SubscriptionStatus {
   freeReadingsUsedToday: number
   freeReadingsDailyLimit: number
   canCreateFreeReading: boolean
+  tarotPlusCredits: number
+}
+
+export enum TarotPlusSessionStatus {
+  Draft = 0,
+  PreviewReady = 1,
+  PaymentPending = 2,
+  Paid = 3,
+  Intake = 4,
+  CardsDrawn = 5,
+  ReportGenerating = 6,
+  ReportReady = 7,
+  Completed = 8,
+  Expired = 9,
+  Cancelled = 10,
+}
+
+export enum TarotPlusRoute {
+  Unknown = 0,
+  Relationship = 1,
+  Career = 2,
+  Money = 3,
+  Decision = 4,
+  SelfIdentity = 5,
+  Family = 6,
+  GeneralLife = 7,
+  ResourceState = 8,
+  SafetySensitive = 9,
+}
+
+export interface TarotPlusAnswer {
+  kind: string
+  question: string
+  answer: string
+  createdAt: string
+}
+
+export interface TarotPlusDrawnCard {
+  position: number
+  positionName: string
+  cardId: number
+  cardName: string
+  imagePath: string
+  isReversed: boolean
+  meaning: string
+}
+
+export interface TarotPlusDrawnSpread {
+  spreadId: string
+  spreadName: string
+  cards: TarotPlusDrawnCard[]
+}
+
+export interface TarotPlusFollowUpItem {
+  question: string
+  answerMarkdown: string
+  createdAt: string
+}
+
+export interface TarotPlusSession {
+  id: string
+  status: TarotPlusSessionStatus
+  route: TarotPlusRoute
+  routeLabel: string
+  coreRequest: string
+  previewText: string | null
+  reportMarkdown: string | null
+  followUpsLeft: number
+  priceRub: number
+  paidAt: string | null
+  createdAt: string
+  updatedAt: string
+  expiresAt: string
+  answerCount: number
+  intakeAnswerCount: number
+  answers: TarotPlusAnswer[]
+  drawnSpreads: TarotPlusDrawnSpread[]
+  followUps: TarotPlusFollowUpItem[]
+}
+
+export interface TarotPlusSessionListItem {
+  id: string
+  status: TarotPlusSessionStatus
+  route: TarotPlusRoute
+  routeLabel: string
+  coreRequest: string
+  priceRub: number
+  paidAt: string | null
+  createdAt: string
+  expiresAt: string
 }
 
 export interface CardGlossary {

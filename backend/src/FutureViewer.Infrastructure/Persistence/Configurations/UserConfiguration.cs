@@ -49,6 +49,9 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.YukassaSubscriptionId)
             .HasColumnName("yukassa_subscription_id")
             .HasMaxLength(128);
+        b.Property(x => x.TarotPlusCredits)
+            .HasColumnName("tarot_plus_credits")
+            .HasDefaultValue(0);
 
         b.Property(x => x.TelegramChatId).HasColumnName("telegram_chat_id");
         b.Property(x => x.TelegramLinkToken)

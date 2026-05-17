@@ -73,6 +73,9 @@ const quotaLabel = computed(() => {
         <RouterLink v-if="auth.isAuthenticated" to="/history" class="nav-link" data-testid="nav-history">
           История
         </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/tarot-plus" class="nav-link" data-testid="nav-tarot-plus">
+          Таро+
+        </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="nav-link" data-testid="nav-achievements">
           Ачивки
         </RouterLink>
@@ -127,6 +130,9 @@ const quotaLabel = computed(() => {
                 <RouterLink to="/history" class="dd-link" @click="menuOpen = false">История раскладов</RouterLink>
               </li>
               <li>
+                <RouterLink to="/tarot-plus" class="dd-link" @click="menuOpen = false">Таро+</RouterLink>
+              </li>
+              <li>
                 <RouterLink to="/achievements" class="dd-link" @click="menuOpen = false">Достижения</RouterLink>
               </li>
               <li>
@@ -167,6 +173,9 @@ const quotaLabel = computed(() => {
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/history" class="burger-link" data-testid="burger-history" @click="burgerOpen = false">
           История
+        </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/tarot-plus" class="burger-link" data-testid="burger-tarot-plus" @click="burgerOpen = false">
+          Таро+
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/achievements" class="burger-link" data-testid="burger-achievements" @click="burgerOpen = false">
           Ачивки

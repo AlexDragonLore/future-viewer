@@ -14,12 +14,14 @@ public static class DomainServicesExtensions
         services.AddScoped<ReadingService>();
         services.AddScoped<AuthService>();
         services.AddScoped<SubscriptionService>();
+        services.AddScoped<PaymentWebhookService>();
         services.AddScoped<FeedbackService>();
         services.AddScoped<AchievementService>();
         services.AddScoped<LeaderboardService>();
         services.AddScoped<TelegramLinkService>();
         services.AddScoped<AdminService>();
         services.AddScoped<PersonalizationService>();
+        services.AddScoped<TarotPlusService>();
 
         services.AddValidatorsFromAssemblyContaining<CreateReadingRequestValidator>();
         return services;

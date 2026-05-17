@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text.Json;
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
@@ -11,9 +12,12 @@ namespace FutureViewer.DomainServices.Services;
 
 public sealed class AdminService
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     private readonly IFeedbackRepository _feedbacks;
     private readonly IReadingRepository _readings;
     private readonly IUserRepository _users;
+    private readonly ITarotPlusSessionRepository _tarotPlusSessions;
     private readonly IAchievementRepository _achievementsRepo;
     private readonly AchievementService _achievements;
     private readonly TelegramLinkService _telegram;
@@ -23,6 +27,7 @@ public sealed class AdminService
         IFeedbackRepository feedbacks,
         IReadingRepository readings,
         IUserRepository users,
+        ITarotPlusSessionRepository tarotPlusSessions,
         IAchievementRepository achievementsRepo,
         AchievementService achievements,
         TelegramLinkService telegram,
@@ -31,6 +36,7 @@ public sealed class AdminService
         _feedbacks = feedbacks;
         _readings = readings;
         _users = users;
+        _tarotPlusSessions = tarotPlusSessions;
         _achievementsRepo = achievementsRepo;
         _achievements = achievements;
         _telegram = telegram;
@@ -237,11 +243,13 @@ public sealed class AdminService
             ?? throw new NotFoundException("User not found");
 
         var totalReadings = await _readings.CountByUserAsync(userId, ct);
+        var totalTarotPlusSessions = await _tarotPlusSessions.CountAsync(userId, null, ct);
         var scoredFeedbacks = await _feedbacks.GetScoredByUserAsync(userId, ct);
         var totalScore = scoredFeedbacks.Sum(f => f.AiScore ?? 0);
         var allFeedbacksCount = await _feedbacks.CountAsync(userId, null, ct);
 
         var recentReadings = await _readings.GetByUserAsync(userId, 20, ct);
+        var recentTarotPlusSessions = await _tarotPlusSessions.SearchAsync(userId, null, 0, 20, ct);
         var recentFeedbacks = await _feedbacks.GetByUserAsync(userId, 20, ct);
         var userAchievements = await _achievementsRepo.GetByUserAsync(userId, ct);
         var allAchievements = await _achievementsRepo.GetAllAsync(ct);
@@ -258,7 +266,9 @@ public sealed class AdminService
             YukassaSubscriptionId = user.YukassaSubscriptionId,
             TelegramChatId = user.TelegramChatId,
             HasTelegramLinkToken = !string.IsNullOrEmpty(user.TelegramLinkToken),
+            TarotPlusCredits = user.TarotPlusCredits,
             TotalReadings = totalReadings,
+            TotalTarotPlusSessions = totalTarotPlusSessions,
             TotalFeedbacks = allFeedbacksCount,
             TotalScore = totalScore,
             RecentReadings = recentReadings.Select(r => new AdminReadingSummary
@@ -269,6 +279,7 @@ public sealed class AdminService
                 DeckType = r.DeckType,
                 CreatedAt = r.CreatedAt
             }).ToList(),
+            RecentTarotPlusSessions = recentTarotPlusSessions.Select(MapAdmin).ToList(),
             RecentFeedbacks = recentFeedbacks.Select(f => MapAdmin(f, f.Reading, user)).ToList(),
             Achievements = userAchievements
                 .Where(ua => byId.ContainsKey(ua.AchievementId))
@@ -281,6 +292,50 @@ public sealed class AdminService
                     UnlockedAt = ua.UnlockedAt
                 }).ToList()
         };
+    }
+
+    public async Task<AdminTarotPlusSessionListResult> SearchTarotPlusSessionsAsync(
+        Guid? userId,
+        TarotPlusSessionStatus? status,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var safePage = Math.Max(1, page);
+        var safeSize = Math.Clamp(pageSize, 1, 100);
+        var skip = (safePage - 1) * safeSize;
+
+        var sessions = await _tarotPlusSessions.SearchAsync(userId, status, skip, safeSize, ct);
+        var total = await _tarotPlusSessions.CountAsync(userId, status, ct);
+
+        return new AdminTarotPlusSessionListResult
+        {
+            Items = sessions.Select(MapAdmin).ToList(),
+            Total = total
+        };
+    }
+
+    public async Task<AdminUserDetailDto> SetTarotPlusCreditsAsync(
+        Guid actorId,
+        string actorEmail,
+        Guid userId,
+        int credits,
+        CancellationToken ct = default)
+    {
+        if (credits is < 0 or > 100)
+            throw new DomainException("credits must be between 0 and 100");
+
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+
+        user.TarotPlusCredits = credits;
+        await _users.UpdateAsync(user, ct);
+
+        _logger.LogInformation(
+            "Admin {ActorEmail} ({ActorId}) set TarotPlusCredits={Credits} on user {UserId}",
+            actorEmail, actorId, credits, userId);
+
+        return await GetUserDetailAsync(userId, ct);
     }
 
     public async Task<AdminUserListItem> SetAdminAsync(
@@ -467,6 +522,10 @@ public sealed class AdminService
         var activeSubs = await _users.CountActiveSubscriptionsAsync(now, ct);
         var readingsToday = await _readings.CountSinceAsync(todayUtc, ct);
         var readingsThisWeek = await _readings.CountSinceAsync(weekAgoUtc, ct);
+        var tarotPlusSessionsTotal = await _tarotPlusSessions.CountAsync(null, null, ct);
+        var tarotPlusPaidSessions = await _tarotPlusSessions.CountPaidOrLaterAsync(ct);
+        var tarotPlusReportsReady = await _tarotPlusSessions.CountReportsReadyAsync(ct);
+        var tarotPlusCreatedThisWeek = await _tarotPlusSessions.CountSinceAsync(weekAgoUtc, ct);
         var pendingToNotify = await _feedbacks.CountPendingToNotifyAsync(now, ct);
         var scoredThisMonth = await _feedbacks.CountScoredSinceAsync(monthAgoUtc, ct);
 
@@ -477,6 +536,10 @@ public sealed class AdminService
             ActiveSubscriptions = activeSubs,
             ReadingsToday = readingsToday,
             ReadingsThisWeek = readingsThisWeek,
+            TarotPlusSessionsTotal = tarotPlusSessionsTotal,
+            TarotPlusPaidSessions = tarotPlusPaidSessions,
+            TarotPlusReportsReady = tarotPlusReportsReady,
+            TarotPlusCreatedThisWeek = tarotPlusCreatedThisWeek,
             PendingFeedbacksToNotify = pendingToNotify,
             ScoredFeedbacksThisMonth = scoredThisMonth
         };
@@ -532,6 +595,7 @@ public sealed class AdminService
     private async Task<AdminUserListItem> BuildListItemAsync(User user, CancellationToken ct)
     {
         var totalReadings = await _readings.CountByUserAsync(user.Id, ct);
+        var totalTarotPlusSessions = await _tarotPlusSessions.CountAsync(user.Id, null, ct);
         var totalFeedbacks = await _feedbacks.CountAsync(user.Id, null, ct);
         var scored = await _feedbacks.GetScoredByUserAsync(user.Id, ct);
         var totalScore = scored.Sum(f => f.AiScore ?? 0);
@@ -545,7 +609,9 @@ public sealed class AdminService
             SubscriptionStatus = user.SubscriptionStatus,
             SubscriptionExpiresAt = user.SubscriptionExpiresAt,
             TelegramChatId = user.TelegramChatId,
+            TarotPlusCredits = user.TarotPlusCredits,
             TotalReadings = totalReadings,
+            TotalTarotPlusSessions = totalTarotPlusSessions,
             TotalFeedbacks = totalFeedbacks,
             TotalScore = totalScore
         };
@@ -572,6 +638,48 @@ public sealed class AdminService
             Status = feedback.Status,
             CreatedAt = feedback.CreatedAt
         };
+
+    private static AdminTarotPlusSessionDto MapAdmin(TarotPlusSession session)
+    {
+        var answerCounts = CountTarotPlusAnswers(session.AnswersJson);
+
+        return new AdminTarotPlusSessionDto
+        {
+            Id = session.Id,
+            UserId = session.UserId,
+            UserEmail = session.User?.Email,
+            Status = session.Status,
+            Route = session.Route,
+            RouteLabel = TarotPlusService.RouteLabel(session.Route),
+            CoreRequest = session.CoreRequest,
+            PreviewText = session.PreviewText,
+            HasReport = !string.IsNullOrWhiteSpace(session.ReportMarkdown),
+            AnswerCount = answerCounts.Total,
+            IntakeAnswerCount = answerCounts.Intake,
+            FollowUpsLeft = session.FollowUpsLeft,
+            PriceRub = session.PriceRub,
+            PaymentId = session.PaymentId,
+            PaidAt = session.PaidAt,
+            AiModel = session.AiModel,
+            CreatedAt = session.CreatedAt,
+            UpdatedAt = session.UpdatedAt,
+            ExpiresAt = session.ExpiresAt
+        };
+    }
+
+    private static (int Total, int Intake) CountTarotPlusAnswers(string answersJson)
+    {
+        try
+        {
+            var answers = JsonSerializer.Deserialize<List<TarotPlusAnswerDto>>(answersJson, JsonOptions)
+                ?? new List<TarotPlusAnswerDto>();
+            return (answers.Count, answers.Count(x => string.Equals(x.Kind, "intake", StringComparison.OrdinalIgnoreCase)));
+        }
+        catch (JsonException)
+        {
+            return (0, 0);
+        }
+    }
 
     private static string GenerateToken()
     {

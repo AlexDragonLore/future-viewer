@@ -13,10 +13,13 @@ public sealed class AdminUserDetailDto
     public string? YukassaSubscriptionId { get; init; }
     public long? TelegramChatId { get; init; }
     public bool HasTelegramLinkToken { get; init; }
+    public required int TarotPlusCredits { get; init; }
     public required int TotalReadings { get; init; }
+    public required int TotalTarotPlusSessions { get; init; }
     public required int TotalFeedbacks { get; init; }
     public required int TotalScore { get; init; }
     public required IReadOnlyList<AdminReadingSummary> RecentReadings { get; init; }
+    public required IReadOnlyList<AdminTarotPlusSessionDto> RecentTarotPlusSessions { get; init; }
     public required IReadOnlyList<AdminFeedbackDto> RecentFeedbacks { get; init; }
     public required IReadOnlyList<AdminAchievementDto> Achievements { get; init; }
 }

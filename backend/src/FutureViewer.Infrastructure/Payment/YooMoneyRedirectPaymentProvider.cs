@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -28,11 +29,26 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         string userEmail,
         CancellationToken ct = default)
     {
+        return CreatePaymentAsync(new PaymentCreateRequest
+        {
+            UserId = userId,
+            UserEmail = userEmail,
+            ProductType = PaymentProductType.Subscription,
+            AmountRub = _options.MonthlyPriceAmount,
+            Description = _options.Targets
+        }, ct);
+    }
+
+    public Task<PaymentCreationResult> CreatePaymentAsync(
+        PaymentCreateRequest request,
+        CancellationToken ct = default)
+    {
         if (string.IsNullOrWhiteSpace(_options.Receiver))
             throw new InvalidOperationException("YooMoney receiver is not configured");
+        EnsureExpectedAmount(request);
 
-        var label = CreateLabel(userId);
-        var url = BuildQuickpayUrl(label);
+        var label = CreateLabel(request);
+        var url = BuildQuickpayUrl(label, request);
 
         return Task.FromResult(new PaymentCreationResult
         {
@@ -58,7 +74,7 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         }
 
         if (!form.TryGetValue("label", out var label)
-            || TryParseUserId(label) is not { } userId)
+            || TryParseLabel(label) is not { } parsedLabel)
         {
             _logger.LogWarning("YooMoney notification {OperationId} rejected: label is missing or invalid", operationId);
             return null;
@@ -82,7 +98,8 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
             return null;
         }
 
-        if (!TryGetPaidAmount(form, out var paidAmount) || paidAmount < _options.MonthlyPriceAmount)
+        var expectedAmount = ExpectedAmount(parsedLabel.ProductType);
+        if (!TryGetPaidAmount(form, out var paidAmount) || paidAmount < expectedAmount)
         {
             _logger.LogWarning("YooMoney notification {OperationId} rejected: amount mismatch", operationId);
             return null;
@@ -93,14 +110,18 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
             PaymentId = operationId,
             Status = "succeeded",
             Paid = true,
-            UserId = userId
+            UserId = parsedLabel.UserId,
+            ProductType = parsedLabel.ProductType,
+            TarotPlusSessionId = parsedLabel.TarotPlusSessionId
         };
 
         return new PaymentWebhookEvent
         {
             Type = PaymentWebhookEventType.PaymentSucceeded,
             PaymentId = operationId,
-            UserId = userId
+            UserId = parsedLabel.UserId,
+            ProductType = parsedLabel.ProductType,
+            TarotPlusSessionId = parsedLabel.TarotPlusSessionId
         };
     }
 
@@ -110,17 +131,17 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         return Task.FromResult<PaymentVerification?>(verification);
     }
 
-    private string BuildQuickpayUrl(string label)
+    private string BuildQuickpayUrl(string label, PaymentCreateRequest request)
     {
         var fields = new Dictionary<string, string>
         {
             ["receiver"] = _options.Receiver,
             ["quickpay-form"] = _options.QuickpayForm,
             ["paymentType"] = _options.PaymentType,
-            ["sum"] = _options.MonthlyPriceAmount.ToString("F2", CultureInfo.InvariantCulture),
+            ["sum"] = request.AmountRub.ToString("F2", CultureInfo.InvariantCulture),
             ["label"] = label,
-            ["targets"] = _options.Targets,
-            ["successURL"] = _options.ReturnUrl
+            ["targets"] = string.IsNullOrWhiteSpace(request.Description) ? _options.Targets : request.Description,
+            ["successURL"] = BuildReturnUrl(request.ReturnPath)
         };
 
         var query = string.Join("&", fields
@@ -191,13 +212,33 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out amount);
     }
 
-    private static string CreateLabel(Guid userId)
+    private string BuildReturnUrl(string? returnPath)
     {
-        var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
-        return $"fv:{userId:N}:{suffix}";
+        if (string.IsNullOrWhiteSpace(returnPath))
+            return _options.ReturnUrl;
+
+        if (!Uri.TryCreate(_options.ReturnUrl, UriKind.Absolute, out var baseUri))
+            return _options.ReturnUrl;
+
+        var builder = new UriBuilder(baseUri)
+        {
+            Path = returnPath.StartsWith('/') ? returnPath : "/" + returnPath,
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        return builder.Uri.ToString();
     }
 
-    private static Guid? TryParseUserId(string? label)
+    private static string CreateLabel(PaymentCreateRequest request)
+    {
+        var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
+        if (request.ProductType == PaymentProductType.TarotPlusSession && request.TarotPlusSessionId is { } sessionId)
+            return $"fv:tp:{request.UserId:N}:{sessionId:N}:{suffix}";
+
+        return $"fv:sub:{request.UserId:N}:{suffix}";
+    }
+
+    private static ParsedLabel? TryParseLabel(string? label)
     {
         if (string.IsNullOrWhiteSpace(label)) return null;
 
@@ -205,9 +246,45 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         if (parts.Length < 2 || !string.Equals(parts[0], "fv", StringComparison.Ordinal))
             return null;
 
-        return Guid.TryParseExact(parts[1], "N", out var id) ? id : null;
+        if (parts.Length >= 4
+            && string.Equals(parts[1], "sub", StringComparison.Ordinal)
+            && Guid.TryParseExact(parts[2], "N", out var subscriptionUserId))
+        {
+            return new ParsedLabel(PaymentProductType.Subscription, subscriptionUserId, null);
+        }
+
+        if (parts.Length >= 5
+            && string.Equals(parts[1], "tp", StringComparison.Ordinal)
+            && Guid.TryParseExact(parts[2], "N", out var tarotPlusUserId)
+            && Guid.TryParseExact(parts[3], "N", out var tarotPlusSessionId))
+        {
+            return new ParsedLabel(PaymentProductType.TarotPlusSession, tarotPlusUserId, tarotPlusSessionId);
+        }
+
+        if (Guid.TryParseExact(parts[1], "N", out var legacyUserId))
+            return new ParsedLabel(PaymentProductType.Subscription, legacyUserId, null);
+
+        return null;
+    }
+
+    private decimal ExpectedAmount(PaymentProductType productType) =>
+        productType == PaymentProductType.TarotPlusSession
+            ? _options.TarotPlusPriceAmount
+            : _options.MonthlyPriceAmount;
+
+    private void EnsureExpectedAmount(PaymentCreateRequest request)
+    {
+        var expectedAmount = ExpectedAmount(request.ProductType);
+        if (request.AmountRub != expectedAmount)
+            throw new InvalidOperationException(
+                $"YooMoney {request.ProductType} amount must be {expectedAmount.ToString("F2", CultureInfo.InvariantCulture)} {_options.CurrencyCode}");
     }
 
     private static bool IsTrue(string? value) =>
         string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+
+    private sealed record ParsedLabel(
+        PaymentProductType ProductType,
+        Guid UserId,
+        Guid? TarotPlusSessionId);
 }

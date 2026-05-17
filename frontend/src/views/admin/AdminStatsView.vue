@@ -62,6 +62,29 @@ function refresh(): void {
         test-id="admin-stat-readings-week"
       />
       <AdminStatTile
+        label="Таро+ всего"
+        :value="store.stats.tarotPlusSessionsTotal"
+        test-id="admin-stat-tarot-plus-total"
+      />
+      <AdminStatTile
+        label="Таро+ оплачено"
+        :value="store.stats.tarotPlusPaidSessions"
+        hint="paid и дальнейшие статусы"
+        test-id="admin-stat-tarot-plus-paid"
+      />
+      <AdminStatTile
+        label="Таро+ отчётов"
+        :value="store.stats.tarotPlusReportsReady"
+        hint="ready/completed"
+        test-id="admin-stat-tarot-plus-ready"
+      />
+      <AdminStatTile
+        label="Таро+ за неделю"
+        :value="store.stats.tarotPlusCreatedThisWeek"
+        hint="последние 7 дней"
+        test-id="admin-stat-tarot-plus-week"
+      />
+      <AdminStatTile
         label="Фидбеков к рассылке"
         :value="store.stats.pendingFeedbacksToNotify"
         hint="Pending, срок подошёл, с Telegram"
