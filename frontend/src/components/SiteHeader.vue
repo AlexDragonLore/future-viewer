@@ -72,6 +72,11 @@ async function markAnnouncementRead(id: string) {
   await announcements.markRead(id)
   if (announcements.unread.length === 0) announcementOpen.value = false
 }
+
+function toggleAnnouncementsFromMenu() {
+  announcementOpen.value = !announcementOpen.value
+  burgerOpen.value = false
+}
 </script>
 
 <template>
@@ -236,6 +241,18 @@ async function markAnnouncementRead(id: string) {
         <RouterLink v-if="auth.isAuthenticated" to="/profile" class="burger-link" data-testid="burger-profile" @click="burgerOpen = false">
           Профиль
         </RouterLink>
+        <button
+          v-if="auth.isAuthenticated"
+          class="burger-link burger-announcement-link"
+          type="button"
+          data-testid="burger-announcements"
+          @click="toggleAnnouncementsFromMenu"
+        >
+          <span>Анонсы</span>
+          <span v-if="unreadCount > 0" class="burger-announcement-badge">
+            {{ unreadCount }}
+          </span>
+        </button>
         <RouterLink v-if="auth.isAuthenticated && auth.isAdmin" to="/admin" class="burger-link" data-testid="burger-admin" @click="burgerOpen = false">
           Админ
         </RouterLink>
@@ -631,6 +648,27 @@ async function markAnnouncementRead(id: string) {
 .burger-link.as-btn {
   color: rgba(252, 165, 165, 0.9);
 }
+.burger-announcement-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.burger-announcement-badge {
+  min-width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
 .burger-panel-enter-active,
 .burger-panel-leave-active {
   transition: opacity 0.2s ease;
@@ -672,6 +710,9 @@ async function markAnnouncementRead(id: string) {
     gap: 0.4rem;
     margin-left: 0;
     flex-shrink: 0;
+  }
+  .announcement-wrap {
+    order: -1;
   }
   .announcement-button {
     width: 2.05rem;

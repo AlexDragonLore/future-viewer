@@ -73,6 +73,7 @@ describe('HistoryView', () => {
     expect(wrapper.text()).toContain('Three card')
     expect(wrapper.text()).toContain('where to?')
     expect(wrapper.text()).toContain('The stars align')
+    expect(wrapper.get('[data-testid="delete-reading"]').text()).toContain('Удалить из истории')
   })
 
   it('each reading item links to its detail page', async () => {

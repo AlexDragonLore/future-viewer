@@ -201,7 +201,32 @@ describe('HomeView', () => {
     )
   })
 
-  it('shows subscriber warning modal and continues after confirmation', async () => {
+  it('forces subscription-only warning for free user even if validator says can continue', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'u@x.com')
+    validateQuestionMock.mockResolvedValue({
+      status: 'needs_rewrite',
+      reason: 'Медицинская диагностика.',
+      suggestedQuestion: 'Какой следующий шаг мне стоит увидеть в этой ситуации?',
+      message: 'По такому запросу обычно не гадают. Вы уверены, что хотите продолжить?',
+      canContinue: true,
+      requiresSubscription: false,
+    })
+    const { wrapper, router } = await mountHome()
+    await wrapper.findAll('.spread-option')[0].trigger('click')
+    await wrapper.find('textarea').setValue('Болен ли я раком?')
+    await wrapper.find('.glow-button').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.name).toBe('home')
+    expect(sessionStorage.getItem('fv_pending')).toBeNull()
+    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
+      'На такие запросы можно ответить только с подпиской.',
+    )
+    expect(wrapper.find('[data-testid="question-warning-modal"]').exists()).toBe(false)
+  })
+
+  it('shows subscriber warning panel and continues after confirmation', async () => {
     localStorage.setItem('fv_token', 'test-token')
     localStorage.setItem('fv_email', 'u@x.com')
     statusMock.mockResolvedValue({
@@ -227,6 +252,7 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="question-warning-modal"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="continue-with-warning"]').text()).toContain('Продолжить с этим вопросом')
     expect(router.currentRoute.value.name).toBe('home')
 
     await wrapper.find('[data-testid="continue-with-warning"]').trigger('click')

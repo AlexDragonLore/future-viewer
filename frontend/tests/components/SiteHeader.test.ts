@@ -181,6 +181,22 @@ describe('SiteHeader', () => {
     expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(false)
   })
 
+  it('burger panel exposes announcements for authenticated users', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'm@x.com')
+    const { wrapper } = await mountHeader()
+    await wrapper.find('[data-testid="burger-button"]').trigger('click')
+
+    const announcementsLink = wrapper.find('[data-testid="burger-announcements"]')
+    expect(announcementsLink.exists()).toBe(true)
+    expect(announcementsLink.text()).toContain('Анонсы')
+    expect(announcementsLink.text()).toContain('1')
+
+    await announcementsLink.trigger('click')
+    expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="announcement-dropdown"]').text()).toContain('Что нового')
+  })
+
   it('logout clears auth state and routes home', async () => {
     localStorage.setItem('fv_token', 'test-token')
     localStorage.setItem('fv_email', 'u@x.com')

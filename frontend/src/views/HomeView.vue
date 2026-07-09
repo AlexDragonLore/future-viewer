@@ -15,6 +15,9 @@ import { unlockAudio } from '@/composables/useAudio'
 import type { AxiosError } from 'axios'
 import type { QuestionValidationResponse } from '@/api/readingApi'
 
+const subscriberWarningMessage = 'По такому запросу обычно не гадают. Вы уверены, что хотите продолжить?'
+const subscriptionRequiredMessage = 'На такие запросы можно ответить только с подпиской.'
+
 const router = useRouter()
 const auth = useAuthStore()
 const deck = useDeckStore()
@@ -131,6 +134,7 @@ const blockMessage = computed(() => {
 
 const canBegin = computed(() => {
   if (validatingQuestion.value) return false
+  if (auth.isAuthenticated && auth.subscriptionLoading) return false
   if (!question.value.trim()) return false
   if (needsIntro.value && (!firstName.value.trim() || !lastName.value.trim() || !birthDate.value)) return false
   if (!auth.isAuthenticated) return true
@@ -217,8 +221,8 @@ async function begin() {
     const validation = await readingApi.validateQuestion(spreadType.value, pending.question, deck.current)
     if (validation.status !== 'accepted') {
       const suggestion = ensureSuggestion(validation.suggestedQuestion, pending.question)
-      if (!validation.canContinue || validation.requiresSubscription) {
-        validationMessage.value = validation.message
+      if (validation.requiresSubscription || !auth.isSubscribed) {
+        validationMessage.value = subscriptionRequiredMessage
         validationSuggestion.value = suggestion
         validationRequiresSubscription.value = true
         sessionStorage.removeItem('fv_pending')
@@ -227,6 +231,9 @@ async function begin() {
 
       questionWarning.value = {
         ...validation,
+        message: validation.message || subscriberWarningMessage,
+        canContinue: true,
+        requiresSubscription: false,
         suggestedQuestion: suggestion,
       }
       return
@@ -333,34 +340,31 @@ async function begin() {
 
       <div
         v-if="questionWarning"
-        class="warning-backdrop"
+        class="validation-warning question-warning-panel"
         role="dialog"
-        aria-modal="true"
         aria-labelledby="question-warning-title"
         data-testid="question-warning-modal"
       >
-        <section class="warning-dialog">
-          <div id="question-warning-title" class="warning-title">Такой вопрос не подходит для гадания</div>
-          <p class="warning-text">{{ questionWarning.message }}</p>
-          <p class="warning-reason">{{ questionWarning.reason }}</p>
-          <button
-            v-if="warningSuggestion"
-            type="button"
-            class="suggestion-button"
-            @click="applySuggestion"
-            data-testid="warning-apply-suggested-question"
-          >
-            {{ warningSuggestion }}
+        <div id="question-warning-title" class="warning-title">Такой вопрос не подходит для гадания</div>
+        <p class="warning-text">{{ questionWarning.message }}</p>
+        <p class="warning-reason">{{ questionWarning.reason }}</p>
+        <button
+          v-if="warningSuggestion"
+          type="button"
+          class="suggestion-button"
+          @click="applySuggestion"
+          data-testid="warning-apply-suggested-question"
+        >
+          {{ warningSuggestion }}
+        </button>
+        <div class="warning-actions">
+          <button type="button" class="warning-secondary" @click="closeWarning">
+            Отмена
           </button>
-          <div class="warning-actions">
-            <button type="button" class="warning-secondary" @click="closeWarning">
-              Отмена
-            </button>
-            <button type="button" class="glow-button warning-primary" @click="continueWithWarning" data-testid="continue-with-warning">
-              Продолжить
-            </button>
-          </div>
-        </section>
+          <button type="button" class="glow-button warning-primary" @click="continueWithWarning" data-testid="continue-with-warning">
+            Продолжить с этим вопросом
+          </button>
+        </div>
       </div>
 
       <div v-if="validatingQuestion" class="validation-pending" data-testid="question-validating">
@@ -515,25 +519,8 @@ async function begin() {
   text-align: left;
   background: rgba(245, 194, 107, 0.08);
 }
-.warning-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: rgba(6, 3, 14, 0.72);
-  backdrop-filter: blur(10px);
-}
-.warning-dialog {
-  width: min(100%, 30rem);
-  border: 1px solid rgba(245, 194, 107, 0.38);
-  border-radius: 12px;
-  background: rgba(16, 8, 34, 0.96);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
-  padding: 1.25rem;
-  color: rgba(224, 212, 186, 0.88);
+.question-warning-panel {
+  border-color: rgba(252, 165, 165, 0.38);
 }
 .warning-title {
   font-family: 'Cinzel', serif;
@@ -571,8 +558,8 @@ async function begin() {
   cursor: pointer;
 }
 .warning-primary {
-  width: auto;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: min(100%, 15rem);
 }
 .deck-blurb-head {
   display: flex;

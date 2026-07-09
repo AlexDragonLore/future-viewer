@@ -57,25 +57,28 @@ async function deleteReading(reading: Reading) {
       <li v-for="r in readings" :key="r.id" class="history-item mystic-card">
         <RouterLink
           :to="{ name: 'reading-detail', params: { id: r.id } }"
-          class="history-link p-5 block transition hover:border-mystic-accent/60 hover:shadow-[0_0_24px_rgba(245,194,107,0.25)]"
+          class="history-link p-5 pb-3 block transition hover:border-mystic-accent/60 hover:shadow-[0_0_24px_rgba(245,194,107,0.25)]"
         >
-          <div class="history-card-head flex justify-between items-start mb-2 pr-10">
+          <div class="history-card-head flex justify-between items-start mb-2">
             <div class="font-display text-mystic-accent">{{ r.spreadName }}</div>
             <div class="text-xs text-mystic-silver/50">{{ new Date(r.createdAt).toLocaleString() }}</div>
           </div>
           <p class="italic text-mystic-silver/70 mb-2">«{{ r.question }}»</p>
           <p class="text-sm text-mystic-silver/90 line-clamp-3">{{ r.interpretation }}</p>
         </RouterLink>
-        <button
-          type="button"
-          class="delete-reading"
-          :disabled="deletingIds.has(r.id)"
-          aria-label="Удалить расклад полностью"
-          data-testid="delete-reading"
-          @click="deleteReading(r)"
-        >
-          <Trash2 :size="16" aria-hidden="true" />
-        </button>
+        <div class="history-actions">
+          <button
+            type="button"
+            class="delete-reading"
+            :disabled="deletingIds.has(r.id)"
+            aria-label="Удалить расклад полностью"
+            data-testid="delete-reading"
+            @click="deleteReading(r)"
+          >
+            <Trash2 :size="16" aria-hidden="true" />
+            <span>{{ deletingIds.has(r.id) ? 'Удаляю...' : 'Удалить из истории' }}</span>
+          </button>
+        </div>
       </li>
     </ul>
 
@@ -100,19 +103,24 @@ async function deleteReading(reading: Reading) {
   border-color: rgba(245, 194, 107, 0.6);
   box-shadow: 0 0 24px rgba(245, 194, 107, 0.25);
 }
+.history-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 1.25rem 1.25rem;
+}
 .delete-reading {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  gap: 0.45rem;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.7rem;
   border: 1px solid rgba(252, 165, 165, 0.34);
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.28);
   color: rgba(252, 165, 165, 0.92);
+  font-size: 0.78rem;
+  line-height: 1;
   cursor: pointer;
   transition:
     background-color 0.2s ease,
@@ -141,6 +149,13 @@ async function deleteReading(reading: Reading) {
   }
   p {
     overflow-wrap: anywhere;
+  }
+  .history-actions {
+    justify-content: stretch;
+    padding: 0 1.25rem 1.25rem;
+  }
+  .delete-reading {
+    width: 100%;
   }
 }
 </style>
