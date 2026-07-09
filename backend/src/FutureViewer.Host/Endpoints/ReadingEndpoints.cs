@@ -91,34 +91,18 @@ public static class ReadingEndpoints
             CreateReadingRequest request,
             IValidator<CreateReadingRequest> validator,
             IAIQuestionValidator questionValidator,
+            SubscriptionService subscription,
             HttpContext ctx,
             CancellationToken ct) =>
         {
             await validator.ValidateAndThrowAsync(request, ct);
-            _ = GetUserId(ctx.User)
+            var userId = GetUserId(ctx.User)
                 ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
 
             var validation = await questionValidator.ValidateAsync(request.Question, ct);
-            if (validation.Status == QuestionValidationStatus.Accepted)
-            {
-                return Results.Ok(new
-                {
-                    status = "accepted",
-                    reason = validation.Reason,
-                    suggestedQuestion = (string?)null
-                });
-            }
-
-            var code = validation.Status == QuestionValidationStatus.NeedsRewrite
-                ? "question_needs_rewrite"
-                : "question_rejected";
-            var suggestedQuestion = validation.SuggestedQuestion
-                ?? QuestionValidationHeuristics.BuildFallbackSuggestion(request.Question);
-
-            throw new DomainServices.Exceptions.QuestionValidationException(
-                code,
-                validation.Reason,
-                suggestedQuestion);
+            var hasActiveSubscription = await subscription.HasActiveSubscriptionAsync(userId, ct);
+            var result = QuestionValidationPolicy.BuildCheck(request.Question, validation, hasActiveSubscription);
+            return Results.Ok(result);
         }).RequireAuthorization();
 
         group.MapGet("/{id:guid}", async (
@@ -142,6 +126,18 @@ public static class ReadingEndpoints
                 ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
             var history = await service.GetHistoryAsync(userId, ct);
             return Results.Ok(history);
+        }).RequireAuthorization();
+
+        group.MapDelete("/{id:guid}", async (
+            Guid id,
+            ReadingService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            var userId = GetUserId(ctx.User)
+                ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
+            await service.DeleteFromHistoryAsync(id, userId, ct);
+            return Results.NoContent();
         }).RequireAuthorization();
 
         return app;

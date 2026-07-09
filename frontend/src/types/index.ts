@@ -183,6 +183,14 @@ export interface TelegramLinkResponse {
   isLinked: boolean
 }
 
+export interface AnnouncementInfo {
+  id: string
+  code: string
+  title: string
+  body: string
+  publishedAt: string
+}
+
 export interface UserMemoryRule {
   id: string
   text: string

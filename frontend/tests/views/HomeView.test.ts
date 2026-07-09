@@ -74,6 +74,9 @@ describe('HomeView', () => {
       status: 'accepted',
       reason: 'ok',
       suggestedQuestion: null,
+      message: 'ok',
+      canContinue: true,
+      requiresSubscription: false,
     })
     statusMock.mockResolvedValue({
       status: SubscriptionStatusValue.None,
@@ -171,17 +174,16 @@ describe('HomeView', () => {
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
-  it('stays on home and shows validator response when question needs rewrite', async () => {
+  it('shows subscription-only warning for free user when question needs rewrite', async () => {
     localStorage.setItem('fv_token', 'test-token')
     localStorage.setItem('fv_email', 'u@x.com')
-    validateQuestionMock.mockRejectedValue({
-      response: {
-        data: {
-          error: 'question_needs_rewrite',
-          message: 'Вопрос слишком общий.',
-          suggestedQuestion: 'На что мне стоит обратить внимание?',
-        },
-      },
+    validateQuestionMock.mockResolvedValue({
+      status: 'needs_rewrite',
+      reason: 'Вопрос слишком общий.',
+      suggestedQuestion: 'На что мне стоит обратить внимание?',
+      message: 'На такие запросы можно ответить только с подпиской.',
+      canContinue: false,
+      requiresSubscription: true,
     })
     const { wrapper, router } = await mountHome()
     await wrapper.findAll('.spread-option')[0].trigger('click')
@@ -191,23 +193,60 @@ describe('HomeView', () => {
 
     expect(router.currentRoute.value.name).toBe('home')
     expect(sessionStorage.getItem('fv_pending')).toBeNull()
-    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain('Вопрос слишком общий.')
+    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
+      'На такие запросы можно ответить только с подпиской.',
+    )
     expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
       'На что мне стоит обратить внимание?',
     )
   })
 
+  it('shows subscriber warning modal and continues after confirmation', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'u@x.com')
+    statusMock.mockResolvedValue({
+      status: SubscriptionStatusValue.Active,
+      expiresAt: '2030-01-01T00:00:00Z',
+      isActive: true,
+      freeReadingsUsedToday: 0,
+      freeReadingsDailyLimit: 1,
+      canCreateFreeReading: true,
+    })
+    validateQuestionMock.mockResolvedValue({
+      status: 'needs_rewrite',
+      reason: 'Вопрос слишком общий.',
+      suggestedQuestion: 'На что мне стоит обратить внимание?',
+      message: 'По такому запросу обычно не гадают. Вы уверены, что хотите продолжить?',
+      canContinue: true,
+      requiresSubscription: false,
+    })
+    const { wrapper, router } = await mountHome()
+    await wrapper.findAll('.spread-option')[0].trigger('click')
+    await wrapper.find('textarea').setValue('что будет?')
+    await wrapper.find('.glow-button').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="question-warning-modal"]').exists()).toBe(true)
+    expect(router.currentRoute.value.name).toBe('home')
+
+    await wrapper.find('[data-testid="continue-with-warning"]').trigger('click')
+    await flushPromises()
+
+    const stored = JSON.parse(sessionStorage.getItem('fv_pending')!)
+    expect(stored.questionWarningAcknowledged).toBe(true)
+    expect(router.currentRoute.value.name).toBe('reading')
+  })
+
   it('adds a fallback suggestion when validator rejects without one', async () => {
     localStorage.setItem('fv_token', 'test-token')
     localStorage.setItem('fv_email', 'u@x.com')
-    validateQuestionMock.mockRejectedValue({
-      response: {
-        data: {
-          error: 'question_rejected',
-          message: 'Вопрос не связан с реальной жизненной ситуацией.',
-          suggestedQuestion: null,
-        },
-      },
+    validateQuestionMock.mockResolvedValue({
+      status: 'rejected',
+      reason: 'Вопрос не связан с реальной жизненной ситуацией.',
+      suggestedQuestion: null,
+      message: 'На такие запросы можно ответить только с подпиской.',
+      canContinue: false,
+      requiresSubscription: true,
     })
     const { wrapper } = await mountHome()
     await wrapper.findAll('.spread-option')[0].trigger('click')
@@ -216,7 +255,7 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
-      'Вопрос не связан с реальной жизненной ситуацией.',
+      'На такие запросы можно ответить только с подпиской.',
     )
     expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
       'Что мне важно понять про тему «тест»?',

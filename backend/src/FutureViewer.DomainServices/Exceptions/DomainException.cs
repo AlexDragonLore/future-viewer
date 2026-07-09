@@ -30,6 +30,39 @@ public sealed class SubscriptionRequiredException : DomainException
     public SubscriptionRequiredException(string message) : base(message) { }
 }
 
+public sealed class QuestionRequiresSubscriptionException : DomainException
+{
+    public QuestionRequiresSubscriptionException(
+        string message,
+        string reason,
+        string? suggestedQuestion = null) : base(message)
+    {
+        Reason = reason;
+        SuggestedQuestion = suggestedQuestion;
+    }
+
+    public string Reason { get; }
+    public string? SuggestedQuestion { get; }
+}
+
+public sealed class QuestionWarningAcknowledgementRequiredException : DomainException
+{
+    public QuestionWarningAcknowledgementRequiredException(
+        string message,
+        string reason,
+        string status,
+        string? suggestedQuestion = null) : base(message)
+    {
+        Reason = reason;
+        Status = status;
+        SuggestedQuestion = suggestedQuestion;
+    }
+
+    public string Reason { get; }
+    public string Status { get; }
+    public string? SuggestedQuestion { get; }
+}
+
 public sealed class EmailNotVerifiedException : DomainException
 {
     public EmailNotVerifiedException(string message) : base(message) { }

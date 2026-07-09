@@ -87,6 +87,7 @@ app.MapLeaderboard();
 app.MapAchievements();
 app.MapTelegram();
 app.MapAdmin();
+app.MapAnnouncements();
 
 // Migrations + seed at startup (skip in Testing env — integration tests manage their own DB)
 if (!app.Environment.IsEnvironment("Testing"))

@@ -47,7 +47,9 @@ public sealed class FeedbackRepository : IFeedbackRepository
             .Where(f => f.Status == FeedbackStatus.Pending
                         && f.ScheduledAt <= before
                         && f.User != null
-                        && f.User.TelegramChatId != null)
+                        && f.User.TelegramChatId != null
+                        && f.Reading != null
+                        && f.Reading.DeletedFromHistoryAt == null)
             .OrderBy(f => f.ScheduledAt)
             .Take(batch)
             .ToListAsync(ct);
@@ -69,7 +71,9 @@ public sealed class FeedbackRepository : IFeedbackRepository
     {
         return await _db.ReadingFeedbacks
             .Include(f => f.Reading)
-            .Where(f => f.UserId == userId)
+            .Where(f => f.UserId == userId
+                        && f.Reading != null
+                        && f.Reading.DeletedFromHistoryAt == null)
             .OrderByDescending(f => f.CreatedAt)
             .Take(take)
             .ToListAsync(ct);
@@ -125,7 +129,9 @@ public sealed class FeedbackRepository : IFeedbackRepository
             f => f.Status == FeedbackStatus.Pending
                  && f.ScheduledAt <= before
                  && f.User != null
-                 && f.User.TelegramChatId != null,
+                 && f.User.TelegramChatId != null
+                 && f.Reading != null
+                 && f.Reading.DeletedFromHistoryAt == null,
             ct);
 
     public Task<int> CountScoredSinceAsync(DateTime fromUtc, CancellationToken ct = default) =>

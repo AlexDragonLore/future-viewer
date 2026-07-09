@@ -5,9 +5,17 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import { SubscriptionStatusValue } from '@/types'
 
 const statusMock = vi.fn()
+const unreadAnnouncementsMock = vi.fn()
+const markAnnouncementReadMock = vi.fn()
 vi.mock('@/api/subscriptionApi', () => ({
   subscriptionApi: {
     status: (...args: []) => statusMock(...args),
+  },
+}))
+vi.mock('@/api/announcementApi', () => ({
+  announcementApi: {
+    unread: (...args: []) => unreadAnnouncementsMock(...args),
+    markRead: (...args: [string]) => markAnnouncementReadMock(...args),
   },
 }))
 
@@ -42,6 +50,8 @@ describe('SiteHeader', () => {
   beforeEach(() => {
     localStorage.clear()
     statusMock.mockReset()
+    unreadAnnouncementsMock.mockReset()
+    markAnnouncementReadMock.mockReset()
     statusMock.mockResolvedValue({
       status: SubscriptionStatusValue.None,
       expiresAt: null,
@@ -50,6 +60,16 @@ describe('SiteHeader', () => {
       freeReadingsDailyLimit: 1,
       canCreateFreeReading: true,
     })
+    unreadAnnouncementsMock.mockResolvedValue([
+      {
+        id: 'ann-1',
+        code: 'current',
+        title: 'Что нового',
+        body: 'Новое сообщение',
+        publishedAt: '2026-07-09T00:00:00Z',
+      },
+    ])
+    markAnnouncementReadMock.mockResolvedValue(undefined)
   })
 
   it('renders logo and glossary link', async () => {
@@ -82,6 +102,25 @@ describe('SiteHeader', () => {
     const quota = wrapper.find('[data-testid="header-quota"]')
     expect(quota.exists()).toBe(true)
     expect(quota.text()).toContain('1/1')
+  })
+
+  it('shows unread announcements and removes one after read', async () => {
+    localStorage.setItem('fv_token', 'test-token')
+    localStorage.setItem('fv_email', 'u@x.com')
+    const { wrapper } = await mountHeader()
+
+    const bell = wrapper.find('[data-testid="announcement-bell"]')
+    expect(bell.exists()).toBe(true)
+    expect(wrapper.find('[data-testid="announcement-badge"]').text()).toBe('1')
+
+    await bell.trigger('click')
+    expect(wrapper.find('[data-testid="announcement-dropdown"]').text()).toContain('Что нового')
+
+    await wrapper.find('[data-testid="announcement-read"]').trigger('click')
+    await flushPromises()
+
+    expect(markAnnouncementReadMock).toHaveBeenCalledWith('ann-1')
+    expect(wrapper.find('[data-testid="announcement-badge"]').exists()).toBe(false)
   })
 
   it('shows infinite badge for subscribed user', async () => {

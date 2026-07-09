@@ -1,18 +1,22 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useDeckStore } from '@/stores/useDeckStore'
+import { useAnnouncementStore } from '@/stores/useAnnouncementStore'
 import { DeckType } from '@/types'
 import { DECKS } from '@/data/decks'
+import { Bell } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const deck = useDeckStore()
+const announcements = useAnnouncementStore()
 const router = useRouter()
 
 const menuOpen = ref(false)
 const deckOpen = ref(false)
 const burgerOpen = ref(false)
+const announcementOpen = ref(false)
 
 const currentDeckLabel = computed(
   () => DECKS.find((o) => o.value === deck.current)?.label ?? 'RWS',
@@ -27,12 +31,29 @@ onMounted(async () => {
   if (auth.isAuthenticated && !auth.subscription) {
     await auth.refreshSubscription()
   }
+  if (auth.isAuthenticated) {
+    await announcements.load()
+  }
 })
+
+watch(
+  () => auth.isAuthenticated,
+  async (isAuthenticated) => {
+    if (isAuthenticated) {
+      await announcements.load()
+    } else {
+      announcements.clear()
+      announcementOpen.value = false
+    }
+  },
+)
 
 function handleLogout() {
   auth.logout()
+  announcements.clear()
   menuOpen.value = false
   burgerOpen.value = false
+  announcementOpen.value = false
   router.push({ name: 'home' })
 }
 
@@ -44,6 +65,13 @@ const quotaLabel = computed(() => {
   const left = Math.max(0, s.freeReadingsDailyLimit - s.freeReadingsUsedToday)
   return `${left}/${s.freeReadingsDailyLimit}`
 })
+
+const unreadCount = computed(() => announcements.unread.length)
+
+async function markAnnouncementRead(id: string) {
+  await announcements.markRead(id)
+  if (announcements.unread.length === 0) announcementOpen.value = false
+}
 </script>
 
 <template>
@@ -111,6 +139,40 @@ const quotaLabel = computed(() => {
         </div>
 
         <template v-if="auth.isAuthenticated">
+          <div class="announcement-wrap">
+            <button
+              class="announcement-button"
+              type="button"
+              aria-label="Анонсы"
+              :aria-expanded="announcementOpen"
+              data-testid="announcement-bell"
+              @click="announcementOpen = !announcementOpen"
+            >
+              <Bell :size="17" aria-hidden="true" />
+              <span v-if="unreadCount > 0" class="announcement-badge" data-testid="announcement-badge">
+                {{ unreadCount }}
+              </span>
+            </button>
+            <div v-if="announcementOpen" class="announcement-dropdown" data-testid="announcement-dropdown">
+              <div v-if="announcements.loading" class="announcement-state">загружаю…</div>
+              <div v-else-if="announcements.error" class="announcement-state error">{{ announcements.error }}</div>
+              <div v-else-if="announcements.unread.length === 0" class="announcement-state">Новых анонсов нет</div>
+              <template v-else>
+                <article v-for="item in announcements.unread" :key="item.id" class="announcement-item">
+                  <div class="announcement-title">{{ item.title }}</div>
+                  <p>{{ item.body }}</p>
+                  <button
+                    type="button"
+                    class="announcement-read"
+                    data-testid="announcement-read"
+                    @click="markAnnouncementRead(item.id)"
+                  >
+                    Понятно
+                  </button>
+                </article>
+              </template>
+            </div>
+          </div>
           <div class="quota desktop-account" v-if="quotaLabel" data-testid="header-quota" :class="{ subscribed: auth.isSubscribed }">
             {{ quotaLabel }}
           </div>
@@ -263,6 +325,105 @@ const quotaLabel = computed(() => {
   align-items: center;
   gap: 0.75rem;
   min-width: 0;
+}
+.announcement-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+.announcement-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 194, 107, 0.3);
+  background: rgba(0, 0, 0, 0.25);
+  color: #f5c26b;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.announcement-button:hover {
+  border-color: rgba(245, 194, 107, 0.7);
+  background: rgba(245, 194, 107, 0.08);
+  box-shadow: 0 0 16px rgba(245, 194, 107, 0.18);
+}
+.announcement-badge {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  min-width: 1rem;
+  height: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.62rem;
+  line-height: 1;
+  font-weight: 700;
+}
+.announcement-dropdown {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  width: min(21rem, calc(100vw - 1rem));
+  padding: 0.65rem;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 194, 107, 0.3);
+  background: rgba(11, 6, 24, 0.95);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  z-index: 45;
+}
+.announcement-state {
+  color: rgba(224, 212, 186, 0.78);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  padding: 0.35rem;
+}
+.announcement-state.error {
+  color: #fca5a5;
+}
+.announcement-item {
+  padding: 0.25rem;
+}
+.announcement-title {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.08em;
+  color: #f5c26b;
+  font-size: 0.82rem;
+  margin-bottom: 0.35rem;
+}
+.announcement-item p {
+  margin: 0;
+  color: rgba(224, 212, 186, 0.82);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.announcement-read {
+  margin-top: 0.65rem;
+  width: 100%;
+  border: 1px solid rgba(245, 194, 107, 0.35);
+  border-radius: 8px;
+  background: rgba(245, 194, 107, 0.08);
+  color: #f5c26b;
+  padding: 0.55rem 0.75rem;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  cursor: pointer;
+  text-align: center;
+}
+.announcement-read:hover {
+  background: rgba(245, 194, 107, 0.15);
 }
 .deck-picker {
   position: relative;
@@ -511,6 +672,16 @@ const quotaLabel = computed(() => {
     gap: 0.4rem;
     margin-left: 0;
     flex-shrink: 0;
+  }
+  .announcement-button {
+    width: 2.05rem;
+    height: 2.05rem;
+  }
+  .announcement-dropdown {
+    position: fixed;
+    top: 3.45rem;
+    right: 0.5rem;
+    width: min(21rem, calc(100vw - 1rem));
   }
   .deck-button {
     padding: 0.4rem 0.55rem;

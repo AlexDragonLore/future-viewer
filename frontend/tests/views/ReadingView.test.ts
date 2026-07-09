@@ -117,6 +117,24 @@ describe('ReadingView', () => {
     expect(sessionStorage.getItem('fv_reading_error')).toContain('AI-провайдер не настроен.')
   })
 
+  it('passes acknowledged question warning to the streaming API', async () => {
+    sessionStorage.setItem('fv_pending', JSON.stringify({
+      spreadType: SpreadType.SingleCard,
+      question: 'Question?',
+      questionWarningAcknowledged: true,
+    }))
+    createStreamMock.mockImplementation(async (_spreadType, _question, _deckType, handlers) => {
+      handlers.onCards(buildReading(1))
+      handlers.onDone()
+    })
+
+    await mountReading()
+    await flushPromises()
+
+    expect(createStreamMock).toHaveBeenCalled()
+    expect(createStreamMock.mock.calls[0][5]).toBe(true)
+  })
+
   it('uses a fixed viewport board without document-height layout shifts', async () => {
     createStreamMock.mockImplementation(async (_spreadType, _question, _deckType, handlers) => {
       handlers.onCards(buildReading(1))

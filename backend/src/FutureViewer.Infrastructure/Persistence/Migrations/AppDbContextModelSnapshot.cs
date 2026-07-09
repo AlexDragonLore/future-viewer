@@ -71,6 +71,80 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.ToTable("achievements", (string)null);
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.Announcement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("body");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.HasIndex("PublishedAt");
+
+                    b.ToTable("announcements", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.AnnouncementRead", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AnnouncementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("announcement_id");
+
+                    b.Property<DateTime>("ReadAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnnouncementId");
+
+                    b.HasIndex("UserId", "AnnouncementId")
+                        .IsUnique();
+
+                    b.ToTable("announcement_reads", (string)null);
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.DeckVariant", b =>
                 {
                     b.Property<int>("Id")
@@ -156,6 +230,10 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(1)
                         .HasColumnName("deck_type");
+
+                    b.Property<DateTime?>("DeletedFromHistoryAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_from_history_at");
 
                     b.Property<string>("Question")
                         .IsRequired()
@@ -550,6 +628,25 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("Card");
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.AnnouncementRead", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.Announcement", "Announcement")
+                        .WithMany("Reads")
+                        .HasForeignKey("AnnouncementId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FutureViewer.Domain.Entities.User", "User")
+                        .WithMany("AnnouncementReads")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Announcement");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.Reading", b =>
                 {
                     b.HasOne("FutureViewer.Domain.Entities.User", "User")
@@ -633,6 +730,11 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("UserAchievements");
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.Announcement", b =>
+                {
+                    b.Navigation("Reads");
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.Reading", b =>
                 {
                     b.Navigation("Cards");
@@ -647,6 +749,8 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.User", b =>
                 {
+                    b.Navigation("AnnouncementReads");
+
                     b.Navigation("Achievements");
 
                     b.Navigation("Feedbacks");

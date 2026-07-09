@@ -51,10 +51,68 @@ public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
+    public async Task Delete_reading_hides_it_from_history_and_detail()
+    {
+        var client = await CreateSubscribedClient();
+        var createResponse = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "delete me" });
+        var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
+
+        var deleteResponse = await client.DeleteAsync($"/api/readings/{created!.Id}");
+        var historyResponse = await client.GetAsync("/api/readings/history");
+        var detailResponse = await client.GetAsync($"/api/readings/{created.Id}");
+
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        detailResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        var history = await historyResponse.Content.ReadFromJsonAsync<List<ReadingResult>>();
+        history!.Select(r => r.Id).Should().NotContain(created.Id);
+    }
+
+    [Fact]
+    public async Task Delete_reading_hides_associated_feedback_link()
+    {
+        var client = await CreateSubscribedClient();
+        var createResponse = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "feedback delete" });
+        var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
+
+        string token;
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var feedbacks = scope.ServiceProvider.GetRequiredService<IFeedbackRepository>();
+            var feedback = await feedbacks.GetByReadingIdAsync(created!.Id);
+            token = feedback!.Token;
+        }
+
+        await client.DeleteAsync($"/api/readings/{created!.Id}");
+        var feedbackResponse = await client.GetAsync($"/api/feedbacks/{token}");
+
+        feedbackResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task History_without_token_returns_unauthorized()
     {
         var client = _fixture.CreateClient();
         var response = await client.GetAsync("/api/readings/history");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private async Task<HttpClient> CreateSubscribedClient()
+    {
+        var client = _fixture.CreateClient();
+        var email = $"hist-{Guid.NewGuid():N}@example.com";
+
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+
+        using var scope = _fixture.Services.CreateScope();
+        var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var user = await users.GetByIdAsync(auth.UserId);
+        user!.SubscriptionStatus = SubscriptionStatus.Active;
+        user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+        await users.UpdateAsync(user);
+
+        return client;
     }
 }

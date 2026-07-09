@@ -49,6 +49,7 @@ public static class DatabaseInitializer
         }
 
         await SeedAchievementsAsync(db, ct);
+        await SeedAnnouncementsAsync(db, ct);
 
         if (config is not null)
             await SeedAdminsAsync(db, config, ct);
@@ -107,6 +108,53 @@ public static class DatabaseInitializer
     }
 
     private sealed record AchievementSeedItem(string Code, string NameRu, string DescriptionRu, string IconPath, int SortOrder, int Points);
+
+    private static async Task SeedAnnouncementsAsync(AppDbContext db, CancellationToken ct)
+    {
+        var existing = await db.Announcements.AsTracking().ToDictionaryAsync(a => a.Code, ct);
+
+        foreach (var item in AnnouncementSeed.All)
+        {
+            if (existing.TryGetValue(item.Code, out var tracked))
+            {
+                tracked.Title = item.Title;
+                tracked.Body = item.Body;
+                tracked.IsActive = item.IsActive;
+                continue;
+            }
+
+            await db.Announcements.AddAsync(new Announcement
+            {
+                Code = item.Code,
+                Title = item.Title,
+                Body = item.Body,
+                PublishedAt = item.PublishedAt,
+                IsActive = item.IsActive
+            }, ct);
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    private sealed record AnnouncementSeedItem(
+        string Code,
+        string Title,
+        string Body,
+        DateTime PublishedAt,
+        bool IsActive);
+
+    private static class AnnouncementSeed
+    {
+        public static readonly IReadOnlyList<AnnouncementSeedItem> All =
+        [
+            new(
+                "current-release-validation-history-announcements",
+                "Что нового",
+                "В текущем обновлении спорные вопросы больше не обрывают расклад для подписчиков: Вуаль покажет предупреждение и предложит более удачную формулировку. В истории теперь можно полностью удалить расклад из личного архива. А новые обновления будут приходить в колокольчик и исчезать после просмотра.",
+                new DateTime(2026, 7, 9, 0, 0, 0, DateTimeKind.Utc),
+                true)
+        ];
+    }
 
     private static class AchievementSeed
     {

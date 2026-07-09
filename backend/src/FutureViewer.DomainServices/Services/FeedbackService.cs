@@ -55,6 +55,8 @@ public sealed class FeedbackService
         var reading = feedback.Reading
             ?? await _readings.GetByIdAsync(feedback.ReadingId, ct)
             ?? throw new NotFoundException("Associated reading not found");
+        if (reading.DeletedFromHistoryAt is not null)
+            throw new NotFoundException("Associated reading not found");
 
         return Map(feedback, reading);
     }
@@ -70,6 +72,8 @@ public sealed class FeedbackService
         var reading = feedback.Reading
             ?? await _readings.GetByIdAsync(feedback.ReadingId, ct)
             ?? throw new NotFoundException("Associated reading not found");
+        if (reading.DeletedFromHistoryAt is not null)
+            throw new NotFoundException("Associated reading not found");
 
         var scoring = await _scorer.ScoreAsync(
             reading.Question,

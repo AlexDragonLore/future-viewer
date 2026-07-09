@@ -20,6 +20,7 @@ public static class DomainServicesExtensions
         services.AddScoped<TelegramLinkService>();
         services.AddScoped<AdminService>();
         services.AddScoped<PersonalizationService>();
+        services.AddScoped<AnnouncementService>();
 
         services.AddValidatorsFromAssemblyContaining<CreateReadingRequestValidator>();
         return services;

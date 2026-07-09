@@ -37,7 +37,7 @@ public sealed class ReadingRepository : IReadingRepository
         return await _db.Readings
             .Include(r => r.Cards)
             .ThenInclude(c => c.Card)
-            .Where(r => r.UserId == userId)
+            .Where(r => r.UserId == userId && r.DeletedFromHistoryAt == null)
             .OrderByDescending(r => r.CreatedAt)
             .Take(take)
             .ToListAsync(ct);

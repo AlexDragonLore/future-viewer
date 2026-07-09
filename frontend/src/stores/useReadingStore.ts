@@ -58,11 +58,16 @@ export const useReadingStore = defineStore('reading', () => {
     }
   }
 
-  async function create(spreadType: SpreadType, question: string) {
+  async function create(spreadType: SpreadType, question: string, questionWarningAcknowledged = false) {
     loading.value = true
     error.value = null
     try {
-      current.value = await readingApi.create(spreadType, question, useDeckStore().current)
+      current.value = await readingApi.create(
+        spreadType,
+        question,
+        useDeckStore().current,
+        questionWarningAcknowledged,
+      )
       void useAuthStore().refreshSubscription()
     } catch (e) {
       error.value = extractApiError(e, 'Не удалось создать расклад')
@@ -72,7 +77,12 @@ export const useReadingStore = defineStore('reading', () => {
     }
   }
 
-  function createStream(spreadType: SpreadType, question: string, signal?: AbortSignal) {
+  function createStream(
+    spreadType: SpreadType,
+    question: string,
+    signal?: AbortSignal,
+    questionWarningAcknowledged = false,
+  ) {
     loading.value = true
     error.value = null
     current.value = null
@@ -108,7 +118,7 @@ export const useReadingStore = defineStore('reading', () => {
           }
           void useAuthStore().refreshSubscription()
         },
-      }, signal)
+      }, signal, questionWarningAcknowledged)
       .catch((e) => {
         flushStreamBuffer()
         if (isAbortError(e)) {

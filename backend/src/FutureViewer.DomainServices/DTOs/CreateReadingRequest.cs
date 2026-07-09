@@ -9,4 +9,5 @@ public sealed class CreateReadingRequest
     public DeckType DeckType { get; init; } = DeckType.RWS;
     public DateOnly? ClientDate { get; init; }
     public string? ClientTimeZone { get; init; }
+    public bool QuestionWarningAcknowledged { get; init; } = false;
 }

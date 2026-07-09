@@ -18,6 +18,8 @@ public sealed class AppDbContext : DbContext
     public DbSet<Achievement> Achievements => Set<Achievement>();
     public DbSet<UserAchievement> UserAchievements => Set<UserAchievement>();
     public DbSet<UserMemoryRule> UserMemoryRules => Set<UserMemoryRule>();
+    public DbSet<Announcement> Announcements => Set<Announcement>();
+    public DbSet<AnnouncementRead> AnnouncementReads => Set<AnnouncementRead>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +33,8 @@ public sealed class AppDbContext : DbContext
         modelBuilder.ApplyConfiguration(new AchievementConfiguration());
         modelBuilder.ApplyConfiguration(new UserAchievementConfiguration());
         modelBuilder.ApplyConfiguration(new UserMemoryRuleConfiguration());
+        modelBuilder.ApplyConfiguration(new AnnouncementConfiguration());
+        modelBuilder.ApplyConfiguration(new AnnouncementReadConfiguration());
         base.OnModelCreating(modelBuilder);
     }
 }

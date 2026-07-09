@@ -49,9 +49,9 @@ public sealed class ReadingService
     {
         var spread = Spread.From(request.SpreadType);
         var promptContext = await PreparePromptContextAsync(request, userId, ct);
-        if (userId is { } uid)
-            await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
-        await ValidateQuestionAsync(request.Question, ct);
+        var uid = userId ?? throw new UnauthorizedException("Authentication required");
+        await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
+        var questionValidation = await ValidateQuestionAccessAsync(request, uid, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -69,8 +69,9 @@ public sealed class ReadingService
             cards.Select(c => c.CardId).ToList(),
             ct);
 
+        var interpretationQuestion = BuildQuestionForInterpretation(request.Question, questionValidation);
         var interpretation = await _interpreter.InterpretAsync(
-            spread, request.Question, cards, request.DeckType, variantNotes, promptContext, ct);
+            spread, interpretationQuestion, cards, request.DeckType, variantNotes, promptContext, ct);
 
         var reading = new Reading
         {
@@ -113,9 +114,9 @@ public sealed class ReadingService
     {
         var spread = Spread.From(request.SpreadType);
         var promptContext = await PreparePromptContextAsync(request, userId, ct);
-        if (userId is { } uid)
-            await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
-        await ValidateQuestionAsync(request.Question, ct);
+        var uid = userId ?? throw new UnauthorizedException("Authentication required");
+        await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
+        var questionValidation = await ValidateQuestionAccessAsync(request, uid, ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -150,8 +151,9 @@ public sealed class ReadingService
         var persisted = false;
         try
         {
+            var interpretationQuestion = BuildQuestionForInterpretation(request.Question, questionValidation);
             await foreach (var delta in _interpreter.InterpretStreamAsync(
-                spread, request.Question, cards, request.DeckType, variantNotes, promptContext, ct))
+                spread, interpretationQuestion, cards, request.DeckType, variantNotes, promptContext, ct))
             {
                 if (!persisted)
                 {
@@ -202,6 +204,8 @@ public sealed class ReadingService
             ?? throw new NotFoundException($"Reading {id} not found");
         if (reading.UserId != userId)
             throw new NotFoundException($"Reading {id} not found");
+        if (reading.DeletedFromHistoryAt is not null)
+            throw new NotFoundException($"Reading {id} not found");
         var spread = Spread.From(reading.SpreadType);
         return Map(reading, spread);
     }
@@ -210,6 +214,20 @@ public sealed class ReadingService
     {
         var readings = await _repo.GetHistoryAsync(userId, take: 50, ct);
         return readings.Select(r => Map(r, Spread.From(r.SpreadType))).ToList();
+    }
+
+    public async Task DeleteFromHistoryAsync(Guid id, Guid userId, CancellationToken ct = default)
+    {
+        var reading = await _repo.GetByIdAsync(id, ct)
+            ?? throw new NotFoundException($"Reading {id} not found");
+        if (reading.UserId != userId)
+            throw new NotFoundException($"Reading {id} not found");
+
+        if (reading.DeletedFromHistoryAt is not null)
+            return;
+
+        reading.DeletedFromHistoryAt = DateTime.UtcNow;
+        await _repo.UpdateAsync(reading, ct);
     }
 
     private async Task<UserPromptContext> PreparePromptContextAsync(
@@ -227,18 +245,62 @@ public sealed class ReadingService
             ct);
     }
 
-    private async Task ValidateQuestionAsync(string question, CancellationToken ct)
+    private async Task<QuestionValidationResult> ValidateQuestionAccessAsync(
+        CreateReadingRequest request,
+        Guid userId,
+        CancellationToken ct)
     {
-        var validation = await _questionValidator.ValidateAsync(question, ct);
-        if (validation.Status == QuestionValidationStatus.Accepted) return;
+        var validation = await _questionValidator.ValidateAsync(request.Question, ct);
+        if (validation.Status == QuestionValidationStatus.Accepted)
+            return validation;
 
-        var code = validation.Status == QuestionValidationStatus.NeedsRewrite
-            ? "question_needs_rewrite"
-            : "question_rejected";
+        var suggestedQuestion = validation.SuggestedQuestion
+            ?? QuestionValidationHeuristics.BuildFallbackSuggestion(request.Question);
+
+        var hasActiveSubscription = await _subscription.HasActiveSubscriptionAsync(userId, ct);
+        if (!hasActiveSubscription)
+        {
+            throw new QuestionRequiresSubscriptionException(
+                QuestionValidationPolicy.SubscriptionRequiredMessage,
+                validation.Reason,
+                suggestedQuestion);
+        }
+
+        if (!request.QuestionWarningAcknowledged)
+        {
+            throw new QuestionWarningAcknowledgementRequiredException(
+                QuestionValidationPolicy.SubscriberWarningMessage,
+                validation.Reason,
+                QuestionValidationPolicy.ToWireStatus(validation.Status),
+                suggestedQuestion);
+        }
+
+        return new QuestionValidationResult
+        {
+            Status = validation.Status,
+            Reason = validation.Reason,
+            SuggestedQuestion = suggestedQuestion
+        };
+    }
+
+    private static string BuildQuestionForInterpretation(
+        string question,
+        QuestionValidationResult validation)
+    {
+        if (validation.Status == QuestionValidationStatus.Accepted)
+            return question;
+
         var suggestedQuestion = validation.SuggestedQuestion
             ?? QuestionValidationHeuristics.BuildFallbackSuggestion(question);
 
-        throw new QuestionValidationException(code, validation.Reason, suggestedQuestion);
+        var sb = new StringBuilder();
+        sb.AppendLine(question);
+        sb.AppendLine();
+        sb.AppendLine("Системная пометка: валидатор отметил этот вопрос как неподходящий для прямого гадания.");
+        sb.Append("Причина: ").AppendLine(validation.Reason);
+        sb.Append("Безопасная формулировка: ").AppendLine(suggestedQuestion);
+        sb.AppendLine("Не давай медицинских, юридических, финансовых гарантий, точных фактов, инструкций контроля или опасных советов. Если исходный вопрос просит именно это, мягко переведи ответ к размышлению, возможностям, рискам и следующему безопасному шагу пользователя.");
+        return sb.ToString();
     }
 
     private async Task RememberAsync(

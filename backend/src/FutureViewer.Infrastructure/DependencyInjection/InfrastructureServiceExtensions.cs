@@ -46,6 +46,7 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IAchievementRepository, AchievementRepository>();
         services.AddScoped<ILeaderboardRepository, LeaderboardRepository>();
         services.AddScoped<IUserMemoryRepository, UserMemoryRepository>();
+        services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();

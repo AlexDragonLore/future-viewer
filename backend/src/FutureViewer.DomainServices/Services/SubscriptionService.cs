@@ -68,6 +68,14 @@ public sealed class SubscriptionService
         };
     }
 
+    public async Task<bool> HasActiveSubscriptionAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new UnauthorizedException("User not found");
+
+        return IsSubscriptionActive(user);
+    }
+
     public async Task<PaymentCreationDto> CreatePaymentAsync(Guid userId, CancellationToken ct = default)
     {
         var user = await _users.GetByIdAsync(userId, ct)

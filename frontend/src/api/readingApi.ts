@@ -14,9 +14,12 @@ export interface ReadingApiError extends Error {
 }
 
 export interface QuestionValidationResponse {
-  status: 'accepted'
+  status: 'accepted' | 'needs_rewrite' | 'rejected'
   reason: string
-  suggestedQuestion: null
+  suggestedQuestion: string | null
+  message: string
+  canContinue: boolean
+  requiresSubscription: boolean
 }
 
 type StreamEvent =
@@ -26,13 +29,19 @@ type StreamEvent =
   | { type: 'error'; message?: string }
 
 export const readingApi = {
-  async create(spreadType: SpreadType, question: string, deckType: DeckType): Promise<Reading> {
+  async create(
+    spreadType: SpreadType,
+    question: string,
+    deckType: DeckType,
+    questionWarningAcknowledged = false,
+  ): Promise<Reading> {
     const { data } = await httpClient.post<Reading>('/api/readings', {
       spreadType,
       question,
       deckType,
       clientDate: todayLocal(),
       clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      questionWarningAcknowledged,
     })
     return data
   },
@@ -58,6 +67,7 @@ export const readingApi = {
     deckType: DeckType,
     handlers: ReadingStreamHandlers,
     signal?: AbortSignal,
+    questionWarningAcknowledged = false,
   ): Promise<void> {
     const baseURL = (httpClient.defaults.baseURL ?? '').replace(/\/$/, '')
     const token = localStorage.getItem('fv_token')
@@ -76,6 +86,7 @@ export const readingApi = {
           deckType,
           clientDate: todayLocal(),
           clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          questionWarningAcknowledged,
         }),
         signal,
       })
@@ -178,6 +189,10 @@ export const readingApi = {
   async history(): Promise<Reading[]> {
     const { data } = await httpClient.get<Reading[]>('/api/readings/history')
     return data
+  },
+
+  async delete(id: string): Promise<void> {
+    await httpClient.delete(`/api/readings/${id}`)
   },
 
   async spreads(): Promise<SpreadInfo[]> {

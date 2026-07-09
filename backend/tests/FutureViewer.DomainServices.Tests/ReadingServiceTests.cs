@@ -142,7 +142,7 @@ public sealed class ReadingServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_stops_before_drawing_cards_when_question_needs_rewrite()
+    public async Task CreateAsync_requires_warning_acknowledgement_when_question_needs_rewrite()
     {
         var repo = new Mock<IReadingRepository>();
         var ai = new Mock<IAIInterpreter>();
@@ -176,8 +176,7 @@ public sealed class ReadingServiceTests
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "что будет?" },
             Guid.NewGuid());
 
-        await act.Should().ThrowAsync<QuestionValidationException>()
-            .Where(ex => ex.ErrorCode == "question_needs_rewrite");
+        await act.Should().ThrowAsync<QuestionWarningAcknowledgementRequiredException>();
         repo.Verify(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()), Times.Never);
         ai.Verify(a => a.InterpretAsync(
             It.IsAny<Spread>(),
@@ -187,6 +186,58 @@ public sealed class ReadingServiceTests
             It.IsAny<IReadOnlyDictionary<int, string>>(),
             It.IsAny<UserPromptContext>(),
             It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_continues_when_subscriber_acknowledges_question_warning()
+    {
+        var repo = new Mock<IReadingRepository>();
+        repo.Setup(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Reading r, CancellationToken _) => r);
+        var ai = new Mock<IAIInterpreter>();
+        ai.Setup(a => a.InterpretAsync(
+                It.IsAny<Spread>(),
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyList<ReadingCard>>(),
+                It.IsAny<DeckType>(),
+                It.IsAny<IReadOnlyDictionary<int, string>>(),
+                It.IsAny<UserPromptContext>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new InterpretationResult { Text = "ok", Model = "stub", GeneratedAt = DateTime.UtcNow });
+        var subscription = new SubscriptionService(CompleteUserRepo().Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
+        var personalization = new PersonalizationService(CompleteUserRepo().Object, EmptyMemoryRepo().Object);
+        var questionValidator = new Mock<IAIQuestionValidator>();
+        questionValidator.Setup(v => v.ValidateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new QuestionValidationResult
+            {
+                Status = QuestionValidationStatus.NeedsRewrite,
+                Reason = "Лучше уточнить.",
+                SuggestedQuestion = "На что мне обратить внимание?"
+            });
+
+        var sut = new ReadingService(
+            repo.Object,
+            new CardDeckService(new TestDeck()),
+            new InterpretationService(ai.Object),
+            subscription,
+            feedback,
+            personalization,
+            questionValidator.Object,
+            EmptyMemoryExtractor().Object,
+            NullLogger<ReadingService>.Instance);
+
+        var result = await sut.CreateAsync(
+            new CreateReadingRequest
+            {
+                SpreadType = SpreadType.SingleCard,
+                Question = "что будет?",
+                QuestionWarningAcknowledged = true
+            },
+            Guid.NewGuid());
+
+        result.Interpretation.Should().Be("ok");
+        repo.Verify(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static Mock<IUserRepository> CompleteUserRepo()

@@ -59,30 +59,48 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
-    public async Task Post_reading_returns_validation_error_before_creating_reading()
+    public async Task Post_reading_requires_warning_acknowledgement_for_subscriber()
     {
         var client = await CreateAuthenticatedSubscribedClient();
 
         var response = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "needs rewrite" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-        body!["error"].ToString().Should().Be("question_needs_rewrite");
+        body!["error"].ToString().Should().Be("question_warning_unacknowledged");
         body["suggestedQuestion"].ToString().Should().Contain("обратить внимание");
     }
 
     [Fact]
-    public async Task Post_stream_reading_returns_validation_error_before_writing_stream()
+    public async Task Post_reading_allows_subscriber_after_warning_acknowledgement()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest
+            {
+                SpreadType = SpreadType.SingleCard,
+                Question = "needs rewrite",
+                QuestionWarningAcknowledged = true
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var result = await response.Content.ReadFromJsonAsync<ReadingResult>();
+        result!.Question.Should().Be("needs rewrite");
+    }
+
+    [Fact]
+    public async Task Post_stream_reading_requires_warning_acknowledgement_before_writing_stream()
     {
         var client = await CreateAuthenticatedSubscribedClient();
 
         var response = await client.PostAsJsonAsync("/api/readings/stream",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "needs rewrite" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-        body!["error"].ToString().Should().Be("question_needs_rewrite");
+        body!["error"].ToString().Should().Be("question_warning_unacknowledged");
         body["suggestedQuestion"].ToString().Should().Contain("обратить внимание");
     }
 
@@ -100,31 +118,48 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
-    public async Task Post_validate_question_returns_rewrite_error()
+    public async Task Post_validate_question_returns_subscriber_warning_payload()
     {
         var client = await CreateAuthenticatedSubscribedClient();
 
         var response = await client.PostAsJsonAsync("/api/readings/validate-question",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "needs rewrite" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-        body!["error"].ToString().Should().Be("question_needs_rewrite");
+        body!["status"].ToString().Should().Be("needs_rewrite");
+        body["canContinue"].ToString().Should().Be("True");
+        body["requiresSubscription"].ToString().Should().Be("False");
         body["suggestedQuestion"].ToString().Should().Contain("обратить внимание");
     }
 
     [Fact]
-    public async Task Post_validate_question_returns_fallback_suggestion_for_rejected_question()
+    public async Task Post_validate_question_returns_subscription_required_payload_for_free_user()
     {
-        var client = await CreateAuthenticatedSubscribedClient();
+        var client = await CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync("/api/readings/validate-question",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "rejected" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-        body!["error"].ToString().Should().Be("question_rejected");
+        body!["status"].ToString().Should().Be("rejected");
+        body["canContinue"].ToString().Should().Be("False");
+        body["requiresSubscription"].ToString().Should().Be("True");
         body["suggestedQuestion"].ToString().Should().Contain("rejected");
+    }
+
+    [Fact]
+    public async Task Post_reading_requires_subscription_for_invalid_free_question()
+    {
+        var client = await CreateAuthenticatedClient();
+
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "rejected" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+        body!["error"].ToString().Should().Be("question_requires_subscription");
     }
 
     [Fact]
@@ -195,11 +230,7 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
 
     private async Task<HttpClient> CreateAuthenticatedSubscribedClient(bool clearProfile = false)
     {
-        var client = _fixture.CreateClient();
-        var email = $"reader-{Guid.NewGuid():N}@example.com";
-
-        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        var (client, auth) = await CreateAuthenticatedClientWithAuth();
 
         using var scope = _fixture.Services.CreateScope();
         var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
@@ -215,5 +246,21 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
         await users.UpdateAsync(user);
 
         return client;
+    }
+
+    private async Task<HttpClient> CreateAuthenticatedClient()
+    {
+        var (client, _) = await CreateAuthenticatedClientWithAuth();
+        return client;
+    }
+
+    private async Task<(HttpClient Client, AuthResponse Auth)> CreateAuthenticatedClientWithAuth()
+    {
+        var client = _fixture.CreateClient();
+        var email = $"reader-{Guid.NewGuid():N}@example.com";
+
+        var auth = await _fixture.RegisterAndLoginAsync(client, email, "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        return (client, auth);
     }
 }

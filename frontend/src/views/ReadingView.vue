@@ -25,6 +25,7 @@ const placeholders = ref<ReadingCard[]>([])
 const showRealCards = ref(false)
 const pendingSpread = ref<SpreadType | null>(null)
 const pendingQuestion = ref('')
+const pendingQuestionWarningAcknowledged = ref(false)
 const boardWidth = ref(0)
 const cardWidth = computed(() =>
   pendingSpread.value !== null ? computeCardWidth(pendingSpread.value, boardWidth.value) : 140,
@@ -101,6 +102,7 @@ onMounted(async () => {
   const parsed = JSON.parse(saved)
   pendingSpread.value = parsed.spreadType
   pendingQuestion.value = parsed.question
+  pendingQuestionWarningAcknowledged.value = parsed.questionWarningAcknowledged === true
 
   const count = parsed.spreadType as number
   placeholders.value = Array.from({ length: count }, (_, i) => ({
@@ -149,6 +151,7 @@ async function startReading() {
     pendingSpread.value,
     pendingQuestion.value,
     streamAbort.signal,
+    pendingQuestionWarningAcknowledged.value,
   )
   donePromise.catch(() => {})
   let cardsFailed = false

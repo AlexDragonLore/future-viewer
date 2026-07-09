@@ -10,6 +10,7 @@ public sealed class Reading
     public required SpreadType SpreadType { get; init; }
     public required string Question { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
+    public DateTime? DeletedFromHistoryAt { get; set; }
     public string? AiInterpretation { get; set; }
     public string? AiModel { get; set; }
     public DeckType DeckType { get; init; } = DeckType.RWS;

@@ -13,6 +13,7 @@ import { extractApiError } from '@/api/httpClient'
 import { readingApi } from '@/api/readingApi'
 import { unlockAudio } from '@/composables/useAudio'
 import type { AxiosError } from 'axios'
+import type { QuestionValidationResponse } from '@/api/readingApi'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -26,6 +27,8 @@ const birthDate = ref('')
 const introError = ref<string | null>(null)
 const validationMessage = ref<string | null>(null)
 const validationSuggestion = ref<string | null>(null)
+const validationRequiresSubscription = ref(false)
+const questionWarning = ref<QuestionValidationResponse | null>(null)
 const validatingQuestion = ref(false)
 const spreadType = ref<SpreadType>(SpreadType.ThreeCard)
 
@@ -144,12 +147,38 @@ const badgeText = computed(() => {
   return `Бесплатно сегодня: ${left}/${s.freeReadingsDailyLimit}`
 })
 
+const warningSuggestion = computed(() =>
+  questionWarning.value
+    ? ensureSuggestion(questionWarning.value.suggestedQuestion, question.value)
+    : null,
+)
+
 function applySuggestion() {
-  if (validationSuggestion.value) {
-    question.value = validationSuggestion.value
+  const suggestion = validationSuggestion.value ?? warningSuggestion.value
+  if (suggestion) {
+    question.value = suggestion
     validationMessage.value = null
     validationSuggestion.value = null
+    validationRequiresSubscription.value = false
+    questionWarning.value = null
+    sessionStorage.removeItem('fv_pending')
   }
+}
+
+function continueWithWarning() {
+  const pending = {
+    spreadType: spreadType.value,
+    question: question.value.trim(),
+    questionWarningAcknowledged: true,
+  }
+  sessionStorage.setItem('fv_pending', JSON.stringify(pending))
+  questionWarning.value = null
+  router.push({ name: 'reading' })
+}
+
+function closeWarning() {
+  questionWarning.value = null
+  sessionStorage.removeItem('fv_pending')
 }
 
 async function begin() {
@@ -158,7 +187,13 @@ async function begin() {
   introError.value = null
   validationMessage.value = null
   validationSuggestion.value = null
-  const pending = { spreadType: spreadType.value, question: question.value.trim() }
+  validationRequiresSubscription.value = false
+  questionWarning.value = null
+  const pending = {
+    spreadType: spreadType.value,
+    question: question.value.trim(),
+    questionWarningAcknowledged: false,
+  }
   sessionStorage.setItem('fv_pending', JSON.stringify(pending))
   if (!auth.isAuthenticated) {
     router.push({ name: 'auth', query: { redirect: '/reading' } })
@@ -179,13 +214,30 @@ async function begin() {
 
   validatingQuestion.value = true
   try {
-    await readingApi.validateQuestion(spreadType.value, pending.question, deck.current)
+    const validation = await readingApi.validateQuestion(spreadType.value, pending.question, deck.current)
+    if (validation.status !== 'accepted') {
+      const suggestion = ensureSuggestion(validation.suggestedQuestion, pending.question)
+      if (!validation.canContinue || validation.requiresSubscription) {
+        validationMessage.value = validation.message
+        validationSuggestion.value = suggestion
+        validationRequiresSubscription.value = true
+        sessionStorage.removeItem('fv_pending')
+        return
+      }
+
+      questionWarning.value = {
+        ...validation,
+        suggestedQuestion: suggestion,
+      }
+      return
+    }
   } catch (e) {
     const err = e as AxiosError<{ message?: string; error?: string; suggestedQuestion?: string | null }>
     const code = err.response?.data?.error
-    if (code === 'question_needs_rewrite' || code === 'question_rejected') {
+    if (code === 'question_needs_rewrite' || code === 'question_rejected' || code === 'question_requires_subscription') {
       validationMessage.value = extractApiError(e, 'Вопрос нужно уточнить')
       validationSuggestion.value = ensureSuggestion(err.response?.data?.suggestedQuestion, pending.question)
+      validationRequiresSubscription.value = code === 'question_requires_subscription'
       sessionStorage.removeItem('fv_pending')
       return
     }
@@ -279,6 +331,38 @@ async function begin() {
         </button>
       </div>
 
+      <div
+        v-if="questionWarning"
+        class="warning-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="question-warning-title"
+        data-testid="question-warning-modal"
+      >
+        <section class="warning-dialog">
+          <div id="question-warning-title" class="warning-title">Такой вопрос не подходит для гадания</div>
+          <p class="warning-text">{{ questionWarning.message }}</p>
+          <p class="warning-reason">{{ questionWarning.reason }}</p>
+          <button
+            v-if="warningSuggestion"
+            type="button"
+            class="suggestion-button"
+            @click="applySuggestion"
+            data-testid="warning-apply-suggested-question"
+          >
+            {{ warningSuggestion }}
+          </button>
+          <div class="warning-actions">
+            <button type="button" class="warning-secondary" @click="closeWarning">
+              Отмена
+            </button>
+            <button type="button" class="glow-button warning-primary" @click="continueWithWarning" data-testid="continue-with-warning">
+              Продолжить
+            </button>
+          </div>
+        </section>
+      </div>
+
       <div v-if="validatingQuestion" class="validation-pending" data-testid="question-validating">
         <span class="validation-spinner" aria-hidden="true"></span>
         <span>Сверяю вопрос с Вуалью…</span>
@@ -322,8 +406,8 @@ async function begin() {
       </button>
 
       <SubscriptionBanner
-        v-if="auth.isAuthenticated && !auth.isSubscribed && blocked"
-        :message="requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
+        v-if="auth.isAuthenticated && !auth.isSubscribed && (blocked || validationRequiresSubscription)"
+        :message="validationRequiresSubscription ? 'Этот вопрос доступен только с подпиской' : requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
       />
 
       <div class="payment-info">
@@ -430,6 +514,65 @@ async function begin() {
   color: #f5c26b;
   text-align: left;
   background: rgba(245, 194, 107, 0.08);
+}
+.warning-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(6, 3, 14, 0.72);
+  backdrop-filter: blur(10px);
+}
+.warning-dialog {
+  width: min(100%, 30rem);
+  border: 1px solid rgba(245, 194, 107, 0.38);
+  border-radius: 12px;
+  background: rgba(16, 8, 34, 0.96);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  padding: 1.25rem;
+  color: rgba(224, 212, 186, 0.88);
+}
+.warning-title {
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.08em;
+  color: #f5c26b;
+  font-size: 0.95rem;
+  margin-bottom: 0.65rem;
+}
+.warning-text,
+.warning-reason {
+  font-size: 0.85rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.warning-reason {
+  margin-top: 0.5rem;
+  color: rgba(252, 165, 165, 0.9);
+}
+.warning-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.warning-secondary {
+  border: 1px solid rgba(224, 212, 186, 0.25);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.24);
+  color: rgba(224, 212, 186, 0.84);
+  padding: 0.65rem 1rem;
+  font-family: 'Cinzel', serif;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.warning-primary {
+  width: auto;
+  flex: 0 0 auto;
 }
 .deck-blurb-head {
   display: flex;
@@ -544,6 +687,14 @@ async function begin() {
     align-items: flex-start;
     flex-direction: column;
     gap: 0.5rem;
+  }
+  .warning-actions {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+  .warning-primary,
+  .warning-secondary {
+    width: 100%;
   }
 }
 </style>

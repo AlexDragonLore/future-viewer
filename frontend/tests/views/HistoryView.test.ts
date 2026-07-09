@@ -5,6 +5,7 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import { DeckType, SpreadType, type Reading } from '@/types'
 
 const historyMock = vi.fn()
+const deleteMock = vi.fn()
 
 vi.mock('@/api/readingApi', () => ({
   readingApi: {
@@ -12,6 +13,7 @@ vi.mock('@/api/readingApi', () => ({
     create: vi.fn(),
     get: vi.fn(),
     history: () => historyMock(),
+    delete: (id: string) => deleteMock(id),
   },
 }))
 
@@ -46,6 +48,9 @@ const sample: Reading = {
 describe('HistoryView', () => {
   beforeEach(() => {
     historyMock.mockReset()
+    deleteMock.mockReset()
+    deleteMock.mockResolvedValue(undefined)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
   })
 
   it('shows loading state before the request resolves', async () => {
@@ -83,5 +88,17 @@ describe('HistoryView', () => {
     const wrapper = await mountHistory()
     await flushPromises()
     expect(wrapper.text()).toContain('Nope')
+  })
+
+  it('deletes a reading from the rendered history after confirmation', async () => {
+    historyMock.mockResolvedValue([sample])
+    const wrapper = await mountHistory()
+    await flushPromises()
+
+    await wrapper.find('[data-testid="delete-reading"]').trigger('click')
+    await flushPromises()
+
+    expect(deleteMock).toHaveBeenCalledWith('r1')
+    expect(wrapper.text()).toContain('Пока что пусто')
   })
 })

@@ -64,6 +64,29 @@ public sealed class ExceptionHandlerMiddleware
                 suggestedQuestion = ex.SuggestedQuestion
             });
         }
+        catch (QuestionRequiresSubscriptionException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+            await ctx.Response.WriteAsJsonAsync(new
+            {
+                error = "question_requires_subscription",
+                message = ex.Message,
+                reason = ex.Reason,
+                suggestedQuestion = ex.SuggestedQuestion
+            });
+        }
+        catch (QuestionWarningAcknowledgementRequiredException ex)
+        {
+            ctx.Response.StatusCode = StatusCodes.Status409Conflict;
+            await ctx.Response.WriteAsJsonAsync(new
+            {
+                error = "question_warning_unacknowledged",
+                message = ex.Message,
+                status = ex.Status,
+                reason = ex.Reason,
+                suggestedQuestion = ex.SuggestedQuestion
+            });
+        }
         catch (QuotaExceededException ex)
         {
             ctx.Response.StatusCode = StatusCodes.Status429TooManyRequests;
