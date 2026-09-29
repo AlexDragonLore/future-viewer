@@ -63,7 +63,15 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IAIQuestionValidator, QuestionValidationInterpreter>();
         services.AddSingleton<IAIMemoryExtractor, MemoryExtractionInterpreter>();
         services.AddSingleton<IFeedbackScorer, FeedbackScoringInterpreter>();
-        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        var emailOptions = configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
+        if (emailOptions.GetTransport() == "RegruWebmail")
+        {
+            if (!emailOptions.IsConfigured)
+                throw new InvalidOperationException("Email:RegruWebmail requires mailbox credentials and a matching From address.");
+            services.AddSingleton<IEmailSender, RegruWebmailEmailSender>();
+        }
+        else
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IEmailLinkBuilder, EmailLinkBuilder>();
 
         var paymentProvider = configuration.GetSection(PaymentOptions.SectionName).Get<PaymentOptions>()?.Provider;

@@ -43,6 +43,7 @@ services:
       Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
       Telegram__SiteUrl: https://${APP_DOMAIN}
       Support__Email: ${SUPPORT_EMAIL:-support@vualgryaduschego.ru}
+      Email__Transport: ${EMAIL_TRANSPORT:-Smtp}
       Email__Host: ${EMAIL_HOST:-}
       Email__Port: ${EMAIL_PORT:-587}
       Email__Username: ${EMAIL_USERNAME:-}
