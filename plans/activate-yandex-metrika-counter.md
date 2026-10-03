@@ -22,3 +22,9 @@
 - Preserve the existing Caddy edge, proxy address, TLS volumes, database, backend, and Janetka routing. If an exact CSP adjustment proves necessary, validate and reload the existing Caddy configuration with the unrelated route retained.
 - Verify `docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps`, `GET https://alex-taro.ru/health`, a production browser smoke check, and `https://janetka.ru`.
 - Keep the previous frontend image and a protected environment backup for a frontend-only rollback.
+
+## Production verification follow-up
+
+- Browser smoke testing found an existing DNS search-suffix issue: a temporary missing `frontend` alias during recreation could resolve to the hosting provider's external wildcard domain. Use rooted `frontend.` and `backend.` names in both Caddy configurations to prevent this fallback.
+- Before reloading, verify the rooted names resolve to the Docker network, validate the edited live Caddyfile, and keep a protected copy. Reload the existing edge without recreating it or changing the Janetka route.
+- Push the reviewed routing fix to the same branch and `main`, update the server checkout, and recheck frontend HTTP 200, health, Janetka, and real-counter browser initialization and revocation.

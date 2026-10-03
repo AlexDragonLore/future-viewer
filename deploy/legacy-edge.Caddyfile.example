@@ -2,6 +2,8 @@
 # /opt/fv-app/legacy-edge.Caddyfile; do not overwrite the other site's block.
 # This Caddy receives public traffic directly. Leave incoming X-Forwarded-*
 # untrusted; Caddy's default behavior replaces spoofable client values.
+# Absolute service names prevent the host's DNS search suffix from redirecting
+# upstream traffic to an external wildcard domain during container replacement.
 {$APP_DOMAIN} {
     encode zstd gzip
 
@@ -22,16 +24,16 @@
             max_size 1MB
         }
         header Cache-Control "no-store"
-        reverse_proxy backend:8080
+        reverse_proxy backend.:8080
     }
 
     handle /health {
         header Cache-Control "no-store"
-        reverse_proxy backend:8080
+        reverse_proxy backend.:8080
     }
 
     handle {
-        reverse_proxy frontend:80
+        reverse_proxy frontend.:80
     }
 }
 
@@ -50,16 +52,16 @@ http://80.87.104.245 {
             max_size 1MB
         }
         header Cache-Control "no-store"
-        reverse_proxy backend:8080
+        reverse_proxy backend.:8080
     }
 
     handle /health {
         header Cache-Control "no-store"
-        reverse_proxy backend:8080
+        reverse_proxy backend.:8080
     }
 
     handle {
-        reverse_proxy frontend:80 {
+        reverse_proxy frontend.:80 {
             header_up Host {$APP_DOMAIN}
         }
     }
