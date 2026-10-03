@@ -33,6 +33,7 @@ vi.mock('@/api/privacyApi', () => ({
 
 import HomeView from '@/views/HomeView.vue'
 import { useReadingStore } from '@/stores/useReadingStore'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 
 async function mountHome(setup?: () => void) {
   setActivePinia(createPinia())
@@ -148,6 +149,35 @@ describe('HomeView privacy and question safety', () => {
     await flushPromises()
     expect(store.pending?.question).toBe('На что мне сейчас стоит обратить внимание?')
     expect(router.currentRoute.value.name).toBe('reading')
+  })
+
+  it('shows the server-priced paid option below the free CTA without adding a guest checkout step', async () => {
+    const { wrapper, router, store } = await mountHome(() => {
+      const config = usePublicConfigStore()
+      config.paymentsEnabled = true
+      config.paymentProduct = { amount: 640, currency: 'RUB', accessDays: 45 }
+    })
+    const offer = wrapper.get('[data-testid="guest-paid-offer"]')
+    expect(offer.text()).toContain('640')
+    expect(offer.text()).toContain('45 дней')
+    expect(offer.text()).toContain('Все 3 расклада безлимитно')
+    expect(offer.text()).toContain('Без автосписаний')
+    expect(wrapper.find('[data-testid="payment-offer-acceptance"]').exists()).toBe(false)
+    expect(offer.element.previousElementSibling?.textContent).toContain('Открыть карту бесплатно')
+    await wrapper.get('button.glow-button').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('reading')
+    expect(store.pending?.question).toBe('На что мне сейчас стоит обратить внимание?')
+  })
+
+  it.each(['disabled', 'missing-product', 'authenticated'])('hides the guest paid offer for %s', async (reason) => {
+    if (reason === 'authenticated') authenticate()
+    const { wrapper } = await mountHome(() => {
+      const config = usePublicConfigStore()
+      config.paymentsEnabled = reason !== 'disabled'
+      config.paymentProduct = reason === 'missing-product' ? null : { amount: 300, currency: 'RUB', accessDays: 30 }
+    })
+    expect(wrapper.find('[data-testid="guest-paid-offer"]').exists()).toBe(false)
   })
 
   it.each([

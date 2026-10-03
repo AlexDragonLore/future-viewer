@@ -3,15 +3,19 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 import { getGuestContinuation } from '@/utils/guestReading'
 import CardFlip from '@/components/cards/CardFlip.vue'
 import AiDisclaimer from '@/components/AiDisclaimer.vue'
+import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
 import { safeMarkdown } from '@/utils/safeMarkdown'
 import { trackGoalOnce } from '@/analytics/metrika'
 
 const router = useRouter()
 const store = useReadingStore()
 const auth = useAuthStore()
+const publicConfig = usePublicConfigStore()
+const paidProduct = computed(() => publicConfig.paidProduct)
 const restoring = ref(false)
 const locked = computed(() => reading.value?.isPreview === true)
 
@@ -179,6 +183,11 @@ watch(
 )
 
 const streaming = computed(() => (hasActiveStream.value && !store.streamingDone) || displayed.value.length < targetText.value.length)
+const showPaidOffer = computed(() => auth.isAuthenticated && auth.subscription !== null
+  && !auth.subscriptionLoading && !auth.isSubscribed
+  && publicConfig.paymentsEnabled && publicConfig.paymentProduct !== null
+  && !locked.value && !streaming.value && !store.loading && !restoring.value
+  && Boolean(targetText.value.trim()))
 
 watch(displayed, () => {
   scheduleMarkdownRender()
@@ -265,6 +274,15 @@ function again() {
         </template>
       </div>
     </section>
+
+    <SubscriptionBanner
+      v-if="showPaidOffer"
+      class="max-w-2xl w-full mb-6"
+      data-testid="result-paid-offer"
+      message="Все 3 расклада без лимита"
+      button-label="Оплатить доступ"
+      :price-label="`${paidProduct.price} за ${paidProduct.period}`"
+    />
 
     <AiDisclaimer class="max-w-2xl w-full mb-8" />
 

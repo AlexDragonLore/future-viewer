@@ -2,8 +2,18 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
-import { DeckType, SpreadType, type Reading } from '@/types'
+import { DeckType, SpreadType, SubscriptionStatusValue, type Reading } from '@/types'
 import { useReadingStore } from '@/stores/useReadingStore'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
+
+const createPayment = vi.fn()
+vi.mock('@/api/paymentApi', () => ({ paymentApi: { createAccessPayment: (acceptance: unknown) => createPayment(acceptance) } }))
+vi.mock('@/content/legal', () => ({
+  legalDocumentVersions: { offer: 'offer-current' },
+  loadLegalDocuments: vi.fn().mockResolvedValue(undefined),
+  isApprovedProcessorUrl: () => false,
+}))
 
 import ResultView from '@/views/ResultView.vue'
 
@@ -29,16 +39,18 @@ const sample: Reading = {
   deckType: DeckType.RWS,
 }
 
-async function mountResult(withReading: Reading | null): Promise<{ wrapper: ReturnType<typeof mount>; router: Router }> {
+async function mountResult(withReading: Reading | null, setup?: () => void): Promise<{ wrapper: ReturnType<typeof mount>; router: Router }> {
   setActivePinia(createPinia())
   const store = useReadingStore()
   store.current = withReading
+  setup?.()
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/result', name: 'result', component: ResultView },
       { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
+      { path: '/legal/:document', component: { template: '<div>legal</div>' } },
     ],
   })
   router.push('/result')
@@ -47,10 +59,33 @@ async function mountResult(withReading: Reading | null): Promise<{ wrapper: Retu
   return { wrapper, router }
 }
 
+function enableFreeAccountCheckout() {
+  const auth = useAuthStore()
+  auth.token = 'qa-session'
+  auth.userId = 'qa-user'
+  auth.subscription = {
+    status: SubscriptionStatusValue.None,
+    expiresAt: null,
+    isActive: false,
+    freeReadingsUsedToday: 1,
+    freeReadingsDailyLimit: 1,
+    canCreateFreeReading: false,
+  }
+  const config = usePublicConfigStore()
+  config.paymentsEnabled = true
+  config.paymentProduct = { amount: 640, currency: 'RUB', accessDays: 45 }
+}
+
+async function finishTyping() {
+  await vi.advanceTimersByTimeAsync(5000)
+  await flushPromises()
+}
+
 describe('ResultView', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     localStorage.clear()
+    createPayment.mockReset().mockResolvedValue({ paymentId: 'qa-order', confirmationUrl: '', status: 'pending' })
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -165,5 +200,56 @@ describe('ResultView', () => {
     expect(wrapper.get('[data-testid="guest-unlock"]').text()).toContain('полное толкование этой карты')
     expect(wrapper.get('a.guest-register').attributes('href')).toBe('/auth?mode=register&redirect=/result')
     expect(wrapper.text()).not.toContain('begin')
+  })
+
+  it('offers the current server product only after the full text is visible and uses the existing consent-aware checkout', async () => {
+    const { wrapper } = await mountResult(sample, enableFreeAccountCheckout)
+    expect(wrapper.find('[data-testid="result-paid-offer"]').exists()).toBe(false)
+    await finishTyping()
+    const offer = wrapper.get('[data-testid="result-paid-offer"]')
+    expect(offer.text()).toContain('640')
+    expect(offer.text()).toContain('45 дней')
+    expect(offer.text()).toContain('Все 3 расклада без лимита')
+    expect(offer.get('button').attributes('disabled')).toBeDefined()
+    expect(createPayment).not.toHaveBeenCalled()
+    await offer.get('[data-testid="payment-offer-acceptance"]').setValue(true)
+    await offer.get('button').trigger('click')
+    await flushPromises()
+    expect(createPayment).toHaveBeenCalledOnce()
+    expect(createPayment).toHaveBeenCalledWith({ offerAccepted: true, offerVersion: 'offer-current' })
+  })
+
+  it.each(['guest', 'preview', 'subscriber', 'disabled', 'missing-product', 'unknown-subscription', 'refreshing-subscription', 'loading'])
+  ('does not offer payment for %s', async (reason) => {
+    const { wrapper } = await mountResult({ ...sample, isPreview: reason === 'preview' }, () => {
+      enableFreeAccountCheckout()
+      const auth = useAuthStore()
+      const config = usePublicConfigStore()
+      if (reason === 'guest') auth.token = null
+      if (reason === 'subscriber') auth.subscription!.isActive = true
+      if (reason === 'disabled') config.paymentsEnabled = false
+      if (reason === 'missing-product') config.paymentProduct = null
+      if (reason === 'unknown-subscription') auth.subscription = null
+      if (reason === 'refreshing-subscription') auth.subscriptionLoading = true
+      if (reason === 'loading') useReadingStore().loading = true
+    })
+    await finishTyping()
+    expect(wrapper.find('[data-testid="result-paid-offer"]').exists()).toBe(false)
+    expect(createPayment).not.toHaveBeenCalled()
+  })
+
+  it('waits for stream completion even when all currently received text has been displayed', async () => {
+    const { wrapper } = await mountResult(sample, () => {
+      enableFreeAccountCheckout()
+      const store = useReadingStore()
+      store.cardsReady = true
+      store.streamingDone = false
+      store.streamingText = sample.interpretation!
+    })
+    await finishTyping()
+    expect(wrapper.find('[data-testid="result-paid-offer"]').exists()).toBe(false)
+    useReadingStore().streamingDone = true
+    await flushPromises()
+    expect(wrapper.find('[data-testid="result-paid-offer"]').exists()).toBe(true)
   })
 })

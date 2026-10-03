@@ -25,6 +25,8 @@ const readingStore = useReadingStore()
 const privacyStore = usePrivacyStore()
 const publicConfig = usePublicConfigStore()
 const paidProduct = computed(() => publicConfig.paidProduct)
+const showGuestPaidOffer = computed(() => !auth.isAuthenticated
+  && publicConfig.paymentsEnabled && publicConfig.paymentProduct !== null)
 
 const question = ref('')
 const validationMessage = ref<string | null>(null)
@@ -285,9 +287,14 @@ async function begin() {
         {{ blockMessage }}
       </div>
 
-      <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
-        {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : hasGuestReading ? 'Продолжить мой расклад' : 'Открыть карту бесплатно' }}
-      </button>
+      <div>
+        <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
+          {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : hasGuestReading ? 'Продолжить мой расклад' : 'Открыть карту бесплатно' }}
+        </button>
+        <p v-if="showGuestPaidOffer" class="guest-paid-offer" data-testid="guest-paid-offer">
+          Все 3 расклада безлимитно — {{ paidProduct.price }} за {{ paidProduct.period }}. Без автосписаний.
+        </p>
+      </div>
 
       <AiDisclaimer />
 
@@ -319,6 +326,13 @@ async function begin() {
 </template>
 
 <style scoped>
+.guest-paid-offer {
+  margin-top: 0.65rem;
+  color: rgba(224, 212, 186, 0.62);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  text-align: center;
+}
 .spread-option {
   padding: 0.75rem 0.5rem;
   border: 1px solid rgba(245, 194, 107, 0.25);
