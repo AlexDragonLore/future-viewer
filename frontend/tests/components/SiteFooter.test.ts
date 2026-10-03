@@ -11,6 +11,7 @@ vi.mock('@/api/publicApi', () => ({
 }))
 
 import SiteFooter from '@/components/SiteFooter.vue'
+import { useCookiePreferences } from '@/composables/useCookiePreferences'
 
 async function mountFooter() {
   setActivePinia(createPinia())
@@ -32,13 +33,17 @@ async function mountFooter() {
 
 describe('SiteFooter', () => {
   beforeEach(() => {
+    useCookiePreferences().resetCookiePreferences()
     publicConfigMock.mockReset()
     publicConfigMock.mockResolvedValue({ supportEmail: 'support@example.com' })
   })
 
-  it('links to public trust and legal pages without the old story modal', async () => {
+  it('keeps legal pages in a closed native disclosure and cookie settings directly accessible', async () => {
     const wrapper = await mountFooter()
 
+    const documents = wrapper.get('details')
+    expect(documents.attributes('open')).toBeUndefined()
+    expect(documents.get('summary').text()).toBe('Документы')
     expect(wrapper.find('a[href="/about"]').exists()).toBe(true)
     for (const path of [
       '/legal/privacy',
@@ -49,10 +54,15 @@ describe('SiteFooter', () => {
       '/legal/ai-disclaimer',
       '/legal/data-request',
       '/legal/processors',
-    ]) expect(wrapper.find(`a[href="${path}"]`).exists()).toBe(true)
+    ]) expect(documents.find(`a[href="${path}"]`).exists()).toBe(true)
+    expect(documents.findAll('a')).toHaveLength(8)
     expect(wrapper.find('a[href="/faq"]').exists()).toBe(true)
     expect(wrapper.find('a[href="/"]').text()).toContain('Вуаль Грядущего')
     expect(wrapper.text()).not.toContain('Ozon')
     expect(wrapper.find('.about-overlay').exists()).toBe(false)
+    expect(documents.find('[data-testid="change-cookie-settings"]').exists()).toBe(false)
+    await wrapper.get('[data-testid="change-cookie-settings"]').trigger('click')
+    expect(useCookiePreferences().settingsOpen.value).toBe(true)
+    wrapper.unmount()
   })
 })
