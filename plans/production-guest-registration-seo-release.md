@@ -10,6 +10,7 @@ Publish the prepared guest single-card preview, simplified registration, complet
 2. Repair pending privacy migration so existing profile fields and valid email links survive. Verify legacy checkout compatibility using provider-authenticated data, recorded order ownership/amount and idempotency.
 3. Keep the current public Caddy and existing Docker network/TLS volumes via a dedicated legacy-edge override; preserve janetka routing. Trust only the verified immediate Caddy address in the backend. Compact the initial cookie prompt for mobile entry.
 4. Build amd64 production artifacts with actual public environment settings. Keep Metrika inactive until a real counter ID is supplied.
+5. Production browser QA found that horizontal overflow rules created a separate body scroll container. Repair the scrolling root so the guest continuation link opens the registration form in the viewport; verify both desktop and mobile before a small follow-up deployment.
 
 ## QA / verification
 
@@ -18,6 +19,7 @@ Publish the prepared guest single-card preview, simplified registration, complet
 - Validate Compose, Caddy, runtime configuration and release technical checks. Restore a production pg_dump into an isolated disposable database and verify integrity before application migrations.
 - Production rendered browser QA via in-app browser: mobile and desktop homepage, one guest card, half interpretation, reload continuation and single unchecked registration checkbox; no account creation, email send or paid transaction. Verify SEO and retired Telegram routes through HTTP.
 - Full real payment settlement cannot be asserted without a paid transaction; verify configured provider readiness, rejection of spoofed source headers and existing automated verified-webhook coverage.
+- After the scroll repair: focused guest browser scenarios must assert the registration heading is in the viewport after following a link from a scrolled result. Repeat the same production transition after publishing the frontend fix.
 
 ## Deploy
 

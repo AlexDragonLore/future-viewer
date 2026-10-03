@@ -99,6 +99,31 @@ test('existing account can log in to unlock the same card', async ({ page, conte
   expect(calls.unlock).toBe(1)
 })
 
+test('registration opens at the top after scrolling down the guest result', async ({ page, context }, testInfo) => {
+  await mockApi(context)
+  await openGuestCard(page)
+  const registerLink = page.getByRole('link', { name: 'Зарегистрироваться и дочитать' })
+  await registerLink.scrollIntoViewIfNeeded()
+  await expect.poll(() => page.evaluate(() => window.scrollY + document.body.scrollTop)).toBeGreaterThan(100)
+  await page.screenshot({ path: testInfo.outputPath('scrolled-guest-result.png') })
+
+  await registerLink.click()
+  await expect(page).toHaveURL(/\/auth\?mode=register&redirect=/)
+  const heading = page.getByRole('heading', { name: 'Регистрация', exact: true })
+  await expect(heading).toBeInViewport()
+  await expect.poll(() => heading.evaluate(element => {
+    const bounds = element.getBoundingClientRect()
+    return bounds.top >= 0 && bounds.bottom <= window.innerHeight
+  })).toBe(true)
+  await expect.poll(() => page.evaluate(() => ({
+    rootScroller: document.scrollingElement === document.documentElement,
+    windowTop: window.scrollY,
+    bodyTop: document.body.scrollTop,
+    noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth,
+  }))).toEqual({ rootScroller: true, windowTop: 0, bodyTop: 0, noHorizontalOverflow: true })
+  await page.screenshot({ path: testInfo.outputPath('registration-at-top.png') })
+})
+
 test('guest API errors return to a usable home instead of authentication', async ({ page, context }) => {
   await mockApi(context)
   await context.route('**/api/readings/guest', route => route.fulfill({ status: 429, json: { message: 'Слишком много запросов. Повторите позже.' } }))
