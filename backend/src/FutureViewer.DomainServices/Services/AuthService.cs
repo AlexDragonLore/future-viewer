@@ -195,25 +195,15 @@ public sealed class AuthService
     private async Task SendVerificationEmailAsync(string email, string token, CancellationToken ct)
     {
         var link = _links.BuildVerificationLink(token);
-        var html = $"""
-            <p>Здравствуйте!</p>
-            <p>Вы зарегистрировались в «Вуаль Грядущего». Пожалуйста, подтвердите свой email, перейдя по ссылке:</p>
-            <p><a href="{link}">{link}</a></p>
-            <p>Ссылка действительна 24 часа.</p>
-            """;
-        await _email.SendAsync(email, "Подтверждение регистрации", html, ct);
+        var html = AuthEmailTemplate.Verification(link);
+        await _email.SendAsync(email, "Подтверждение регистрации — Вуаль Грядущего", html, ct);
     }
 
     private async Task SendPasswordResetEmailAsync(string email, string token, CancellationToken ct)
     {
         var link = _links.BuildPasswordResetLink(token);
-        var html = $"""
-            <p>Здравствуйте!</p>
-            <p>Мы получили запрос на восстановление пароля в «Вуаль Грядущего». Чтобы задать новый пароль, перейдите по ссылке:</p>
-            <p><a href="{link}">{link}</a></p>
-            <p>Ссылка действительна 1 час. Если вы не запрашивали восстановление — просто проигнорируйте это письмо.</p>
-            """;
-        await _email.SendAsync(email, "Восстановление пароля", html, ct);
+        var html = AuthEmailTemplate.PasswordReset(link);
+        await _email.SendAsync(email, "Восстановление пароля — Вуаль Грядущего", html, ct);
     }
 
     private static string GenerateToken()

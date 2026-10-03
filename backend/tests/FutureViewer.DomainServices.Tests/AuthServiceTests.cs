@@ -44,7 +44,8 @@ public sealed class AuthServiceTests
             && !x.IsEmailVerified
             && x.EmailVerificationToken != null
             && x.EmailVerificationSentAt != null), It.IsAny<CancellationToken>()), Times.Once);
-        email.Verify(e => e.SendAsync("test@example.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("test@example.com", It.IsAny<string>(),
+            AuthEmailTemplate.Verification("http://link"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -254,7 +255,8 @@ public sealed class AuthServiceTests
 
         await sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" });
 
-        email.Verify(e => e.SendAsync("a@b.c", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("a@b.c", It.IsAny<string>(),
+            AuthEmailTemplate.Verification("http://link"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -283,7 +285,8 @@ public sealed class AuthServiceTests
         user.PasswordResetTokenExpiresAt.Should().NotBeNull();
         user.PasswordResetTokenExpiresAt!.Value.Should().BeAfter(DateTime.UtcNow);
         users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
-        email.Verify(e => e.SendAsync("a@b.c", It.Is<string>(s => s.Contains("пароля")), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("a@b.c", It.Is<string>(s => s.Contains("пароля")),
+            AuthEmailTemplate.PasswordReset("http://reset-link"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
