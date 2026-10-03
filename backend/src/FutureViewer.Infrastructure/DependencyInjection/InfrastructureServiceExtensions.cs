@@ -1,17 +1,16 @@
+using FutureViewer.DomainServices;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Infrastructure.AI;
 using FutureViewer.Infrastructure.Auth;
 using FutureViewer.Infrastructure.BackgroundServices;
+using FutureViewer.Infrastructure.Compliance;
 using FutureViewer.Infrastructure.Email;
 using FutureViewer.Infrastructure.Payment;
 using FutureViewer.Infrastructure.Persistence;
 using FutureViewer.Infrastructure.Persistence.Repositories;
-using FutureViewer.Infrastructure.Telegram;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
-using Telegram.Bot.Polling;
 
 namespace FutureViewer.Infrastructure.DependencyInjection;
 
@@ -29,8 +28,9 @@ public static class InfrastructureServiceExtensions
         services.Configure<PaymentOptions>(configuration.GetSection(PaymentOptions.SectionName));
         services.Configure<YukassaOptions>(configuration.GetSection(YukassaOptions.SectionName));
         services.Configure<YooMoneyOptions>(configuration.GetSection(YooMoneyOptions.SectionName));
-        services.Configure<TelegramOptions>(configuration.GetSection(TelegramOptions.SectionName));
         services.Configure<EmailOptions>(configuration.GetSection(EmailOptions.SectionName));
+        services.AddSingleton(configuration.GetSection(PrivacyOptions.SectionName).Get<PrivacyOptions>() ?? new PrivacyOptions());
+        services.AddSingleton<IProcessorRegistryGuard, ProcessorRegistryGuard>();
 
         var connectionString = configuration.GetConnectionString("Default")
             ?? throw new InvalidOperationException("ConnectionStrings:Default is not configured");
@@ -42,11 +42,13 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ICardDeck, CardDeckRepository>();
         services.AddScoped<IProcessedPaymentRepository, ProcessedPaymentRepository>();
+        services.AddScoped<IPaymentOrderRepository, PaymentOrderRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IAchievementRepository, AchievementRepository>();
         services.AddScoped<ILeaderboardRepository, LeaderboardRepository>();
         services.AddScoped<IUserMemoryRepository, UserMemoryRepository>();
         services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
+        services.AddScoped<IPrivacyRepository, PrivacyRepository>();
         services.AddScoped<IUnitOfWork, EfUnitOfWork>();
 
         services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
@@ -61,8 +63,10 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IAIQuestionValidator, DevelopmentQuestionValidator>();
         else
             services.AddSingleton<IAIQuestionValidator, QuestionValidationInterpreter>();
-        services.AddSingleton<IAIMemoryExtractor, MemoryExtractionInterpreter>();
-        services.AddSingleton<IFeedbackScorer, FeedbackScoringInterpreter>();
+        // These secondary AI uses are disabled by default. They previously sent raw
+        // question/answer/self-report content to the provider without separate consent.
+        services.AddSingleton<IAIMemoryExtractor, DisabledMemoryExtractor>();
+        services.AddSingleton<IFeedbackScorer, PrivacyPreservingFeedbackScorer>();
         var emailOptions = configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
         if (emailOptions.GetTransport() == "RegruWebmail")
         {
@@ -74,27 +78,21 @@ public static class InfrastructureServiceExtensions
             services.AddSingleton<IEmailSender, SmtpEmailSender>();
         services.AddSingleton<IEmailLinkBuilder, EmailLinkBuilder>();
 
-        var paymentProvider = configuration.GetSection(PaymentOptions.SectionName).Get<PaymentOptions>()?.Provider;
-        if (string.Equals(paymentProvider, "YooMoney", StringComparison.OrdinalIgnoreCase))
+        var paymentOptions = configuration.GetSection(PaymentOptions.SectionName).Get<PaymentOptions>()
+                             ?? new PaymentOptions();
+        if (!paymentOptions.Enabled)
+            services.AddSingleton<IPaymentProvider, DisabledPaymentProvider>();
+        else if (string.Equals(paymentOptions.Provider, "YooMoney", StringComparison.OrdinalIgnoreCase))
             services.AddSingleton<IPaymentProvider, YooMoneyRedirectPaymentProvider>();
         else
             services.AddHttpClient<IPaymentProvider, YukassaClient>();
 
-        AddTelegram(services);
+        services.AddScoped<AccountDeletionProcessor>();
+        services.AddHostedService<AccountDeletionJob>();
+        services.AddHostedService<DataSubjectRequestDeadlineJob>();
+        services.AddHostedService<RetentionCleanupJob>();
 
         return services;
     }
 
-    private static void AddTelegram(IServiceCollection services)
-    {
-        services.TryAddSingleton<ITelegramLinkUrlBuilder, TelegramLinkUrlBuilder>();
-        services.AddSingleton<TelegramBotClientProvider>();
-        services.AddSingleton<TelegramBotService>();
-        services.AddSingleton<ITelegramNotifier>(sp => sp.GetRequiredService<TelegramBotService>());
-        services.AddSingleton<IUpdateHandler, TelegramUpdateHandler>();
-
-        services.AddScoped<FeedbackNotificationProcessor>();
-        services.AddHostedService<TelegramPollingHostedService>();
-        services.AddHostedService<FeedbackNotificationJob>();
-    }
 }

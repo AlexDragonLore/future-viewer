@@ -11,6 +11,7 @@ public sealed class Reading
     public required string Question { get; init; }
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public DateTime? DeletedFromHistoryAt { get; set; }
+    public bool SavedToHistory { get; set; }
     public string? AiInterpretation { get; set; }
     public string? AiModel { get; set; }
     public DeckType DeckType { get; init; } = DeckType.RWS;

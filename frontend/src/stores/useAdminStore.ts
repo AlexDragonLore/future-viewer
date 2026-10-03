@@ -1,3 +1,4 @@
+import { resetOnAccountChange } from '@/utils/accountSession'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { adminApi } from '@/api/adminApi'
@@ -41,6 +42,8 @@ export const useAdminStore = defineStore('admin', () => {
   const stats = ref<AdminStats | null>(null)
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
+
+  resetOnAccountChange({ feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError })
 
   async function loadFeedbacks(): Promise<void> {
     feedbackLoading.value = true
@@ -126,18 +129,6 @@ export const useAdminStore = defineStore('admin', () => {
     } catch (e) {
       feedbackError.value = extractApiError(e, 'Не удалось удалить фидбек')
       return false
-    }
-  }
-
-  async function runNotifications(): Promise<number | null> {
-    feedbackError.value = null
-    try {
-      const { processed } = await adminApi.runNotifications()
-      feedbackToast.value = `Отправлено уведомлений: ${processed}`
-      return processed
-    } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось запустить рассылку')
-      return null
     }
   }
 
@@ -284,36 +275,6 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
-  async function setUserTelegram(id: string, chatId: number): Promise<boolean> {
-    userError.value = null
-    try {
-      await adminApi.setUserTelegram(id, chatId)
-      userToast.value = 'Telegram chatId установлен'
-      const idx = users.value.findIndex((u) => u.id === id)
-      if (idx >= 0) users.value[idx] = { ...users.value[idx], telegramChatId: chatId }
-      if (selectedUser.value?.id === id) await loadUserDetail(id)
-      return true
-    } catch (e) {
-      userError.value = extractApiError(e, 'Не удалось установить Telegram chatId')
-      return false
-    }
-  }
-
-  async function unlinkUserTelegram(id: string): Promise<boolean> {
-    userError.value = null
-    try {
-      await adminApi.unlinkUserTelegram(id)
-      userToast.value = 'Telegram отвязан'
-      const idx = users.value.findIndex((u) => u.id === id)
-      if (idx >= 0) users.value[idx] = { ...users.value[idx], telegramChatId: null }
-      if (selectedUser.value?.id === id) await loadUserDetail(id)
-      return true
-    } catch (e) {
-      userError.value = extractApiError(e, 'Не удалось отвязать Telegram')
-      return false
-    }
-  }
-
   function clearUserToast(): void {
     userToast.value = null
   }
@@ -348,7 +309,6 @@ export const useAdminStore = defineStore('admin', () => {
     createSyntheticFeedback,
     updateFeedback,
     deleteFeedback,
-    runNotifications,
     clearFeedbackToast,
     users,
     userTotal,
@@ -372,8 +332,6 @@ export const useAdminStore = defineStore('admin', () => {
     grantAchievement,
     revokeAchievement,
     recheckAchievements,
-    setUserTelegram,
-    unlinkUserTelegram,
     clearUserToast,
     stats,
     statsLoading,

@@ -11,7 +11,6 @@ public sealed class AchievementService
     {
         public const string FirstReading = "first_reading";
         public const string FirstFeedback = "first_feedback";
-        public const string TelegramLinked = "telegram_linked";
         public const string Streak3 = "streak_3";
         public const string Streak7 = "streak_7";
         public const string Streak30 = "streak_30";
@@ -27,25 +26,22 @@ public sealed class AchievementService
     private readonly IReadingRepository _readings;
     private readonly IFeedbackRepository _feedbacks;
     private readonly IUserRepository _users;
-    private readonly ITelegramNotifier? _notifier;
 
     public AchievementService(
         IAchievementRepository achievements,
         IReadingRepository readings,
         IFeedbackRepository feedbacks,
-        IUserRepository users,
-        ITelegramNotifier? notifier = null)
+        IUserRepository users)
     {
         _achievements = achievements;
         _readings = readings;
         _feedbacks = feedbacks;
         _users = users;
-        _notifier = notifier;
     }
 
     public async Task<IReadOnlyList<AchievementDto>> CheckAndGrantAsync(Guid userId, CancellationToken ct = default)
     {
-        var user = await _users.GetByIdAsync(userId, ct)
+        _ = await _users.GetByIdAsync(userId, ct)
             ?? throw new NotFoundException("User not found");
 
         var readingCount = await _readings.CountByUserAsync(userId, ct);
@@ -62,15 +58,12 @@ public sealed class AchievementService
             maxStreak = ComputeCurrentStreak(dates);
         }
 
-        var telegramLinked = user.TelegramChatId.HasValue;
-
         var candidateCodes = new List<string>();
         if (readingCount >= 1) candidateCodes.Add(Codes.FirstReading);
         if (readingCount >= 10) candidateCodes.Add(Codes.Total10);
         if (readingCount >= 50) candidateCodes.Add(Codes.Total50);
         if (readingCount >= 100) candidateCodes.Add(Codes.Total100);
         if (scoredCount >= 1) candidateCodes.Add(Codes.FirstFeedback);
-        if (telegramLinked) candidateCodes.Add(Codes.TelegramLinked);
         if (maxStreak >= 3) candidateCodes.Add(Codes.Streak3);
         if (maxStreak >= 7) candidateCodes.Add(Codes.Streak7);
         if (maxStreak >= 30) candidateCodes.Add(Codes.Streak30);
@@ -101,15 +94,6 @@ public sealed class AchievementService
 
             if (ua is null) continue;
             newlyGranted.Add(MapAchievement(achievement, ua.UnlockedAt));
-
-            if (_notifier is not null && user.TelegramChatId.HasValue)
-            {
-                await _notifier.SendAchievementNotificationAsync(
-                    user.TelegramChatId.Value,
-                    achievement.NameRu,
-                    achievement.DescriptionRu,
-                    ct);
-            }
         }
 
         return newlyGranted;

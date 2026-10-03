@@ -25,7 +25,7 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         var email = $"user-{Guid.NewGuid():N}@example.com";
 
         var registerResponse = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
+            AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
         registerResponse.StatusCode.Should().Be(HttpStatusCode.Accepted);
 
         var body = await registerResponse.Content.ReadFromJsonAsync<RegisterResponse>();
@@ -38,7 +38,7 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task Register_allows_login_without_verification_when_email_is_not_configured()
+    public async Task Register_does_not_create_an_account_when_email_is_not_configured()
     {
         _fixture.EmailSender.IsConfigured = false;
         try
@@ -47,18 +47,16 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
             var email = $"no-mail-{Guid.NewGuid():N}@example.com";
 
             var registerResponse = await client.PostAsJsonAsync("/api/auth/register",
-                new RegisterRequest { Email = email, Password = "password123" });
-            registerResponse.StatusCode.Should().Be(HttpStatusCode.Accepted);
-
-            var body = await registerResponse.Content.ReadFromJsonAsync<RegisterResponse>();
-            body!.VerificationRequired.Should().BeFalse();
+                AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
+            registerResponse.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+            (await registerResponse.Content.ReadAsStringAsync()).Should().Contain("email_verification");
 
             var loginResponse = await client.PostAsJsonAsync("/api/auth/login",
                 new LoginRequest { Email = email, Password = "password123" });
-            loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
-
-            var auth = await loginResponse.Content.ReadFromJsonAsync<AuthResponse>();
-            auth!.AccessToken.Should().NotBeNullOrWhiteSpace();
+            loginResponse.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+            using var scope = _fixture.Services.CreateScope();
+            (await scope.ServiceProvider.GetRequiredService<IUserRepository>().GetByEmailAsync(email))
+                .Should().BeNull();
         }
         finally
         {
@@ -74,7 +72,7 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         var email = $"unv-{Guid.NewGuid():N}@example.com";
 
         await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
+            AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
 
         var login = await client.PostAsJsonAsync("/api/auth/login",
             new LoginRequest { Email = email, Password = "password123" });
@@ -89,15 +87,9 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         var email = $"verify-{Guid.NewGuid():N}@example.com";
 
         await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
+            AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
 
-        string token;
-        using (var scope = _fixture.Services.CreateScope())
-        {
-            var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-            var user = await users.GetByEmailAsync(email.ToLowerInvariant());
-            token = user!.EmailVerificationToken!;
-        }
+        var token = ExtractToken(_fixture.EmailSender.LastFor(email)!);
 
         var verifyResponse = await client.PostAsJsonAsync("/api/auth/verify-email",
             new VerifyEmailRequest { Token = token });
@@ -126,7 +118,7 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         var email = $"resend-{Guid.NewGuid():N}@example.com";
 
         await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
+            AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
 
         using (var scope = _fixture.Services.CreateScope())
         {
@@ -153,11 +145,11 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         var email = $"dup-{Guid.NewGuid():N}@example.com";
 
         await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
+            AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
         var second = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = "password123" });
+            AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
 
-        second.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        second.StatusCode.Should().Be(HttpStatusCode.Accepted);
     }
 
     [Fact]
@@ -184,18 +176,10 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
             new ForgotPasswordRequest { Email = email });
         forgot.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        string token;
-        using (var scope = _fixture.Services.CreateScope())
-        {
-            var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-            var user = await users.GetByEmailAsync(email.ToLowerInvariant());
-            token = user!.PasswordResetToken!;
-            token.Should().NotBeNullOrWhiteSpace();
-        }
-
         var resetEmail = _fixture.EmailSender.LastFor(email);
         resetEmail.Should().NotBeNull();
         resetEmail!.Subject.Should().Contain("Восстановление");
+        var token = ExtractToken(resetEmail);
 
         var reset = await client.PostAsJsonAsync("/api/auth/reset-password",
             new ResetPasswordRequest { Token = token, NewPassword = "newpassword1" });
@@ -242,12 +226,12 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         await client.PostAsJsonAsync("/api/auth/forgot-password",
             new ForgotPasswordRequest { Email = email });
 
-        string token;
+        var token = ExtractToken(_fixture.EmailSender.LastFor(email)!);
         using (var scope = _fixture.Services.CreateScope())
         {
             var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
             var user = await users.GetByEmailAsync(email.ToLowerInvariant());
-            token = user!.PasswordResetToken!;
+            user!.PasswordResetToken.Should().NotBe(token);
             user.PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(-1);
             await users.UpdateAsync(user);
         }
@@ -256,5 +240,16 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
             new ResetPasswordRequest { Token = token, NewPassword = "newpassword1" });
 
         reset.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private static string ExtractToken(CapturedEmail email)
+    {
+        const string marker = "token=";
+        var start = email.HtmlBody.IndexOf(marker, StringComparison.Ordinal);
+        start.Should().BeGreaterThanOrEqualTo(0);
+        start += marker.Length;
+        var end = email.HtmlBody.IndexOfAny(['\"', '<', '&'], start);
+        if (end < 0) end = email.HtmlBody.Length;
+        return Uri.UnescapeDataString(email.HtmlBody[start..end]);
     }
 }

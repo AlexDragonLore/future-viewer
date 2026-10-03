@@ -4,6 +4,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using FutureViewer.DomainServices.Interfaces;
+using FutureViewer.Infrastructure.Compliance;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -17,26 +18,44 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
 
     public YooMoneyRedirectPaymentProvider(
         IOptions<YooMoneyOptions> options,
-        ILogger<YooMoneyRedirectPaymentProvider> logger)
+        ILogger<YooMoneyRedirectPaymentProvider> logger,
+        IProcessorRegistryGuard? registry = null)
     {
         _options = options.Value;
         _logger = logger;
     }
 
+    public string ProviderName => "YooMoney";
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.Receiver)
+        && !string.IsNullOrWhiteSpace(_options.NotificationSecret)
+        && PaymentEndpointSafety.IsYooMoneyCheckout(_options.QuickpayUrl)
+        && _options.MonthlyPriceAmount > 0 && decimal.Round(_options.MonthlyPriceAmount, 2) == _options.MonthlyPriceAmount
+        && _options.CurrencyCode == "643";
+
+    public PaymentProductDescriptor Product => new()
+    {
+        TariffCode = "pro-30d",
+        Amount = _options.MonthlyPriceAmount,
+        Currency = "RUB",
+        AccessDays = 30
+    };
+
     public Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
-        Guid userId,
-        string userEmail,
+        Guid publicOrderId,
+        string idempotencyKey,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(_options.Receiver))
             throw new InvalidOperationException("YooMoney receiver is not configured");
+        PaymentEndpointSafety.EnsureYooMoneyCheckout(_options.QuickpayUrl);
 
-        var label = CreateLabel(userId);
+        _ = idempotencyKey; // YooMoney quickpay has no request idempotency header.
+        var label = CreateLabel(publicOrderId);
         var url = BuildQuickpayUrl(label);
 
         return Task.FromResult(new PaymentCreationResult
         {
-            PaymentId = label,
+            PaymentId = null,
             ConfirmationUrl = url,
             Status = "pending"
         });
@@ -44,6 +63,7 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
 
     public PaymentWebhookEvent? ParseWebhook(string body)
     {
+        PaymentEndpointSafety.EnsureYooMoneyCheckout(_options.QuickpayUrl);
         var form = ParseFormBody(body);
         if (form.Count == 0) return null;
 
@@ -58,7 +78,7 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         }
 
         if (!form.TryGetValue("label", out var label)
-            || TryParseUserId(label) is not { } userId)
+            || TryParseOrderId(label) is not { } orderId)
         {
             _logger.LogWarning("YooMoney notification {OperationId} rejected: label is missing or invalid", operationId);
             return null;
@@ -82,7 +102,9 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
             return null;
         }
 
-        if (!TryGetPaidAmount(form, out var paidAmount) || paidAmount < _options.MonthlyPriceAmount)
+        // The service checks this authenticated amount against the persisted order.
+        // Comparing to today's price would reject a payment started before repricing.
+        if (!TryGetPaidAmount(form, out var paidAmount) || paidAmount <= 0)
         {
             _logger.LogWarning("YooMoney notification {OperationId} rejected: amount mismatch", operationId);
             return null;
@@ -93,20 +115,24 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
             PaymentId = operationId,
             Status = "succeeded",
             Paid = true,
-            UserId = userId
+            UserId = null,
+            OrderId = orderId,
+            Amount = paidAmount,
+            Currency = "RUB"
         };
 
         return new PaymentWebhookEvent
         {
             Type = PaymentWebhookEventType.PaymentSucceeded,
             PaymentId = operationId,
-            UserId = userId
+            UserId = null,
+            OrderId = orderId
         };
     }
 
     public Task<PaymentVerification?> VerifyPaymentAsync(string paymentId, CancellationToken ct = default)
     {
-        _verifiedPayments.TryGetValue(paymentId, out var verification);
+        _verifiedPayments.TryRemove(paymentId, out var verification);
         return Task.FromResult<PaymentVerification?>(verification);
     }
 
@@ -169,7 +195,8 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
             var key = WebUtility.UrlDecode(pair[0]);
             if (string.IsNullOrWhiteSpace(key)) continue;
 
-            result[key] = pair.Length == 2 ? WebUtility.UrlDecode(pair[1]) : string.Empty;
+            if (!result.TryAdd(key, pair.Length == 2 ? WebUtility.UrlDecode(pair[1]) : string.Empty))
+                return new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
         return result;
@@ -188,21 +215,21 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         if (string.IsNullOrWhiteSpace(raw))
             raw = form.GetValueOrDefault("amount");
 
-        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out amount);
+        return decimal.TryParse(raw, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount);
     }
 
-    private static string CreateLabel(Guid userId)
+    private static string CreateLabel(Guid publicOrderId)
     {
         var suffix = Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
-        return $"fv:{userId:N}:{suffix}";
+        return $"fv-order:{publicOrderId:N}:{suffix}";
     }
 
-    private static Guid? TryParseUserId(string? label)
+    private static Guid? TryParseOrderId(string? label)
     {
         if (string.IsNullOrWhiteSpace(label)) return null;
 
         var parts = label.Split(':');
-        if (parts.Length < 2 || !string.Equals(parts[0], "fv", StringComparison.Ordinal))
+        if (parts.Length < 2 || !string.Equals(parts[0], "fv-order", StringComparison.Ordinal))
             return null;
 
         return Guid.TryParseExact(parts[1], "N", out var id) ? id : null;

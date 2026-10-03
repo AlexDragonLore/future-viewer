@@ -79,11 +79,19 @@ public sealed class LeaderboardEndpointTests : IClassFixture<IntegrationTestFixt
         var response = await client.GetAsync("/api/leaderboard/alltime?take=200");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var list = await response.Content.ReadFromJsonAsync<List<LeaderboardEntryDto>>();
+        var json = await response.Content.ReadAsStringAsync();
+        json.ToLowerInvariant().Should().NotContain(userId.ToString().ToLowerInvariant());
+        json.Should().NotContain("@");
+        json.Should().NotContain("\"userId\"");
+        var list = System.Text.Json.JsonSerializer.Deserialize<List<LeaderboardEntryDto>>(
+            json,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         list.Should().NotBeNull();
-        var entry = list!.FirstOrDefault(e => e.UserId == userId);
+        var entry = list!.FirstOrDefault(e => e.FeedbackScore == 0 && e.AchievementScore > 0);
         entry.Should().NotBeNull();
-        entry!.FeedbackScore.Should().Be(0);
+        entry!.EntryId.Should().StartWith("rank-");
+        entry.DisplayName.Should().StartWith("Участник №");
+        entry.FeedbackScore.Should().Be(0);
         entry.AchievementScore.Should().BeGreaterThan(0);
         entry.TotalScore.Should().Be(entry.FeedbackScore + entry.AchievementScore);
         entry.FeedbackCount.Should().Be(0);
@@ -106,9 +114,15 @@ public sealed class LeaderboardEndpointTests : IClassFixture<IntegrationTestFixt
         var response = await client.GetAsync($"/api/leaderboard/monthly?year={now.Year}&month={now.Month}&take=200");
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var list = await response.Content.ReadFromJsonAsync<List<LeaderboardEntryDto>>();
+        var json = await response.Content.ReadAsStringAsync();
+        json.ToLowerInvariant().Should().NotContain(userId.ToString().ToLowerInvariant());
+        json.Should().NotContain("@");
+        json.Should().NotContain("\"userId\"");
+        var list = System.Text.Json.JsonSerializer.Deserialize<List<LeaderboardEntryDto>>(
+            json,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         list.Should().NotBeNull();
-        var entry = list!.FirstOrDefault(e => e.UserId == userId);
+        var entry = list!.FirstOrDefault(e => e.AchievementScore == 10);
         entry.Should().NotBeNull();
         entry!.AchievementScore.Should().Be(10); // only first_reading (10pts), not first_feedback
     }

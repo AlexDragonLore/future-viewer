@@ -3,6 +3,7 @@ using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace FutureViewer.DomainServices.Services;
 
@@ -10,25 +11,36 @@ public sealed class SubscriptionService
 {
     public const int FreeDailyLimit = 1;
     public const int SubscriptionDurationDays = 30;
+    public const decimal NpdAnnualIncomeLimitRub = 2_400_000m;
+    public bool IsPaymentConfigured => _payments.IsConfigured;
 
     private readonly IUserRepository _users;
     private readonly IReadingRepository _readings;
     private readonly IPaymentProvider _payments;
     private readonly IProcessedPaymentRepository _processedPayments;
     private readonly IUnitOfWork _uow;
+    private readonly IPaymentOrderRepository? _orders;
+    private readonly ILogger<SubscriptionService>? _logger;
+    private readonly IPrivacyRepository? _privacy;
 
     public SubscriptionService(
         IUserRepository users,
         IReadingRepository readings,
         IPaymentProvider payments,
         IProcessedPaymentRepository processedPayments,
-        IUnitOfWork uow)
+        IUnitOfWork uow,
+        IPaymentOrderRepository? orders = null,
+        ILogger<SubscriptionService>? logger = null,
+        IPrivacyRepository? privacy = null)
     {
         _users = users;
         _readings = readings;
         _payments = payments;
         _processedPayments = processedPayments;
         _uow = uow;
+        _orders = orders;
+        _logger = logger;
+        _privacy = privacy;
     }
 
     public async Task EnsureReadingAllowedAsync(Guid userId, SpreadType spreadType, CancellationToken ct = default)
@@ -76,51 +88,190 @@ public sealed class SubscriptionService
         return IsSubscriptionActive(user);
     }
 
-    public async Task<PaymentCreationDto> CreatePaymentAsync(Guid userId, CancellationToken ct = default)
+    public async Task<PaymentCreationDto> CreatePaymentAsync(
+        Guid userId,
+        CreatePaymentRequest request,
+        CancellationToken ct = default)
     {
         var user = await _users.GetByIdAsync(userId, ct)
             ?? throw new UnauthorizedException("User not found");
 
-        var result = await _payments.CreateSubscriptionPaymentAsync(userId, user.Email, ct);
+        if (_orders is null || _privacy is null)
+            throw new InvalidOperationException("Local payment order and consent storage are required.");
+        if (!request.OfferAccepted || string.IsNullOrWhiteSpace(request.OfferVersion))
+            throw new DomainException("Для оплаты необходимо принять действующую оферту.");
+        var offer = await _privacy.GetActiveLegalDocumentAsync(
+            LegalDocumentType.PublicOffer, request.OfferVersion, ct)
+            ?? throw new ConflictException("Оферта обновилась. Обновите страницу и ознакомьтесь с действующей редакцией.");
+
+        var product = _payments.Product;
+        if (product.Amount <= 0 || decimal.Round(product.Amount, 2) != product.Amount || product.AccessDays <= 0
+            || string.IsNullOrWhiteSpace(product.TariffCode)
+            || !string.Equals(product.Currency, "RUB", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Payment product is not configured.");
+
+        var order = new PaymentOrder
+        {
+            UserId = user.Id,
+            SubjectReference = user.PrivacySubjectId,
+            TariffCode = product.TariffCode,
+            Amount = product.Amount,
+            Currency = product.Currency.ToUpperInvariant(),
+            AccessDays = product.AccessDays,
+            Provider = _payments.ProviderName,
+            IdempotencyKey = Guid.NewGuid().ToString("N")
+        };
+        await _uow.ExecuteInTransactionAsync(async innerCt =>
+        {
+            await _orders.AddAsync(order, innerCt);
+            await _privacy.AddConsentAsync(new UserConsent
+            {
+                UserId = user.Id,
+                SubjectReference = user.PrivacySubjectId,
+                ConsentType = ConsentType.OfferAcceptance,
+                LegalDocumentId = offer.Id,
+                DocumentVersion = offer.Version,
+                ContentHash = offer.ContentHash,
+                AcceptedAt = DateTime.UtcNow,
+                CollectionSource = $"checkout:{order.PublicId:N}"
+            }, innerCt);
+            return true;
+        }, ct);
+
+        PaymentCreationResult result;
+        try
+        {
+            result = await _payments.CreateSubscriptionPaymentAsync(
+                order.PublicId,
+                order.IdempotencyKey,
+                ct);
+            order.ProviderPaymentId = result.PaymentId;
+            order.Status = PaymentOrderStatus.ProviderCreated;
+            await _orders.UpdateAsync(order, ct);
+        }
+        catch
+        {
+            order.Status = PaymentOrderStatus.Failed;
+            await _orders.UpdateAsync(order, ct);
+            throw;
+        }
 
         return new PaymentCreationDto
         {
-            PaymentId = result.PaymentId,
+            PaymentId = order.PublicId.ToString("N"),
             ConfirmationUrl = result.ConfirmationUrl,
             Status = result.Status
         };
     }
 
+    public async Task<PaymentStatusDto> GetPaymentStatusAsync(
+        Guid userId, Guid publicOrderId, CancellationToken ct = default)
+    {
+        var order = _orders is null ? null : await _orders.GetByPublicIdAsync(publicOrderId, ct);
+        if (order?.UserId != userId)
+            throw new NotFoundException("Платёж не найден.");
+        return new PaymentStatusDto(order.Status.ToString().ToLowerInvariant(), order.Status == PaymentOrderStatus.Paid);
+    }
+
     public async Task<bool> ProcessWebhookAsync(string body, CancellationToken ct = default)
     {
+        return await ProcessWebhookWithOutcomeAsync(body, ct) == PaymentWebhookHandling.Processed;
+    }
+
+    public bool IsWebhookSourceAllowed(string? sourceAddress) =>
+        _payments.IsWebhookSourceAllowed(sourceAddress);
+
+    public async Task<PaymentWebhookHandling> ProcessWebhookWithOutcomeAsync(
+        string body,
+        CancellationToken ct = default)
+    {
+        if (_orders is null) return PaymentWebhookHandling.Rejected;
+
         var evt = _payments.ParseWebhook(body);
-        if (evt is null) return false;
-        if (evt.Type != PaymentWebhookEventType.PaymentSucceeded) return false;
-        if (string.IsNullOrEmpty(evt.PaymentId)) return false;
+        if (evt is null) return PaymentWebhookHandling.Rejected;
+        if (evt.Type == PaymentWebhookEventType.PaymentCanceled)
+            return PaymentWebhookHandling.Acknowledged;
+        if (evt.Type != PaymentWebhookEventType.PaymentSucceeded)
+            return PaymentWebhookHandling.Rejected;
+        if (string.IsNullOrEmpty(evt.PaymentId)) return PaymentWebhookHandling.Rejected;
 
         var verified = await _payments.VerifyPaymentAsync(evt.PaymentId, ct);
-        if (verified is null) return false;
-        if (!verified.Paid) return false;
-        if (!string.Equals(verified.Status, "succeeded", StringComparison.OrdinalIgnoreCase)) return false;
-        if (verified.UserId is null) return false;
-
-        var user = await _users.GetByIdAsync(verified.UserId.Value, ct);
-        if (user is null) return false;
-
-        return await _uow.ExecuteInTransactionAsync(async innerCt =>
+        if (verified is null) return PaymentWebhookHandling.Rejected;
+        if (!string.Equals(verified.PaymentId, evt.PaymentId, StringComparison.Ordinal))
+            return PaymentWebhookHandling.Rejected;
+        if (!verified.Paid) return PaymentWebhookHandling.Rejected;
+        if (!string.Equals(verified.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            return PaymentWebhookHandling.Rejected;
+        if (verified.Amount is null || string.IsNullOrWhiteSpace(verified.Currency))
+            return PaymentWebhookHandling.Rejected;
+        if (verified.OrderId is null)
         {
-            if (!await _processedPayments.TryRecordAsync(verified.PaymentId, user.Id, innerCt))
-                return false;
+            // Previously completed payments predate local checkout orders. A
+            // provider-verified replay only acknowledges the existing receipt;
+            // unknown legacy payments cannot grant access or create an order.
+            return await _processedPayments.ExistsAsync(verified.PaymentId, ct)
+                ? PaymentWebhookHandling.Acknowledged
+                : PaymentWebhookHandling.Rejected;
+        }
 
+        var outcome = await _uow.ExecuteInTransactionAsync(async innerCt =>
+        {
+            var order = await _orders.GetByPublicIdForUpdateAsync(verified.OrderId.Value, innerCt);
+            if (order is null
+                || order.UserId is null
+                || order.Status is PaymentOrderStatus.Canceled or PaymentOrderStatus.Failed
+                || !string.Equals(order.Provider, _payments.ProviderName, StringComparison.Ordinal)
+                || order.Amount <= 0 || order.AccessDays <= 0
+                || order.Amount != verified.Amount.Value
+                || !string.Equals(order.Currency, verified.Currency, StringComparison.OrdinalIgnoreCase)
+                || (order.ProviderPaymentId is not null
+                    && !string.Equals(order.ProviderPaymentId, verified.PaymentId, StringComparison.Ordinal)))
+            {
+                return PaymentWebhookHandling.Rejected;
+            }
+
+            // Serialize grants for one owner so separate paid orders cannot overwrite
+            // each other's access. Read the expiry only after acquiring the lock.
+            await _orders.LockOwnerAsync(order.UserId.Value, innerCt);
+            var user = await _users.GetByIdAsync(order.UserId.Value, innerCt);
+            if (user is null) return PaymentWebhookHandling.Rejected;
+            if (!await _processedPayments.TryRecordAsync(verified.PaymentId, user.Id, innerCt))
+                return PaymentWebhookHandling.Acknowledged;
+
+            // Honor the price and access term saved at checkout, even after repricing.
             var now = DateTime.UtcNow;
             var currentExpiry = user.SubscriptionExpiresAt is { } e && e > now ? e : now;
             user.SubscriptionStatus = SubscriptionStatus.Active;
-            user.SubscriptionExpiresAt = currentExpiry.AddDays(SubscriptionDurationDays);
+            user.SubscriptionExpiresAt = currentExpiry.AddDays(order.AccessDays);
             user.YukassaSubscriptionId = verified.PaymentId;
 
             await _users.UpdateAsync(user, innerCt);
-            return true;
+            order.ProviderPaymentId = verified.PaymentId;
+            order.Status = PaymentOrderStatus.Paid;
+            order.CompletedAt = now;
+            order.ReceiptStatus = NpdReceiptStatus.PendingManualIssue;
+            await _orders.UpdateAsync(order, innerCt);
+            return PaymentWebhookHandling.Processed;
         }, ct);
+
+        if (outcome == PaymentWebhookHandling.Processed)
+        {
+            var now = DateTime.UtcNow;
+            var total = await _orders.GetPaidTotalAsync(
+                new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                new DateTime(now.Year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                ct);
+            if (total >= NpdAnnualIncomeLimitRub * 0.8m)
+            {
+                _logger?.LogWarning(
+                    "NPD annual income threshold warning: totalRub={TotalRub}; thresholdRatio={ThresholdRatio}; receiptStatus={ReceiptStatus}",
+                    total,
+                    0.8m,
+                    NpdReceiptStatus.PendingManualIssue);
+            }
+        }
+
+        return outcome;
     }
 
     private static bool IsSubscriptionActive(User user)
@@ -131,4 +282,11 @@ public sealed class SubscriptionService
             return false;
         return user.SubscriptionExpiresAt.Value > DateTime.UtcNow;
     }
+}
+
+public enum PaymentWebhookHandling
+{
+    Rejected = 0,
+    Acknowledged = 1,
+    Processed = 2
 }

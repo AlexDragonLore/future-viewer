@@ -1,0 +1,46 @@
+# Compatibility with the existing production layout. Apply LAST, after the
+# prebuilt-image override. Requires Docker Compose 2.24.4+ for !override.
+# Keep the existing public Caddy and network during this application update;
+# migration to a separate shared edge is a different operational change.
+services:
+  postgres:
+    networks: !override
+      - default
+
+  backend:
+    networks: !override
+      - default
+
+  frontend:
+    networks: !override
+      - default
+
+  caddy:
+    networks: !override
+      default:
+        # Inspect address ownership first; never claim another container's IP.
+        ipv4_address: ${FV_LEGACY_EDGE_IP:?Set verified existing Caddy address}
+    ports: !override
+      - "80:80"
+      - "443:443"
+    volumes: !override
+      - /opt/fv-app/legacy-edge.Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    # TLS state must remain in the existing writable named volumes. The base
+    # internal proxy's tmpfs mounts must not mask /data and /config.
+    read_only: false
+    tmpfs: !override []
+
+networks: !override
+  default:
+    external: true
+    name: future-viewer_default
+
+volumes:
+  caddy_data:
+    external: true
+    name: future-viewer_caddy_data
+  caddy_config:
+    external: true
+    name: future-viewer_caddy_config

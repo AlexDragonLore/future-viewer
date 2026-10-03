@@ -68,7 +68,7 @@ const deck = computed(() => findTarotSeoDeckBySlug(slug.value))
       <section class="cta-band">
         <div>
           <h2>Сделать расклад</h2>
-          <p>Выберите вопрос, расклад и колоду, чтобы получить связную AI-интерпретацию.</p>
+          <p>Выберите вопрос, расклад и колоду, чтобы получить связную интерпретацию ИИ.</p>
         </div>
         <RouterLink to="/" class="seo-button">Начать расклад</RouterLink>
       </section>

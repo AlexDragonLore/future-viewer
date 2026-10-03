@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useLeaderboardStore } from '@/stores/useLeaderboardStore'
-import { useAuthStore } from '@/stores/useAuthStore'
 import LeaderboardTable from '@/components/LeaderboardTable.vue'
 
 type Tab = 'monthly' | 'alltime'
 
 const store = useLeaderboardStore()
-const auth = useAuthStore()
 
 const tab = ref<Tab>('monthly')
 
-const currentUserId = computed(() => auth.token ? parseSubFromToken(auth.token) : null)
 const entries = computed(() => (tab.value === 'monthly' ? store.monthly : store.allTime))
 
 onMounted(async () => {
@@ -24,18 +21,6 @@ async function select(next: Tab) {
   if (next === 'alltime' && store.allTime.length === 0) await store.loadAllTime()
 }
 
-function parseSubFromToken(token: string): string | null {
-  try {
-    const payload = token.split('.')[1]
-    if (!payload) return null
-    const padded = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const json = atob(padded + '==='.slice((padded.length + 3) % 4))
-    const data = JSON.parse(json) as { sub?: string; nameid?: string }
-    return data.sub ?? data.nameid ?? null
-  } catch {
-    return null
-  }
-}
 </script>
 
 <template>
@@ -75,7 +60,7 @@ function parseSubFromToken(token: string): string | null {
       {{ store.error }}
     </div>
     <section v-else class="mystic-card overflow-hidden">
-      <LeaderboardTable :entries="entries" :highlight-user-id="currentUserId" />
+      <LeaderboardTable :entries="entries" />
     </section>
   </main>
 </template>

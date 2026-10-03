@@ -37,7 +37,6 @@ function onRow(u: AdminUserListItem): void {
             <th class="num">Читок</th>
             <th class="num mobile-hide">Фидбеков</th>
             <th class="num">Баллов</th>
-            <th class="mobile-hide">TG</th>
           </tr>
         </thead>
         <tbody>
@@ -65,10 +64,6 @@ function onRow(u: AdminUserListItem): void {
             <td class="num">{{ u.totalReadings }}</td>
             <td class="num mobile-hide">{{ u.totalFeedbacks }}</td>
             <td class="num">{{ u.totalScore }}</td>
-            <td class="mobile-hide">
-              <span v-if="u.telegramChatId" class="badge active">✓</span>
-              <span v-else class="badge muted">—</span>
-            </td>
           </tr>
         </tbody>
       </table>
@@ -99,8 +94,6 @@ function onRow(u: AdminUserListItem): void {
           <strong>{{ u.totalFeedbacks }}</strong>
           <span>Баллов</span>
           <strong>{{ u.totalScore }}</strong>
-          <span>Telegram</span>
-          <span>{{ u.telegramChatId ? '✓' : '—' }}</span>
         </div>
         <div v-if="u.subscriptionExpiresAt" class="expiry mobile-expiry">
           до {{ new Date(u.subscriptionExpiresAt).toLocaleDateString() }}

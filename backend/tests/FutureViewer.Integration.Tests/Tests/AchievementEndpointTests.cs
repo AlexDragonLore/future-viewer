@@ -26,7 +26,7 @@ public sealed class AchievementEndpointTests : IClassFixture<IntegrationTestFixt
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var list = await response.Content.ReadFromJsonAsync<List<AchievementCatalogItem>>();
         list.Should().NotBeNull();
-        list!.Should().HaveCount(12);
+        list!.Should().HaveCount(11);
         list.Select(a => a.Code).Should().Contain("first_reading");
     }
 
@@ -52,7 +52,7 @@ public sealed class AchievementEndpointTests : IClassFixture<IntegrationTestFixt
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var list = await response.Content.ReadFromJsonAsync<List<AchievementDto>>();
         list.Should().NotBeNull();
-        list!.Should().HaveCount(12);
+        list!.Should().HaveCount(11);
         list.Should().OnlyContain(a => a.UnlockedAt == null);
     }
 

@@ -1,11 +1,30 @@
-{$APP_DOMAIN} {
+# Internal reverse proxy for the future-viewer Compose project. TLS termination and
+# the public alex-taro.ru host match are owned by the host-level shared edge.
+http://{$APP_DOMAIN} {
     encode zstd gzip
 
-    handle /api/* {
+    header {
+        -Server
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://mc.yandex.ru; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob: https://mc.yandex.ru; object-src 'none'; script-src 'self' https://mc.yandex.ru; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests"
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+        X-Frame-Options "DENY"
+        Cross-Origin-Opener-Policy "same-origin"
+    }
+
+    @api path /api/*
+    handle @api {
+        request_body {
+            max_size 1MB
+        }
+        header Cache-Control "no-store"
         reverse_proxy backend:8080
     }
 
     handle /health {
+        header Cache-Control "no-store"
         reverse_proxy backend:8080
     }
 

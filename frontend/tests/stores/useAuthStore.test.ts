@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import type { RegisterPayload } from '@/types'
 
 vi.mock('@/api/authApi', () => ({
   authApi: {
@@ -10,9 +11,9 @@ vi.mock('@/api/authApi', () => ({
       email,
       isAdmin: email.startsWith('admin'),
     })),
-    register: vi.fn(async (email: string) => ({
+    register: vi.fn(async (payload: RegisterPayload) => ({
       userId: 'u2',
-      email,
+      email: payload.email,
       verificationRequired: true,
     })),
     verifyEmail: vi.fn(async () => ({
@@ -75,7 +76,24 @@ describe('useAuthStore', () => {
 
   it('register does not persist credentials and returns verification response', async () => {
     const auth = useAuthStore()
-    const response = await auth.register('new@example.com', 'password123')
+    const payload: RegisterPayload = {
+      email: 'new@example.com',
+      password: 'password123',
+      offerAccepted: true,
+      privacyAcknowledged: true,
+      personalDataConsentAccepted: true,
+      ageConfirmed18: true,
+      documentVersions: {
+        offer: '1',
+        privacy: '1',
+        personalDataConsent: '1',
+        marketingConsent: '1',
+        cookies: '1',
+      },
+      optionalConsents: { personalization: false, marketing: false, analytics: false },
+      collectionSource: 'registration',
+    }
+    const response = await auth.register(payload)
     expect(response.verificationRequired).toBe(true)
     expect(response.email).toBe('new@example.com')
     expect(auth.isAuthenticated).toBe(false)
@@ -145,5 +163,30 @@ describe('useAuthStore', () => {
     expect(auth.token).toBe('jwt-reset')
     expect(auth.email).toBe('reset@example.com')
     expect(localStorage.getItem('fv_token')).toBe('jwt-reset')
+  })
+})
+
+describe('account data isolation', () => {
+  it('clears account-specific caches on logout', async () => {
+    const { usePrivacyStore } = await import('@/stores/usePrivacyStore')
+    const { useProfileStore } = await import('@/stores/useProfileStore')
+    const { useReadingStore } = await import('@/stores/useReadingStore')
+    const { useAdminStore } = await import('@/stores/useAdminStore')
+    const { SpreadType } = await import('@/types')
+    const auth = useAuthStore()
+    await auth.login('admin@example.com', 'password123')
+    const privacy = usePrivacyStore()
+    const profile = useProfileStore()
+    const reading = useReadingStore()
+    const admin = useAdminStore()
+    privacy.settings.historyEnabled = true
+    reading.setPending({ spreadType: SpreadType.ThreeCard, question: 'private question', questionWarningAcknowledged: false, saveToHistory: true, validated: false })
+    reading.streamingText = 'private interpretation'
+    admin.userSearch = 'another-user@example.com'
+    auth.logout()
+    expect(privacy.settings.historyEnabled).toBe(false)
+    expect(reading.pending).toBeNull()
+    expect(reading.streamingText).toBe('')
+    expect(admin.userSearch).toBeNull()
   })
 })

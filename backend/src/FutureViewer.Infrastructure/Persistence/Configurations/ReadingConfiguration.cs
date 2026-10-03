@@ -16,6 +16,10 @@ public sealed class ReadingConfiguration : IEntityTypeConfiguration<Reading>
         b.Property(x => x.Question).HasColumnName("question").HasMaxLength(1000);
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.DeletedFromHistoryAt).HasColumnName("deleted_from_history_at");
+        b.Property(x => x.SavedToHistory)
+            .HasColumnName("saved_to_history")
+            .IsRequired()
+            .HasDefaultValue(false);
         b.Property(x => x.AiInterpretation).HasColumnName("ai_interpretation");
         b.Property(x => x.AiModel).HasColumnName("ai_model").HasMaxLength(64);
         b.Property(x => x.DeckType)

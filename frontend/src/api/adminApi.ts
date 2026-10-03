@@ -4,14 +4,12 @@ import type {
   AdminFeedbackListResponse,
   AdminGrantedAchievement,
   AdminStats,
-  AdminTelegramLinkResult,
   AdminUserDetail,
   AdminUserListItem,
   AdminUserListResponse,
   CreateAdminFeedbackPayload,
   CreateSyntheticFeedbackPayload,
   FeedbackSearchFilters,
-  RunNotificationsResult,
   SetSubscriptionPayload,
   UpdateAdminFeedbackPayload,
   UserSearchFilters,
@@ -47,11 +45,6 @@ export const adminApi = {
 
   async deleteFeedback(id: string): Promise<void> {
     await httpClient.delete(`/api/admin/feedbacks/${id}`)
-  },
-
-  async runNotifications(): Promise<RunNotificationsResult> {
-    const { data } = await httpClient.post<RunNotificationsResult>('/api/admin/feedbacks/run-notifications')
-    return data
   },
 
   async listUsers(filters: UserSearchFilters = {}): Promise<AdminUserListResponse> {
@@ -101,18 +94,6 @@ export const adminApi = {
       `/api/admin/users/${id}/achievements/recheck`,
     )
     return data
-  },
-
-  async setUserTelegram(id: string, chatId: number): Promise<AdminTelegramLinkResult> {
-    const { data } = await httpClient.put<AdminTelegramLinkResult>(
-      `/api/admin/users/${id}/telegram`,
-      { chatId },
-    )
-    return data
-  },
-
-  async unlinkUserTelegram(id: string): Promise<void> {
-    await httpClient.delete(`/api/admin/users/${id}/telegram`)
   },
 
   async getStats(): Promise<AdminStats> {

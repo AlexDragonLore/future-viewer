@@ -2,13 +2,23 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { getGuestContinuation } from '@/utils/guestReading'
 import CardFlip from '@/components/cards/CardFlip.vue'
-import { marked } from 'marked'
+import AiDisclaimer from '@/components/AiDisclaimer.vue'
+import { safeMarkdown } from '@/utils/safeMarkdown'
+import { trackGoalOnce } from '@/analytics/metrika'
 
 const router = useRouter()
 const store = useReadingStore()
+const auth = useAuthStore()
+const restoring = ref(false)
+const locked = computed(() => reading.value?.isPreview === true)
 
 const reading = computed(() => store.current)
+watch(reading, (value) => {
+  if (value?.isPreview) trackGoalOnce('guest_preview_viewed', value.id)
+}, { immediate: true, flush: 'post' })
 
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
 function onResize() {
@@ -108,7 +118,7 @@ function cancelTick() {
 
 function renderMarkdown() {
   markdownRafId = null
-  renderedHtml.value = marked.parse(displayed.value) as string
+  renderedHtml.value = safeMarkdown(displayed.value)
 }
 
 function scheduleMarkdownRender() {
@@ -175,16 +185,24 @@ watch(displayed, () => {
   nextTick(() => scheduleAutoScroll())
 }, { immediate: true })
 
-onMounted(() => {
+onMounted(async () => {
   shouldFollowStream = true
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('wheel', markUserScrollIntent, { passive: true })
   window.addEventListener('touchmove', markUserScrollIntent, { passive: true })
   window.addEventListener('keydown', onKeydown)
-  if (!reading.value) {
+  if ((!reading.value || (locked.value && auth.isAuthenticated)) && getGuestContinuation()) {
+    await resumeGuest()
+  } else if (!reading.value) {
     router.replace({ name: 'home' })
   }
 })
+
+async function resumeGuest() {
+  restoring.value = true
+  await store.restoreGuest()
+  restoring.value = false
+}
 
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScroll)
@@ -207,7 +225,7 @@ function again() {
   <main v-if="reading" class="result-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center">
     <header class="text-center mb-10">
       <div class="result-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
-      <h1 class="font-display text-3xl sm:text-4xl md:text-5xl gold-text">Расклад раскрыт</h1>
+      <h1 class="font-display text-3xl sm:text-4xl md:text-5xl gold-text">{{ locked ? 'Твоя карта раскрыта' : 'Расклад раскрыт' }}</h1>
       <p class="result-question text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
     </header>
 
@@ -217,22 +235,70 @@ function again() {
           {{ card.positionName }}
         </div>
         <CardFlip :card="card" :face-up="true" :width="cardWidth" />
-        <div class="text-xs text-mystic-silver/60 mt-2 text-center max-w-[140px]">
+        <div v-if="!locked" class="text-xs text-mystic-silver/60 mt-2 text-center max-w-[140px]">
           {{ card.meaning }}
         </div>
       </div>
     </section>
 
     <section class="mystic-card max-w-2xl w-full p-5 sm:p-8 mb-8">
-      <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Интерпретация</div>
+      <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">{{ locked ? 'Начало толкования' : 'Интерпретация' }}</div>
       <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="renderedHtml" /><span v-if="streaming" class="caret">▮</span><span ref="streamTail" class="stream-tail" aria-hidden="true"></span>
+      <div v-if="locked && !streaming" class="guest-unlock" data-testid="guest-unlock">
+        <div class="guest-hidden-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+        <h2 class="font-display text-2xl gold-text">Что карта подсказывает дальше?</h2>
+        <p>Ты прочитал начало. Создай бесплатный аккаунт, чтобы открыть полное толкование этой карты.</p>
+        <template v-if="!auth.isAuthenticated">
+          <RouterLink :to="{ name: 'auth', query: { mode: 'register', redirect: '/result' } }" class="glow-button guest-register">
+            Зарегистрироваться и дочитать
+          </RouterLink>
+          <RouterLink :to="{ name: 'auth', query: { redirect: '/result' } }" class="guest-login">
+            Уже есть аккаунт? Войти
+          </RouterLink>
+          <p class="guest-retention">Эта карта ждёт тебя 24 часа. После подтверждения почты продолжим отсюда.</p>
+        </template>
+        <template v-else>
+          <p v-if="store.error" role="alert">{{ store.error }}</p>
+          <button class="glow-button" :disabled="restoring" @click="resumeGuest">
+            {{ restoring ? 'Открываю продолжение…' : 'Открыть полное толкование' }}
+          </button>
+        </template>
+      </div>
     </section>
 
-    <button class="glow-button" @click="again">Новый расклад</button>
+    <AiDisclaimer class="max-w-2xl w-full mb-8" />
+
+    <button :class="locked ? 'guest-login' : 'glow-button'" @click="again">{{ locked ? 'На главную' : 'Новый расклад' }}</button>
+  </main>
+  <main v-else class="min-h-screen px-4 py-16 flex flex-col items-center" aria-live="polite">
+    <section class="mystic-card max-w-xl w-full p-8 text-center space-y-5">
+      <h1 class="font-display text-2xl gold-text">Твоя карта</h1>
+      <p v-if="restoring">Открываю сохранённый расклад…</p>
+      <template v-else>
+        <p role="alert">{{ store.error || 'Срок хранения расклада истёк. Можно открыть новую карту.' }}</p>
+        <button v-if="getGuestContinuation()" class="glow-button" @click="resumeGuest">Попробовать ещё раз</button>
+        <RouterLink to="/" class="guest-login">Открыть новую карту</RouterLink>
+      </template>
+    </section>
   </main>
 </template>
 
 <style scoped>
+.guest-unlock {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1rem;
+  text-align: center;
+  color: rgba(224, 212, 186, 0.8);
+  line-height: 1.6;
+}
+.guest-hidden-lines { display: grid; gap: 0.7rem; padding: 0.4rem 0 1rem; }
+.guest-hidden-lines i { height: 0.55rem; border-radius: 1rem; background: rgba(224, 212, 186, 0.12); }
+.guest-hidden-lines i:nth-child(2) { width: 86%; opacity: 0.6; }
+.guest-hidden-lines i:last-child { width: 60%; opacity: 0.3; }
+.guest-register { display: block; white-space: normal; line-height: 1.5; }
+.guest-login { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; color: #f5c26b; font-size: 0.85rem; text-decoration: underline; text-underline-offset: 3px; }
+.guest-unlock .guest-retention { font-size: 0.75rem; color: rgba(224, 212, 186, 0.55); }
 .cards-grid {
   display: flex;
   flex-wrap: wrap;

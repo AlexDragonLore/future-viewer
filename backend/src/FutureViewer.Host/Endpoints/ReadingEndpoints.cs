@@ -4,6 +4,7 @@ using FluentValidation;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.DomainServices.Services;
+using FutureViewer.Host.Auth;
 
 namespace FutureViewer.Host.Endpoints;
 
@@ -14,6 +15,40 @@ public static class ReadingEndpoints
     public static IEndpointRouteBuilder MapReadings(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/readings").WithTags("Readings");
+
+        group.MapPost("/guest", async (
+            CreateReadingRequest request,
+            IValidator<CreateReadingRequest> validator,
+            ReadingService service,
+            GuestReadingTickets tickets,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            ctx.Response.Headers.CacheControl = "no-store";
+            await validator.ValidateAndThrowAsync(request, ct);
+            var reading = await service.CreateGuestAsync(request, ct);
+            return Results.Ok(tickets.Issue(reading));
+        }).AllowAnonymous().RequireRateLimiting("guest-reading");
+
+        group.MapPost("/guest/preview", (
+            GuestReadingTicketRequest request, GuestReadingTickets tickets, HttpContext ctx) =>
+        {
+            ctx.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(GuestReadingTickets.Preview(tickets.Read(request.Ticket)));
+        }).AllowAnonymous().RequireRateLimiting("ai");
+
+        group.MapPost("/guest/unlock", async (
+            GuestReadingTicketRequest request,
+            GuestReadingTickets tickets,
+            ReadingService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            ctx.Response.Headers.CacheControl = "no-store";
+            var userId = GetUserId(ctx.User)
+                ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
+            return Results.Ok(await service.UnlockGuestAsync(tickets.Read(request.Ticket), userId, ct));
+        }).RequireAuthorization().RequireRateLimiting("ai");
 
         group.MapPost("/", async (
             CreateReadingRequest request,
@@ -27,7 +62,7 @@ public static class ReadingEndpoints
                 ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
             var result = await service.CreateAsync(request, userId, ct);
             return Results.Created($"/api/readings/{result.Id}", result);
-        }).RequireAuthorization();
+        }).RequireAuthorization().RequireRateLimiting("ai");
 
         group.MapPost("/stream", async (
             CreateReadingRequest request,
@@ -85,7 +120,7 @@ public static class ReadingEndpoints
                     // Best-effort terminal frame.
                 }
             }
-        }).RequireAuthorization();
+        }).RequireAuthorization().RequireRateLimiting("ai");
 
         group.MapPost("/validate-question", async (
             CreateReadingRequest request,
@@ -103,7 +138,7 @@ public static class ReadingEndpoints
             var hasActiveSubscription = await subscription.HasActiveSubscriptionAsync(userId, ct);
             var result = QuestionValidationPolicy.BuildCheck(request.Question, validation, hasActiveSubscription);
             return Results.Ok(result);
-        }).RequireAuthorization();
+        }).RequireAuthorization().RequireRateLimiting("ai");
 
         group.MapGet("/{id:guid}", async (
             Guid id,

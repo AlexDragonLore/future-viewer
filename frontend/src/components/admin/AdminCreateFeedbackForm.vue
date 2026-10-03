@@ -78,7 +78,7 @@ async function submit(): Promise<void> {
 
     <template v-if="mode === 'synthetic'">
       <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
-        <span>AI score (1–10)</span>
+        <span>Оценка ИИ (1–10)</span>
         <input
           v-model.number="aiScore"
           type="number"

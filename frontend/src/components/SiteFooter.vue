@@ -1,19 +1,37 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
+import { useCookiePreferences } from '@/composables/useCookiePreferences'
 
 const { supportEmail } = storeToRefs(usePublicConfigStore())
+const { openCookieSettings } = useCookiePreferences()
 </script>
 
 <template>
   <footer class="site-footer">
     <RouterLink to="/about" class="about-link">О сервисе</RouterLink>
     <span class="footer-separator">·</span>
-    <RouterLink to="/legal" class="about-link">Оплата и оферта</RouterLink>
+    <RouterLink to="/legal/offer" class="about-link">Оферта</RouterLink>
     <span class="footer-separator">·</span>
-    <RouterLink to="/privacy" class="about-link">Конфиденциальность</RouterLink>
+    <RouterLink to="/legal/privacy" class="about-link">Политика ПД</RouterLink>
     <span class="footer-separator">·</span>
-    <RouterLink to="/faq" class="about-link">FAQ</RouterLink>
+    <RouterLink to="/legal/personal-data-consent" class="about-link">Согласие</RouterLink>
+    <span class="footer-separator">·</span>
+    <RouterLink to="/legal/cookies" class="about-link">Хранение в браузере</RouterLink>
+    <span class="footer-separator">·</span>
+    <RouterLink to="/legal/marketing-consent" class="about-link">Реклама</RouterLink>
+    <span class="footer-separator">·</span>
+    <RouterLink to="/legal/ai-disclaimer" class="about-link">ИИ и Таро</RouterLink>
+    <span class="footer-separator">·</span>
+    <RouterLink to="/legal/data-request" class="about-link">Права на данные</RouterLink>
+    <span class="footer-separator">·</span>
+    <RouterLink to="/legal/processors" class="about-link">Обработчики</RouterLink>
+    <span class="footer-separator">·</span>
+    <button type="button" class="about-link" data-testid="change-cookie-settings" @click="openCookieSettings">
+      Настройки cookies
+    </button>
+    <span class="footer-separator">·</span>
+    <RouterLink to="/faq" class="about-link">Вопросы и ответы</RouterLink>
     <span class="footer-separator">·</span>
     <RouterLink to="/" class="footer-brand-link">Вуаль Грядущего</RouterLink>
     <template v-if="supportEmail">

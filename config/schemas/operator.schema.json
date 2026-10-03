@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alex-taro.ru/schemas/operator.schema.json",
+  "title": "Future Viewer verified operator facts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "operator"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["full_name", "tax_status", "taxpayer_id", "postal_address", "contact_email", "support_email", "evidence_reference", "reviewed_at", "manual_approved", "publication_allowed"],
+      "properties": {
+        "full_name": { "type": ["string", "null"] },
+        "tax_status": { "type": ["string", "null"] },
+        "taxpayer_id": { "type": ["string", "null"] },
+        "postal_address": { "type": ["string", "null"] },
+        "contact_email": { "type": ["string", "null"], "format": "email" },
+        "support_email": { "type": ["string", "null"], "format": "email" },
+        "evidence_reference": { "type": ["string", "null"] },
+        "reviewed_at": { "type": ["string", "null"], "format": "date" },
+        "manual_approved": { "type": "boolean" },
+        "publication_allowed": { "type": "boolean" }
+      }
+    }
+  }
+}

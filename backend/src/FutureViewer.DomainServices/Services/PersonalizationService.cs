@@ -31,9 +31,9 @@ public sealed class PersonalizationService
         CancellationToken ct = default)
     {
         var user = await GetUserAsync(userId, ct);
-        user.FirstName = request.FirstName.Trim();
-        user.LastName = request.LastName.Trim();
-        user.BirthDate = request.BirthDate;
+        user.FirstName = NormalizeOptional(request.FirstName);
+        user.LastName = NormalizeOptional(request.LastName);
+        user.BirthYear = request.BirthYear;
         await _users.UpdateAsync(user, ct);
 
         var rules = await _memory.GetByUserAsync(userId, MemoryLimit, ct);
@@ -47,15 +47,12 @@ public sealed class PersonalizationService
         CancellationToken ct = default)
     {
         var user = await GetUserAsync(userId, ct);
-        if (!IsComplete(user))
-            throw new ProfileRequiredException("Заполните имя, фамилию и дату рождения перед раскладом.");
-
         var rules = await _memory.GetByUserAsync(userId, MemoryLimit, ct);
         return new UserPromptContext
         {
-            FirstName = user.FirstName!.Trim(),
-            LastName = user.LastName!.Trim(),
-            BirthDate = user.BirthDate!.Value,
+            FirstName = NormalizeOptional(user.FirstName),
+            LastName = NormalizeOptional(user.LastName),
+            BirthYear = user.BirthYear,
             Today = clientDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
             ClientTimeZone = string.IsNullOrWhiteSpace(clientTimeZone) ? null : clientTimeZone.Trim(),
             MemoryRules = rules.Select(r => r.Text).ToList()
@@ -107,7 +104,7 @@ public sealed class PersonalizationService
         {
             FirstName = user.FirstName,
             LastName = user.LastName,
-            BirthDate = user.BirthDate,
+            BirthYear = user.BirthYear,
             IsComplete = IsComplete(user),
             MemoryRules = rules.Select(r => new UserMemoryRuleDto
             {
@@ -119,10 +116,10 @@ public sealed class PersonalizationService
         };
     }
 
-    private static bool IsComplete(User user) =>
-        !string.IsNullOrWhiteSpace(user.FirstName)
-        && !string.IsNullOrWhiteSpace(user.LastName)
-        && user.BirthDate.HasValue;
+    private static bool IsComplete(User user) => true;
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static string CleanRule(string text) =>
         text.Trim().Length > 500 ? text.Trim()[..500] : text.Trim();

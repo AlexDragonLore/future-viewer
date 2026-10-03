@@ -19,9 +19,6 @@ const achievementCodeInput = ref<string>('')
 const grantingAchievement = ref(false)
 const revokingCode = ref<string | null>(null)
 const rechecking = ref(false)
-const telegramInput = ref<string>('')
-const savingTelegram = ref(false)
-const unlinkingTelegram = ref(false)
 
 const isSelf = computed(() => store.selectedUser?.id === auth.userId)
 
@@ -113,34 +110,6 @@ async function recheckAchievements(): Promise<void> {
   }
 }
 
-async function saveTelegram(): Promise<void> {
-  if (!store.selectedUser) return
-  const raw = telegramInput.value.trim()
-  if (!raw) return
-  const chatId = Number(raw)
-  if (!Number.isInteger(chatId)) {
-    alert('chatId должен быть целым числом')
-    return
-  }
-  savingTelegram.value = true
-  try {
-    const ok = await store.setUserTelegram(store.selectedUser.id, chatId)
-    if (ok) telegramInput.value = ''
-  } finally {
-    savingTelegram.value = false
-  }
-}
-
-async function unlinkTelegram(): Promise<void> {
-  if (!store.selectedUser) return
-  if (!confirm('Отвязать Telegram у пользователя?')) return
-  unlinkingTelegram.value = true
-  try {
-    await store.unlinkUserTelegram(store.selectedUser.id)
-  } finally {
-    unlinkingTelegram.value = false
-  }
-}
 </script>
 
 <template>
@@ -206,39 +175,6 @@ async function unlinkTelegram(): Promise<void> {
         </button>
       </section>
 
-      <section class="section">
-        <h4>Telegram</h4>
-        <p v-if="store.selectedUser.telegramChatId" class="text-sm">
-          chatId: <span class="mono">{{ store.selectedUser.telegramChatId }}</span>
-        </p>
-        <p v-else class="text-sm text-mystic-muted">не привязан</p>
-        <div class="flex items-center gap-2 mt-2">
-          <input
-            v-model="telegramInput"
-            type="text"
-            class="admin-input flex-1"
-            placeholder="chatId (целое число)"
-            data-testid="admin-user-telegram-input"
-          />
-          <button
-            class="admin-btn"
-            :disabled="savingTelegram || !telegramInput.trim()"
-            data-testid="admin-user-telegram-save"
-            @click="saveTelegram"
-          >
-            {{ savingTelegram ? '…' : 'Привязать' }}
-          </button>
-          <button
-            v-if="store.selectedUser.telegramChatId"
-            class="admin-btn danger"
-            :disabled="unlinkingTelegram"
-            data-testid="admin-user-telegram-unlink"
-            @click="unlinkTelegram"
-          >
-            {{ unlinkingTelegram ? '…' : 'Отвязать' }}
-          </button>
-        </div>
-      </section>
 
       <section class="section">
         <h4>Статистика</h4>

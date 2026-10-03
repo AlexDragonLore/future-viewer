@@ -1,23 +1,42 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { extractApiError } from '@/api/httpClient'
+import { legalDocumentVersions, loadLegalDocuments } from '@/content/legal'
+import { trackGoal } from '@/analytics/metrika'
+import type { RegisterPayload } from '@/types'
+import { getGuestContinuation } from '@/utils/guestReading'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const mode = ref<'login' | 'register'>('login')
+const mode = ref<'login' | 'register'>(route.query.mode === 'register' ? 'register' : 'login')
+const continuesReading = Boolean(getGuestContinuation())
+watch(mode, (value) => {
+  if (value === 'register') trackGoal('registration_started')
+}, { immediate: true })
+
+function destination() {
+  if (getGuestContinuation()) return '/result'
+  const redirect = route.query.redirect
+  return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
+}
 const email = ref('')
 const password = ref('')
 const error = ref<string | null>(null)
 const errorHint = ref<string | null>(null)
 const busy = ref(false)
-const info = ref<string | null>(null)
+const info = ref<string | null>(route.query.accountDeletion === 'requested'
+  ? 'Запрос на удаление аккаунта принят. Вход заблокирован, сеанс завершён. По вопросам выполнения запроса обратитесь к оператору через раздел «Права и обращения».'
+  : null)
 const needsVerification = ref(false)
 const resendBusy = ref(false)
+const personalDataConsentAccepted = ref(false)
+
+const registrationReady = computed(() => personalDataConsentAccepted.value)
 
 function getAuthError(e: unknown) {
   if (axios.isAxiosError(e)) {
@@ -25,8 +44,8 @@ function getAuthError(e: unknown) {
     const data = e.response?.data as { error?: string; message?: string } | undefined
     if (!e.response || e.message === 'Network Error') {
       return {
-        message: 'Не удалось связаться с локальным API.',
-        hint: 'Проверь, что backend запущен, подожди несколько секунд и попробуй снова.',
+        message: 'Не удалось связаться с сервисом.',
+        hint: 'Проверьте подключение к интернету и попробуйте ещё раз через несколько минут.',
       }
     }
     if (status === 401 || data?.error === 'unauthorized' || data?.message === 'Invalid credentials') {
@@ -51,16 +70,37 @@ async function submit() {
   try {
     if (mode.value === 'login') {
       await auth.login(email.value, password.value)
-      const redirect = (route.query.redirect as string) || '/'
-      router.replace(redirect)
+      router.replace(destination())
     } else {
-      const result = await auth.register(email.value, password.value)
+      if (!registrationReady.value) {
+        error.value = 'Для регистрации нужно дать согласие на обработку персональных данных.'
+        return
+      }
+      await loadLegalDocuments()
+      const payload: RegisterPayload = {
+        email: email.value,
+        password: password.value,
+        offerAccepted: true,
+        privacyAcknowledged: true,
+        personalDataConsentAccepted: true,
+        ageConfirmed18: true,
+        documentVersions: {
+          offer: legalDocumentVersions.offer,
+          privacy: legalDocumentVersions.privacy,
+          personalDataConsent: legalDocumentVersions.personalDataConsent,
+          marketingConsent: legalDocumentVersions.marketingConsent,
+          cookies: legalDocumentVersions.cookies,
+        },
+        optionalConsents: { personalization: false, marketing: false, analytics: false },
+        collectionSource: 'registration',
+      }
+      const result = await auth.register(payload)
       if (result.verificationRequired) {
-        info.value = `Мы отправили письмо на ${result.email}. Перейдите по ссылке, чтобы подтвердить почту.`
+        info.value = `Мы отправили письмо на ${result.email}. Перейдите по ссылке, чтобы подтвердить почту.${continuesReading ? ' Затем откроется полное толкование вашей карты.' : ''}`
+        needsVerification.value = true
       } else {
         await auth.login(email.value, password.value)
-        const redirect = (route.query.redirect as string) || '/'
-        router.replace(redirect)
+        router.replace(destination())
       }
     }
   } catch (e) {
@@ -101,22 +141,38 @@ async function resendVerification() {
         {{ mode === 'login' ? 'Войти' : 'Регистрация' }}
       </h1>
 
+      <p v-if="continuesReading" class="text-center text-sm text-mystic-silver/70 mb-6" data-testid="auth-continue-reading">
+        Твоя карта уже открыта. {{ mode === 'register' ? 'Зарегистрируйся и подтверди почту' : 'Войди' }}, чтобы дочитать толкование бесплатно.
+      </p>
+
       <form class="space-y-4" @submit.prevent="submit">
         <input
           v-model="email"
           type="email"
-          placeholder="email"
+          placeholder="Электронная почта"
+          autocomplete="email"
+          aria-label="Электронная почта"
           required
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 focus:outline-none focus:border-mystic-accent"
         />
         <input
           v-model="password"
           type="password"
-          placeholder="пароль"
+          placeholder="Пароль"
+          :autocomplete="mode === 'register' ? 'new-password' : 'current-password'"
+          aria-label="Пароль"
           required
           minlength="8"
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 focus:outline-none focus:border-mystic-accent"
         />
+        <label v-if="mode === 'register'" class="registration-consent" data-testid="registration-consents">
+          <input v-model="personalDataConsentAccepted" type="checkbox" required data-testid="personal-data-consent-acceptance" />
+          <span>Даю <RouterLink to="/legal/personal-data-consent">согласие на обработку персональных данных</RouterLink>.</span>
+        </label>
+        <p v-if="mode === 'register'" class="registration-terms" data-testid="registration-terms">
+          Нажимая «Создать», принимаю <RouterLink to="/legal/offer">оферту</RouterLink>, подтверждаю ознакомление с
+          <RouterLink to="/legal/privacy">политикой конфиденциальности</RouterLink> и возраст 18+.
+        </p>
         <div v-if="error" class="auth-error">
           <p>{{ error }}</p>
           <p v-if="errorHint" class="auth-error-hint">{{ errorHint }}</p>
@@ -131,7 +187,11 @@ async function resendVerification() {
         >
           {{ resendBusy ? '...' : 'Отправить письмо повторно' }}
         </button>
-        <button type="submit" class="glow-button w-full" :disabled="busy">
+        <button
+          type="submit"
+          class="glow-button w-full"
+          :disabled="busy || (mode === 'register' && !registrationReady)"
+        >
           {{ busy ? '...' : mode === 'login' ? 'Войти' : 'Создать' }}
         </button>
       </form>
@@ -193,6 +253,34 @@ async function resendVerification() {
 .auth-secondary-action:hover {
   color: #f5c26b;
 }
+.registration-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  color: rgba(224, 212, 186, 0.88);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  cursor: pointer;
+}
+.registration-consent input {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.2rem;
+  accent-color: #f5c26b;
+}
+.registration-terms {
+  color: rgba(224, 212, 186, 0.65);
+  font-size: 0.73rem;
+  line-height: 1.6;
+}
+.registration-consent a,
+.registration-terms a {
+  color: #f5c26b;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 @media (max-width: 640px) {
   .auth-page {
     align-items: flex-start;

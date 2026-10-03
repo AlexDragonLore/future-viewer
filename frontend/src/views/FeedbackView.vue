@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { marked } from 'marked'
 import { feedbackApi } from '@/api/feedbackApi'
 import { extractApiError } from '@/api/httpClient'
 import FeedbackForm from '@/components/FeedbackForm.vue'
 import ScoreBadge from '@/components/ScoreBadge.vue'
+import AiDisclaimer from '@/components/AiDisclaimer.vue'
+import { safeMarkdown } from '@/utils/safeMarkdown'
 import { FeedbackStatus, type FeedbackInfo } from '@/types'
 
 const route = useRoute()
@@ -17,7 +18,7 @@ const submitting = ref(false)
 const submitError = ref<string | null>(null)
 
 const interpretationHtml = computed(() =>
-  feedback.value?.interpretation ? (marked.parse(feedback.value.interpretation) as string) : '',
+  safeMarkdown(feedback.value?.interpretation),
 )
 
 const isScored = computed(() => feedback.value?.status === FeedbackStatus.Scored)
@@ -87,6 +88,8 @@ watch(
         <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="interpretationHtml" />
       </section>
 
+      <AiDisclaimer class="mb-6" />
+
       <section v-if="!isScored" class="mystic-card p-6">
         <FeedbackForm :busy="submitting" :error="submitError" @submit="onSubmit" />
         <p class="mt-4 text-xs text-mystic-silver/50">
@@ -98,7 +101,7 @@ watch(
         <div class="flex items-center gap-4 mb-4">
           <ScoreBadge :score="displayScore" size="lg" />
           <div>
-            <div class="text-xs uppercase tracking-widest text-mystic-accent/80">Оценка AI</div>
+            <div class="text-xs uppercase tracking-widest text-mystic-accent/80">Оценка ИИ</div>
             <div class="text-mystic-silver font-display">
               {{ displayScore ?? '—' }} / 10
               <span v-if="displaySincere === false" class="insincere-tag">не искренне</span>

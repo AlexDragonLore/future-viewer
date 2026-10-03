@@ -46,7 +46,9 @@ async function submit() {
         <input
           v-model="email"
           type="email"
-          placeholder="email"
+          placeholder="Электронная почта"
+          autocomplete="email"
+          aria-label="Электронная почта"
           required
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 focus:outline-none focus:border-mystic-accent"
         />

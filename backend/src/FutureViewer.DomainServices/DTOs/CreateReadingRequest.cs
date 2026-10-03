@@ -10,4 +10,5 @@ public sealed class CreateReadingRequest
     public DateOnly? ClientDate { get; init; }
     public string? ClientTimeZone { get; init; }
     public bool QuestionWarningAcknowledged { get; init; } = false;
+    public bool SaveToHistory { get; init; } = false;
 }

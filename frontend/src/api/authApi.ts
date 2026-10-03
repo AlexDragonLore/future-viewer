@@ -1,9 +1,9 @@
 import { httpClient } from './httpClient'
-import type { AuthResponse, RegisterResponse } from '@/types'
+import type { AuthResponse, RegisterPayload, RegisterResponse } from '@/types'
 
 export const authApi = {
-  async register(email: string, password: string): Promise<RegisterResponse> {
-    const { data } = await httpClient.post<RegisterResponse>('/api/auth/register', { email, password })
+  async register(payload: RegisterPayload): Promise<RegisterResponse> {
+    const { data } = await httpClient.post<RegisterResponse>('/api/auth/register', payload)
     return data
   },
 

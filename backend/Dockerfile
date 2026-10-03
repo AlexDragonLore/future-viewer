@@ -18,4 +18,7 @@ WORKDIR /app
 COPY --from=build /app/publish ./
 EXPOSE 8080
 ENV ASPNETCORE_URLS=http://+:8080
+ENV DataProtection__KeysPath=/app/data-protection-keys
+RUN mkdir -p /app/data-protection-keys && chown "$APP_UID" /app/data-protection-keys
+USER $APP_UID
 ENTRYPOINT ["dotnet", "FutureViewer.Host.dll"]

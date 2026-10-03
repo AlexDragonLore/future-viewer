@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
+import { useAuthStore } from '@/stores/useAuthStore'
 import CardDeck from '@/components/cards/CardDeck.vue'
 import CardFlip from '@/components/cards/CardFlip.vue'
 import { computeSlots, computeCardWidth } from '@/composables/useSpread'
@@ -26,6 +27,7 @@ const showRealCards = ref(false)
 const pendingSpread = ref<SpreadType | null>(null)
 const pendingQuestion = ref('')
 const pendingQuestionWarningAcknowledged = ref(false)
+const pendingSaveToHistory = ref(false)
 const boardWidth = ref(0)
 const cardWidth = computed(() =>
   pendingSpread.value !== null ? computeCardWidth(pendingSpread.value, boardWidth.value) : 140,
@@ -94,17 +96,17 @@ function normalizeReadingForSpread(reading: Reading, spreadType: SpreadType): Re
 }
 
 onMounted(async () => {
-  const saved = sessionStorage.getItem('fv_pending')
-  if (!saved) {
+  const saved = store.takePending()
+  if (!saved || !saved.validated) {
     router.replace({ name: 'home' })
     return
   }
-  const parsed = JSON.parse(saved)
-  pendingSpread.value = parsed.spreadType
-  pendingQuestion.value = parsed.question
-  pendingQuestionWarningAcknowledged.value = parsed.questionWarningAcknowledged === true
+  pendingSpread.value = saved.spreadType
+  pendingQuestion.value = saved.question
+  pendingQuestionWarningAcknowledged.value = saved.questionWarningAcknowledged
+  pendingSaveToHistory.value = saved.saveToHistory
 
-  const count = parsed.spreadType as number
+  const count = saved.spreadType as number
   placeholders.value = Array.from({ length: count }, (_, i) => ({
     position: i,
     positionName: '',
@@ -147,31 +149,32 @@ async function startReading() {
   playShuffle()
 
   streamAbort = new AbortController()
-  const { cardsPromise, donePromise } = store.createStream(
+  const { cardsPromise, donePromise } = useAuthStore().isAuthenticated ? store.createStream(
     pendingSpread.value,
     pendingQuestion.value,
     streamAbort.signal,
     pendingQuestionWarningAcknowledged.value,
-  )
+    pendingSaveToHistory.value,
+  ) : store.createGuest(pendingQuestion.value, streamAbort.signal)
   donePromise.catch(() => {})
   let cardsFailed = false
   cardsPromise.catch((e) => {
     if (isAbortError(e) || currentRun !== runId) return
-    const err = e as ReadingApiError
+    const err = e as ReadingApiError & { response?: { data?: { suggestedQuestion?: string | null } } }
     if (err.code === 'question_needs_rewrite' || err.code === 'question_rejected') {
       cardsFailed = true
-      sessionStorage.setItem('fv_question_validation', JSON.stringify({
-        code: err.code,
+      store.setWorkflowIssue({
         message: err.message,
         suggestedQuestion: err.suggestedQuestion ?? null,
-      }))
+      })
       router.replace({ name: 'home' })
       return
     }
     cardsFailed = true
-    sessionStorage.setItem('fv_reading_error', JSON.stringify({
+    store.setWorkflowIssue({
       message: store.error ?? err.message ?? 'Не удалось создать расклад',
-    }))
+      suggestedQuestion: err.response?.data?.suggestedQuestion ?? null,
+    })
     router.replace({ name: 'home' })
   })
 

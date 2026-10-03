@@ -5,10 +5,10 @@ import type { LeaderboardEntry } from '@/types'
 
 function makeEntries(): LeaderboardEntry[] {
   return [
-    { userId: 'u1', displayName: 'a***@mail.com', totalScore: 58, feedbackScore: 48, achievementScore: 10, feedbackCount: 8, averageScore: 7.25, rank: 1 },
-    { userId: 'u2', displayName: 'b***@mail.com', totalScore: 40, feedbackScore: 40, achievementScore: 0, feedbackCount: 5, averageScore: 8, rank: 2 },
-    { userId: 'u3', displayName: 'c***@mail.com', totalScore: 30, feedbackScore: 10, achievementScore: 20, feedbackCount: 5, averageScore: 6, rank: 3 },
-    { userId: 'u4', displayName: 'd***@mail.com', totalScore: 20, feedbackScore: 0, achievementScore: 20, feedbackCount: 4, averageScore: 5, rank: 4 },
+    { entryId: 'rank-1', displayName: 'Участник №1', totalScore: 58, feedbackScore: 48, achievementScore: 10, feedbackCount: 8, averageScore: 7.25, rank: 1 },
+    { entryId: 'rank-2', displayName: 'Участник №2', totalScore: 40, feedbackScore: 40, achievementScore: 0, feedbackCount: 5, averageScore: 8, rank: 2 },
+    { entryId: 'rank-3', displayName: 'Участник №3', totalScore: 30, feedbackScore: 10, achievementScore: 20, feedbackCount: 5, averageScore: 6, rank: 3 },
+    { entryId: 'rank-4', displayName: 'Участник №4', totalScore: 20, feedbackScore: 0, achievementScore: 20, feedbackCount: 4, averageScore: 5, rank: 4 },
   ]
 }
 
@@ -30,7 +30,8 @@ describe('LeaderboardTable', () => {
     const wrapper = mount(LeaderboardTable, { props: { entries: makeEntries() } })
     const rows = wrapper.findAll('[data-testid="leaderboard-row"]')
     expect(rows).toHaveLength(4)
-    expect(rows[0].text()).toContain('a***@mail.com')
+    expect(rows[0].text()).toContain('Участник №1')
+    expect(rows[0].text()).not.toContain('@')
     expect(rows[0].text()).toContain('58')
     expect(rows[0].text()).toContain('8')
     expect(rows[0].text()).toContain('7.3')
@@ -46,20 +47,11 @@ describe('LeaderboardTable', () => {
     expect(rows[3].text()).toContain('4')
   })
 
-  it('highlights the current user row when highlightUserId matches', () => {
-    const wrapper = mount(LeaderboardTable, {
-      props: { entries: makeEntries(), highlightUserId: 'u2' },
-    })
-    const rows = wrapper.findAll('[data-testid="leaderboard-row"]')
-    expect(rows[0].classes()).not.toContain('highlight')
-    expect(rows[1].classes()).toContain('highlight')
-  })
-
   it('formats the average score with a single decimal place', () => {
     const wrapper = mount(LeaderboardTable, {
       props: {
         entries: [
-          { userId: 'u1', displayName: 'x', totalScore: 10, feedbackScore: 10, achievementScore: 0, feedbackCount: 2, averageScore: 7, rank: 1 },
+          { entryId: 'rank-1', displayName: 'Участник №1', totalScore: 10, feedbackScore: 10, achievementScore: 0, feedbackCount: 2, averageScore: 7, rank: 1 },
         ],
       },
     })
@@ -86,7 +78,7 @@ describe('LeaderboardTable', () => {
     const list = wrapper.find('[data-testid="leaderboard-mobile-list"]')
 
     expect(list.exists()).toBe(true)
-    expect(list.text()).toContain('a***@mail.com')
+    expect(list.text()).toContain('Участник №1')
     expect(list.text()).toContain('Откликов: 8')
     expect(list.text()).toContain('Средний: 7.3')
     expect(list.text()).toContain('Итог')

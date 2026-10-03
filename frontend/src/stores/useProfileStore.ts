@@ -1,33 +1,26 @@
+import { resetOnAccountChange } from '@/utils/accountSession'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { leaderboardApi } from '@/api/leaderboardApi'
-import { telegramApi } from '@/api/telegramApi'
 import { feedbackApi } from '@/api/feedbackApi'
 import { profileApi } from '@/api/profileApi'
 import { extractApiError } from '@/api/httpClient'
-import type { FeedbackInfo, Personalization, TelegramStatus, UpdatePersonalizationPayload, UserScoreSummary } from '@/types'
+import type { FeedbackInfo, Personalization, UpdatePersonalizationPayload, UserScoreSummary } from '@/types'
 
 export const useProfileStore = defineStore('profile', () => {
   const summary = ref<UserScoreSummary | null>(null)
-  const telegram = ref<TelegramStatus | null>(null)
   const feedbacks = ref<FeedbackInfo[]>([])
   const personalization = ref<Personalization | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  resetOnAccountChange({ summary, feedbacks, personalization, loading, error })
 
   async function loadSummary() {
     try {
       summary.value = await leaderboardApi.me()
     } catch (e) {
       error.value = extractApiError(e, 'Не удалось загрузить рейтинг')
-    }
-  }
-
-  async function loadTelegram() {
-    try {
-      telegram.value = await telegramApi.status()
-    } catch (e) {
-      error.value = extractApiError(e, 'Не удалось загрузить статус Telegram')
     }
   }
 
@@ -72,7 +65,7 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true
     error.value = null
     try {
-      await Promise.all([loadSummary(), loadTelegram(), loadFeedbacks(), loadPersonalization()])
+      await Promise.all([loadSummary(), loadFeedbacks(), loadPersonalization()])
     } finally {
       loading.value = false
     }
@@ -80,13 +73,11 @@ export const useProfileStore = defineStore('profile', () => {
 
   return {
     summary,
-    telegram,
     feedbacks,
     personalization,
     loading,
     error,
     loadSummary,
-    loadTelegram,
     loadFeedbacks,
     loadPersonalization,
     savePersonalization,

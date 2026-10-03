@@ -32,6 +32,14 @@ Object.defineProperty(globalThis, 'sessionStorage', {
   configurable: true,
   value: makeMemoryStorage(),
 })
+Object.defineProperty(window, 'confirm', {
+  configurable: true,
+  value: () => false,
+})
+Object.defineProperty(window, 'prompt', {
+  configurable: true,
+  value: () => null,
+})
 
 vi.mock('gsap', () => {
   const timeline = () => {

@@ -5,6 +5,7 @@ import Starfield from '@/components/fx/Starfield.vue'
 import MistLayer from '@/components/fx/MistLayer.vue'
 import SiteHeader from '@/components/SiteHeader.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
+import CookiePreferences from '@/components/CookiePreferences.vue'
 import { useMotionPreferences } from '@/composables/useMotionPreferences'
 import { unlockAudio } from '@/composables/useAudio'
 import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
@@ -26,14 +27,23 @@ const ambientEffectsActive = computed(() => !performanceMode.value && !prefersRe
 const showFooter = computed(() => route.name !== 'reading')
 const useRouteTransition = computed(() => route.name !== 'reading' && route.name !== 'result')
 
+function syncSession(event: StorageEvent) {
+  // Reload account-bound views if another tab changes or clears the credentials.
+  if (event.storageArea === localStorage && (event.key === 'fv_token' || event.key === null)) {
+    window.location.reload()
+  }
+}
+
 onMounted(() => {
   publicConfig.load()
+  window.addEventListener('storage', syncSession)
   window.addEventListener('pointerdown', unlockAudio, { once: true, passive: true })
   window.addEventListener('keydown', unlockAudio, { once: true })
   window.addEventListener('touchstart', unlockAudio, { once: true, passive: true })
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('storage', syncSession)
   window.removeEventListener('pointerdown', unlockAudio)
   window.removeEventListener('keydown', unlockAudio)
   window.removeEventListener('touchstart', unlockAudio)
@@ -58,6 +68,7 @@ onBeforeUnmount(() => {
       <SiteFooter v-if="showFooter" />
     </div>
     <div class="screen-vignette pointer-events-none fixed inset-0 z-[5]"></div>
+    <CookiePreferences />
   </div>
 </template>
 

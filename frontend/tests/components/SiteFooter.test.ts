@@ -19,8 +19,7 @@ async function mountFooter() {
     routes: [
       { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/about', name: 'about', component: { template: '<div>about</div>' } },
-      { path: '/privacy', name: 'privacy', component: { template: '<div>privacy</div>' } },
-      { path: '/legal', name: 'legal', component: { template: '<div>legal</div>' } },
+      { path: '/legal/:document', component: { template: '<div>legal</div>' } },
       { path: '/faq', name: 'faq', component: { template: '<div>faq</div>' } },
     ],
   })
@@ -41,8 +40,16 @@ describe('SiteFooter', () => {
     const wrapper = await mountFooter()
 
     expect(wrapper.find('a[href="/about"]').exists()).toBe(true)
-    expect(wrapper.find('a[href="/privacy"]').exists()).toBe(true)
-    expect(wrapper.find('a[href="/legal"]').exists()).toBe(true)
+    for (const path of [
+      '/legal/privacy',
+      '/legal/personal-data-consent',
+      '/legal/cookies',
+      '/legal/offer',
+      '/legal/marketing-consent',
+      '/legal/ai-disclaimer',
+      '/legal/data-request',
+      '/legal/processors',
+    ]) expect(wrapper.find(`a[href="${path}"]`).exists()).toBe(true)
     expect(wrapper.find('a[href="/faq"]').exists()).toBe(true)
     expect(wrapper.find('a[href="/"]').text()).toContain('Вуаль Грядущего')
     expect(wrapper.text()).not.toContain('Ozon')

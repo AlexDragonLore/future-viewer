@@ -1,0 +1,30 @@
+{
+  "$schema": "./schemas/legal-publication.schema.json",
+  "schema_version": 1,
+  "reviewed_at": null,
+  "manual_approved": false,
+  "service": {
+    "service_name": null,
+    "paid_product_title": null,
+    "price_label": null,
+    "access_period": null,
+    "description": null,
+    "auto_renewal": false,
+    "npd_receipt_process_verified": false,
+    "npd_receipt_procedure": null,
+    "support_response_term": null,
+    "refund_method": null,
+    "claim_review_procedure": null,
+    "manual_approved": false
+  },
+  "documents": [
+    { "document_type": "offer", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false },
+    { "document_type": "privacy", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false },
+    { "document_type": "personal-data-consent", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false },
+    { "document_type": "marketing-consent", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false },
+    { "document_type": "cookies", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false },
+    { "document_type": "ai-disclaimer", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false },
+    { "document_type": "data-request", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false },
+    { "document_type": "processors", "version": null, "content_hash": null, "published_at": null, "effective_at": null, "is_active": false, "manual_approved": false }
+  ]
+}

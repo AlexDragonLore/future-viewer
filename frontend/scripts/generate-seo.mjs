@@ -4,20 +4,23 @@ import { fileURLToPath } from 'node:url'
 import {
   FAQ_ITEMS,
   SEO_CONTENT_ROUTES,
-  buildStructuredDataForRoute,
   findTarotSeoCardBySlug,
   findTarotSeoDeckBySlug,
   findTarotSeoSpreadBySlug,
 } from '../src/data/tarotSeoCatalog.js'
+import { buildSeoStructuredData } from '../src/seo/structuredData.js'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const dist = path.join(root, 'dist')
+const outputFlagIndex = process.argv.indexOf('--out-dir')
+if (outputFlagIndex !== -1 && !process.argv[outputFlagIndex + 1]) {
+  throw new Error('--out-dir requires an output directory containing index.html')
+}
+const dist = outputFlagIndex === -1 ? path.join(root, 'dist') : path.resolve(process.argv[outputFlagIndex + 1])
 const seoPath = path.join(root, 'src/seo/routes.json')
 
 const seo = JSON.parse(await readFile(seoPath, 'utf8'))
 const indexableRoutes = [...seo.indexableRoutes, ...SEO_CONTENT_ROUTES]
 const baseHtml = await readFile(path.join(dist, 'index.html'), 'utf8')
-const today = new Date().toISOString().slice(0, 10)
 const iconAssetVersion = '20260516'
 
 function cleanSiteUrl(value) {
@@ -54,35 +57,14 @@ function managedHead(route, { index, canonicalPath = route?.path }) {
     : 'noindex, nofollow'
   const googleVerification = process.env.VITE_GOOGLE_SITE_VERIFICATION?.trim() || seo.googleSiteVerification?.trim()
   const yandexVerification = process.env.VITE_YANDEX_VERIFICATION?.trim() || seo.yandexVerification?.trim()
-  const siteStructuredData = [
-    {
-      '@context': 'https://schema.org',
-      '@type': 'WebSite',
-      name: seo.siteName,
-      url: siteUrl,
-      inLanguage: 'ru-RU',
-    },
-    {
-      '@context': 'https://schema.org',
-      '@type': 'Organization',
-      name: seo.siteName,
-      url: siteUrl,
-      logo: absoluteUrl(siteUrl, '/icons/icon-512.png'),
-      contactPoint: {
-        '@type': 'ContactPoint',
-        contactType: 'customer support',
-        availableLanguage: 'Russian',
-      },
-    },
-  ]
   const routeStructuredData = index
-    ? buildStructuredDataForRoute(route, {
+    ? buildSeoStructuredData(route, {
         siteUrl,
         siteName: seo.siteName,
         defaultImage: seo.defaultImage,
       })
     : []
-  const jsonLd = index ? JSON.stringify([...siteStructuredData, ...routeStructuredData], null, 0) : null
+  const jsonLd = index ? JSON.stringify(routeStructuredData) : null
 
   const lines = [
     '<!-- seo:managed:start -->',
@@ -119,7 +101,7 @@ function managedHead(route, { index, canonicalPath = route?.path }) {
     lines.push(`    <meta name="yandex-verification" content="${escapeHtml(yandexVerification)}" />`)
   }
   if (jsonLd) {
-    lines.push(`    <script type="application/ld+json">${jsonLd.replaceAll('</script', '<\\/script')}</script>`)
+    lines.push(`    <script id="seo-managed-jsonld" type="application/ld+json">${jsonLd.replaceAll('</script', '<\\/script')}</script>`)
   }
   lines.push(`    <link rel="manifest" href="/site.webmanifest?v=${iconAssetVersion}" />`)
   lines.push(`    <link rel="icon" href="/favicon.ico?v=${iconAssetVersion}" sizes="any" />`)
@@ -143,6 +125,22 @@ function listItems(values) {
 
 function staticSeoContent(route, index) {
   if (!index) return ''
+
+  if (route.path === '/') {
+    return `
+      <main class="seo-static-fallback">
+        <h1>Одна карта Таро бесплатно — без регистрации</h1>
+        <p>${escapeHtml(route.description)}</p>
+        <h2>Как получить расклад</h2>
+        <ol>
+          <li>Откройте одну карту бесплатно. Вопрос можно оставить пустым.</li>
+          <li>Сразу прочитайте первую половину толкования ИИ.</li>
+          <li>Зарегистрируйтесь и подтвердите email, чтобы дочитать тот же расклад.</li>
+        </ol>
+        <p><a href="/glossary">Значения карт Таро</a> · <a href="/faq">Вопросы и ответы</a> · <a href="/about">О сервисе</a></p>
+      </main>
+    `
+  }
 
   if (route.contentKind === 'card') {
     const card = findTarotSeoCardBySlug(route.slug)
@@ -247,7 +245,6 @@ const sitemap = [
   ...indexableRoutes.flatMap((route) => [
     '  <url>',
     `    <loc>${escapeHtml(absoluteUrl(siteUrl, route.path))}</loc>`,
-    `    <lastmod>${today}</lastmod>`,
     `    <changefreq>${escapeHtml(route.changefreq)}</changefreq>`,
     `    <priority>${route.priority}</priority>`,
     '  </url>',

@@ -34,13 +34,14 @@ public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
             var user = await users.GetByIdAsync(auth.UserId);
             user!.SubscriptionStatus = SubscriptionStatus.Active;
             user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+            user.HistoryEnabled = true;
             await users.UpdateAsync(user);
         }
 
         await client.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q1" });
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q1", SaveToHistory = true });
         await client.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "q2" });
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "q2", SaveToHistory = true });
 
         var response = await client.GetAsync("/api/readings/history");
 
@@ -55,7 +56,7 @@ public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
     {
         var client = await CreateSubscribedClient();
         var createResponse = await client.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "delete me" });
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "delete me", SaveToHistory = true });
         var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
 
         var deleteResponse = await client.DeleteAsync($"/api/readings/{created!.Id}");
@@ -73,7 +74,7 @@ public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
     {
         var client = await CreateSubscribedClient();
         var createResponse = await client.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "feedback delete" });
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "feedback delete", SaveToHistory = true });
         var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
 
         string token;
@@ -111,6 +112,7 @@ public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
         var user = await users.GetByIdAsync(auth.UserId);
         user!.SubscriptionStatus = SubscriptionStatus.Active;
         user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+        user.HistoryEnabled = true;
         await users.UpdateAsync(user);
 
         return client;

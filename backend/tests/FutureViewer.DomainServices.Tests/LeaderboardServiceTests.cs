@@ -10,6 +10,30 @@ namespace FutureViewer.DomainServices.Tests;
 public sealed class LeaderboardServiceTests
 {
     [Fact]
+    public void Public_entry_uses_rank_identity_without_user_identifier_or_email_alias()
+    {
+        var entry = new LeaderboardEntryDto
+        {
+            EntryId = LeaderboardPublicIdentity.EntryIdForRank(3),
+            DisplayName = LeaderboardPublicIdentity.DisplayNameForRank(3),
+            TotalScore = 10,
+            FeedbackScore = 0,
+            AchievementScore = 10,
+            FeedbackCount = 0,
+            AverageScore = 0,
+            Rank = 3
+        };
+
+        entry.EntryId.Should().Be("rank-3");
+        entry.DisplayName.Should().Be("Участник №3");
+        entry.DisplayName.Should().NotContain("@");
+
+        var json = System.Text.Json.JsonSerializer.Serialize(entry);
+        json.ToLowerInvariant().Should().NotContain("userid");
+        json.Should().NotContain("@");
+    }
+
+    [Fact]
     public async Task GetMonthlyAsync_uses_current_year_and_month_when_omitted()
     {
         var repo = new Mock<ILeaderboardRepository>();

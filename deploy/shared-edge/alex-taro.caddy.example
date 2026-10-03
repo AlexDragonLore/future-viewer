@@ -1,0 +1,8 @@
+# Host-level Caddy fragment. Keep janetka.ru in its own site block and project.
+# Replace the upstream port with the dedicated FV_SHARED_EDGE_PORT from the
+# future-viewer environment, then validate the entire shared edge config.
+alex-taro.ru {
+    # Do not enable a URI/query access log here: auth/reset/feedback links may
+    # contain bearer material. Use a separately reviewed metadata-only format.
+    reverse_proxy 127.0.0.1:18080
+}

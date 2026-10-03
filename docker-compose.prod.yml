@@ -1,3 +1,11 @@
+name: ${FV_COMPOSE_PROJECT_NAME:-future-viewer}
+
+x-default-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -13,6 +21,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    networks:
+      - data
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
 
   backend:
     build:
@@ -32,26 +45,28 @@ services:
       Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in /opt/fv-app/.env.production}
       Jwt__Issuer: ${JWT_ISSUER:-future-viewer}
       Jwt__Audience: ${JWT_AUDIENCE:-future-viewer}
+      Privacy__ExportEnabled: ${PRIVACY_EXPORT_ENABLED:-true}
       AI__Provider: ${AI_PROVIDER:-OpenAI}
+      AI__Enabled: ${AI_ENABLED:-true}
+      AI__RegistryPath: config/processors.json
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__Model: ${OPENAI_MODEL:-gpt-4o}
-      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-}
+      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       DeepSeek__ApiKey: ${DEEPSEEK_API_KEY:-}
       DeepSeek__Model: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       DeepSeek__BaseUrl: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
-      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
-      Telegram__SiteUrl: https://${APP_DOMAIN}
-      Support__Email: ${SUPPORT_EMAIL:-support@vualgryaduschego.ru}
+      Support__Email: ${SUPPORT_EMAIL:-}
       Email__Transport: ${EMAIL_TRANSPORT:-Smtp}
       Email__Host: ${EMAIL_HOST:-}
       Email__Port: ${EMAIL_PORT:-587}
       Email__Username: ${EMAIL_USERNAME:-}
       Email__Password: ${EMAIL_PASSWORD:-}
-      Email__From: ${EMAIL_FROM:-no-reply@vualgryaduschego.ru}
+      Email__From: ${EMAIL_FROM:-}
       Email__UseSsl: ${EMAIL_USE_SSL:-true}
       Email__FrontendUrl: https://${APP_DOMAIN}
       Payment__Provider: ${PAYMENT_PROVIDER:-Yukassa}
+      Payment__Enabled: ${PAYMENT_ENABLED:-true}
+      Payment__WebhookEnabled: ${PAYMENT_WEBHOOK_ENABLED:-true}
       Yukassa__ShopId: ${YUKASSA_SHOP_ID:-}
       Yukassa__SecretKey: ${YUKASSA_SECRET_KEY:-}
       Yukassa__ReturnUrl: https://${APP_DOMAIN}/payment/success
@@ -67,8 +82,23 @@ services:
       YooMoney__CurrencyCode: ${YOOMONEY_CURRENCY_CODE:-643}
       YooMoney__MonthlyPriceAmount: ${YOOMONEY_MONTHLY_PRICE_AMOUNT:-300}
       YooMoney__Targets: ${YOOMONEY_TARGETS:-Доступ Future Viewer Pro}
+    volumes:
+      - ./config:/app/config:ro
+      - data-protection-keys:/app/data-protection-keys
     expose:
       - "8080"
+    networks:
+      - proxy
+      - data
+      - egress
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging: *default-logging
 
   frontend:
     build:
@@ -81,23 +111,55 @@ services:
         VITE_GOOGLE_SITE_VERIFICATION: ${VITE_GOOGLE_SITE_VERIFICATION:-}
         VITE_YANDEX_VERIFICATION: ${VITE_YANDEX_VERIFICATION:-}
         VITE_YANDEX_METRICA_ID: ${VITE_YANDEX_METRICA_ID:-}
-        VITE_GOOGLE_ANALYTICS_ID: ${VITE_GOOGLE_ANALYTICS_ID:-}
-        VITE_MERCHANT_SERVICE_NAME: ${VITE_MERCHANT_SERVICE_NAME:-Future Viewer}
-        VITE_MERCHANT_OWNER_NAME: ${VITE_MERCHANT_OWNER_NAME:-Дунецев Александр Дмитриевич}
-        VITE_MERCHANT_TAX_STATUS: ${VITE_MERCHANT_TAX_STATUS:-самозанятый, плательщик налога на профессиональный доход}
-        VITE_MERCHANT_INN: ${VITE_MERCHANT_INN:-592108465422}
-        VITE_MERCHANT_PHONE: ${VITE_MERCHANT_PHONE:-79967669613}
-        VITE_MERCHANT_EMAIL: ${VITE_MERCHANT_EMAIL:-duntsev010@mail.ru}
-        VITE_MERCHANT_POSTAL_ADDRESS: ${VITE_MERCHANT_POSTAL_ADDRESS:-duntsev010@mail.ru}
-        VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-Доступ Future Viewer Pro}
-        VITE_PAID_PRODUCT_PRICE: ${VITE_PAID_PRODUCT_PRICE:-300 ₽}
-        VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-30 дней}
-        VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.}
+        VITE_MERCHANT_SERVICE_NAME: ${VITE_MERCHANT_SERVICE_NAME:-}
+        VITE_MERCHANT_OWNER_NAME: ${VITE_MERCHANT_OWNER_NAME:-}
+        VITE_MERCHANT_TAX_STATUS: ${VITE_MERCHANT_TAX_STATUS:-}
+        VITE_MERCHANT_INN: ${VITE_MERCHANT_INN:-}
+        VITE_MERCHANT_PHONE: ${VITE_MERCHANT_PHONE:-}
+        VITE_MERCHANT_EMAIL: ${VITE_MERCHANT_EMAIL:-}
+        VITE_MERCHANT_POSTAL_ADDRESS: ${VITE_MERCHANT_POSTAL_ADDRESS:-}
+        VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-}
+        VITE_PAID_PRODUCT_PRICE: ${VITE_PAID_PRODUCT_PRICE:-}
+        VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-}
+        VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-}
+        VITE_NPD_RECEIPT_PROCESS_VERIFIED: ${VITE_NPD_RECEIPT_PROCESS_VERIFIED:-false}
+        VITE_NPD_RECEIPT_PROCEDURE: ${VITE_NPD_RECEIPT_PROCEDURE:-}
+        VITE_SUPPORT_RESPONSE_TERM: ${VITE_SUPPORT_RESPONSE_TERM:-}
+        VITE_REFUND_METHOD: ${VITE_REFUND_METHOD:-}
+        VITE_CLAIM_REVIEW_PROCEDURE: ${VITE_CLAIM_REVIEW_PROCEDURE:-}
+        VITE_LEGAL_OPERATOR_VERIFIED: ${VITE_LEGAL_OPERATOR_VERIFIED:-false}
+        VITE_LEGAL_PROCESSORS_VERIFIED: ${VITE_LEGAL_PROCESSORS_VERIFIED:-false}
+        VITE_LEGAL_PROCESSORS_JSON: ${VITE_LEGAL_PROCESSORS_JSON:-}
+        VITE_LEGAL_DOCUMENT_VERSION: ${VITE_LEGAL_DOCUMENT_VERSION:-}
+        VITE_LEGAL_EFFECTIVE_AT: ${VITE_LEGAL_EFFECTIVE_AT:-}
+        VITE_LEGAL_OFFER_VERSION: ${VITE_LEGAL_OFFER_VERSION:-}
+        VITE_LEGAL_PRIVACY_VERSION: ${VITE_LEGAL_PRIVACY_VERSION:-}
+        VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION: ${VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION:-}
+        VITE_LEGAL_MARKETING_CONSENT_VERSION: ${VITE_LEGAL_MARKETING_CONSENT_VERSION:-}
+        VITE_LEGAL_COOKIES_VERSION: ${VITE_LEGAL_COOKIES_VERSION:-}
+        VITE_LEGAL_AI_DISCLAIMER_VERSION: ${VITE_LEGAL_AI_DISCLAIMER_VERSION:-}
+        VITE_LEGAL_DATA_REQUEST_VERSION: ${VITE_LEGAL_DATA_REQUEST_VERSION:-}
+        VITE_LEGAL_PROCESSORS_VERSION: ${VITE_LEGAL_PROCESSORS_VERSION:-}
+        VITE_LEGAL_READING_RETENTION: ${VITE_LEGAL_READING_RETENTION:-}
+        VITE_LEGAL_ACCOUNT_RETENTION: ${VITE_LEGAL_ACCOUNT_RETENTION:-}
+        VITE_LEGAL_CONSENT_RETENTION: ${VITE_LEGAL_CONSENT_RETENTION:-}
+        VITE_LEGAL_LOG_RETENTION: ${VITE_LEGAL_LOG_RETENTION:-}
+        VITE_LEGAL_BACKUP_RETENTION: ${VITE_LEGAL_BACKUP_RETENTION:-}
     restart: unless-stopped
     depends_on:
       - backend
     expose:
       - "80"
+    networks:
+      - proxy
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:size=32m,mode=0755
+      - /var/run:size=4m,mode=0755
+      - /tmp:size=16m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
 
   caddy:
     image: caddy:2-alpine
@@ -107,15 +169,30 @@ services:
       - backend
     environment:
       APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in /opt/fv-app/.env.production}
+    # TLS and hostname selection belong to the host-level shared edge. Bind only
+    # to loopback so this project cannot steal janetka.ru traffic on ports 80/443.
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:${FV_SHARED_EDGE_PORT:?Set a dedicated loopback port for alex-taro.ru}:80"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+    networks:
+      - proxy
+    read_only: true
+    tmpfs:
+      - /config:size=8m,mode=0700
+      - /data:size=8m,mode=0700
+      - /tmp:size=8m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+networks:
+  proxy:
+    internal: true
+  data:
+    internal: true
+  egress:
 
 volumes:
+  data-protection-keys:
   pgdata:
-  caddy_data:
-  caddy_config:

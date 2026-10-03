@@ -4,7 +4,8 @@ import { useRoute } from 'vue-router'
 import { readingApi } from '@/api/readingApi'
 import { extractApiError } from '@/api/httpClient'
 import CardFlip from '@/components/cards/CardFlip.vue'
-import { marked } from 'marked'
+import AiDisclaimer from '@/components/AiDisclaimer.vue'
+import { safeMarkdown } from '@/utils/safeMarkdown'
 import type { Reading } from '@/types'
 
 const route = useRoute()
@@ -42,7 +43,7 @@ watch(
 )
 
 const interpretationHtml = computed(() =>
-  reading.value?.interpretation ? (marked.parse(reading.value.interpretation) as string) : '',
+  safeMarkdown(reading.value?.interpretation),
 )
 
 const cardWidth = computed(() => {
@@ -88,6 +89,7 @@ const cardWidth = computed(() => {
         <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Интерпретация</div>
         <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="interpretationHtml" />
       </section>
+      <AiDisclaimer class="max-w-2xl w-full mb-8" />
     </template>
   </main>
 </template>

@@ -1,34 +1,32 @@
-# REG.RU HTTPS email transport
+# Почта REG.RU через HTTPS
 
-`EMAIL_TRANSPORT=RegruWebmail` selects an authenticated adapter to REG.RU Roundcube at `https://webmail.hosting.reg.ru/`. It uses the existing paid mailbox and normal HTTPS certificate validation. The provider then sends the email using its own mail infrastructure, retaining the domain's REG.RU SPF/DKIM configuration.
+Production уже отправляет сервисные письма из существующего ящика `no-reply@alex-taro.ru` через REG.RU. Отправка регистрации и восстановления пароля проверялась при внедрении транспорта в коммите `732d0f6`. Фирменные шаблоны писем добавлены в `2b8476e`.
 
-This is a temporary compatibility adapter to the webmail interface, not an officially supported email API. Provider UI changes, CAPTCHA, account restrictions or rate limits can interrupt delivery. Keep SMTP as the preferred long-term transport when the hosting provider restores outbound SMTP access.
+Транспорт `EMAIL_TRANSPORT=RegruWebmail` использует HTTPS-интерфейс Roundcube по фиксированному адресу `https://webmail.hosting.reg.ru/`. Это обход заблокированного исходящего SMTP на текущем сервере, а не новый почтовый сервис. Почта отправляется инфраструктурой провайдера с существующей доменной настройкой SPF/DKIM.
 
-## Configuration
+## Конфигурация
 
-Keep credentials only in the root-owned, mode-600 production environment file. Set:
+Сохраняйте существующие значения в `/opt/fv-app/.env.production` с правами `600`:
 
 ```dotenv
 EMAIL_TRANSPORT=RegruWebmail
 EMAIL_USERNAME=no-reply@alex-taro.ru
-EMAIL_PASSWORD=<existing mailbox password>
+EMAIL_PASSWORD=<существующий пароль ящика>
 EMAIL_FROM=no-reply@alex-taro.ru
 ```
 
-The sender identity must match the mailbox. `EMAIL_HOST`, `EMAIL_PORT` and `EMAIL_USE_SSL` are unused by this transport; keep the verified SMTP settings there for a later switch back. Compose continues to set `Email__FrontendUrl` from `APP_DOMAIN`.
+Отправитель должен совпадать с ящиком. Этот транспорт не использует `EMAIL_HOST`, `EMAIL_PORT` и `EMAIL_USE_SSL`; сохраните действительные SMTP-настройки для будущего возвращения к SMTP. Compose задаёт `Email__FrontendUrl` из production-домена. Ссылки подтверждения и восстановления передают одноразовый токен в `#token=…`, чтобы он не попадал в access-логи сервера.
 
-Each send creates its own authenticated cookie session. Form CSRF tokens and compose state are required. Redirects must remain on the fixed HTTPS origin. The adapter requires an explicit successful-send response and throws on authentication, form or SMTP failures. It never automatically retries a potentially accepted message after a timeout. Do not add generic HTTP retry middleware around the final send request.
+Каждое письмо получает собственные cookies, CSRF-токен и compose identity. Все редиректы и формы ограничены фиксированным HTTPS origin, используется обычная проверка сертификата. Успехом считается явное подтверждение отправки от webmail, а не произвольный HTTP 200. После неоднозначного timeout отправка автоматически не повторяется.
 
-## Verification and diagnosis
+Фактическая доступность требует настроенного транспорта и действительных credentials. Отсутствующие договорные или retention-сведения в документарном реестре не заменяются выдуманными значениями и не отключают уже настроенную отправку.
 
-- Send a harmless diagnostic message using the real sender, then verify receipt in the controlled mailbox. A successful HTTP status is insufficient evidence of sending.
-- Exercise registration or password reset on a controlled site test account and confirm that the email contains an `https://alex-taro.ru/` link.
-- Inspect backend errors for the transport stage and failure category. Do not log passwords, cookies, CSRF tokens, auth links, message bodies or entire provider responses.
-- Repeat the delivery check after email-related deployments or provider UI changes. API errors must remain visible to monitoring; do not turn transport failures into a false success.
-- Verify the production containers and `https://alex-taro.ru/health` after configuration changes.
+## Проверка после обновления
 
-## Rollback / return to SMTP
+1. Зарегистрируйте контролируемый тестовый аккаунт и убедитесь, что письмо действительно пришло. Проверьте адрес отправителя, фирменное оформление и домен ссылки.
+2. Откройте ссылку подтверждения, затем отдельно проверьте восстановление пароля этого аккаунта.
+3. Проверьте контейнеры и `https://alex-taro.ru/health` по production runbook.
 
-Back up the current environment and record the current backend image before deploying. For deployment rollback, restore that image and environment and recreate only the backend. Preserve the new image for diagnosis. Returning to an environment without a configured email sender also restores that version's existing registration behavior, so do not silently disable email as a response to delivery failures.
+Не логируйте пароли, cookies, CSRF-токены, одноразовые ссылки, содержимое писем или полные ответы провайдера. Тесты `RegruWebmailEmailSenderTests` проверяют протокол на локальных фикстурах и не подтверждают доставку реальным адресатам.
 
-Once outbound access to `mail.hosting.reg.ru:465` is restored, verify TLS and SMTP login, set `EMAIL_TRANSPORT=Smtp`, retain `EMAIL_HOST=mail.hosting.reg.ru`, `EMAIL_PORT=465`, `EMAIL_USE_SSL=true`, and the same mailbox credentials. Recreate the backend, verify an actual delivered message, and check health again.
+Адаптер зависит от webmail-интерфейса, который может измениться; CAPTCHA или ограничения ящика также могут прервать отправку. Для перехода обратно на SMTP сначала проверьте доступность порта, TLS, авторизацию и реальную доставку. Затем используйте `EMAIL_TRANSPORT=Smtp`, проверенный SMTP host/port и те же credentials. Не заменяйте ошибку доставки автоматическим подтверждением почты.

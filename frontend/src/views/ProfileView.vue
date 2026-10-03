@@ -4,19 +4,22 @@ import { useProfileStore } from '@/stores/useProfileStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import ScoreBadge from '@/components/ScoreBadge.vue'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
-import TelegramLinkButton from '@/components/TelegramLinkButton.vue'
+import PrivacyCenter from '@/components/PrivacyCenter.vue'
 import { extractApiError } from '@/api/httpClient'
-import { paidProduct } from '@/content/legal'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
+import { usePrivacyStore } from '@/stores/usePrivacyStore'
 import { FeedbackStatus, type FeedbackInfo } from '@/types'
 
 const store = useProfileStore()
 const auth = useAuthStore()
+const privacy = usePrivacyStore()
+const publicConfig = usePublicConfigStore()
+const paidProduct = computed(() => publicConfig.paidProduct)
 
 const recentFeedbacks = computed(() => store.feedbacks.slice(0, 5))
-const isLinked = computed(() => store.telegram?.isLinked ?? false)
 const firstName = ref('')
 const lastName = ref('')
-const birthDate = ref('')
+const birthYear = ref('')
 const personalizationError = ref<string | null>(null)
 const personalizationSaved = ref(false)
 const accessExpiresLabel = computed(() => {
@@ -30,13 +33,16 @@ const accessMessage = computed(() =>
 const accessButtonLabel = computed(() =>
   auth.isSubscribed ? 'Продлить доступ' : 'Оплатить доступ',
 )
+const personalizationConsentActive = computed(() => privacy.consents.some((consent) =>
+  consent.consentType.toLowerCase() === 'personalization' && !consent.revokedAt,
+))
 
 watch(
   () => store.personalization,
   (value) => {
     firstName.value = value?.firstName ?? ''
     lastName.value = value?.lastName ?? ''
-    birthDate.value = value?.birthDate ?? ''
+    birthYear.value = value?.birthYear ? String(value.birthYear) : ''
   },
   { immediate: true },
 )
@@ -72,9 +78,9 @@ async function savePersonalization() {
   personalizationSaved.value = false
   try {
     await store.savePersonalization({
-      firstName: firstName.value,
-      lastName: lastName.value,
-      birthDate: birthDate.value,
+      firstName: firstName.value.trim() || null,
+      lastName: lastName.value.trim() || null,
+      birthYear: birthYear.value ? Number(birthYear.value) : null,
     })
     personalizationSaved.value = true
   } catch (e) {
@@ -167,39 +173,41 @@ async function clearMemory() {
         </div>
       </section>
 
-      <section class="mystic-card p-6 mb-6" data-testid="profile-telegram">
-        <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Telegram</div>
-        <p class="text-sm text-mystic-silver/80 mb-3">
-          <template v-if="isLinked">
-            Уведомления привязаны. Отвяжи, чтобы перестать получать напоминания.
-          </template>
-          <template v-else>
-            Привяжи аккаунт, чтобы получать уведомления и ссылку на отклик через день после расклада.
-          </template>
-        </p>
-        <TelegramLinkButton :is-linked="isLinked" @update="store.loadTelegram()" />
-      </section>
-
       <section class="mystic-card p-6 mb-6" data-testid="profile-personalization">
         <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Знакомство и память</div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
           <input v-model="firstName" class="profile-input" maxlength="80" placeholder="Имя" data-testid="profile-first-name" />
           <input v-model="lastName" class="profile-input" maxlength="80" placeholder="Фамилия" data-testid="profile-last-name" />
-          <input v-model="birthDate" class="profile-input sm:col-span-2" type="date" data-testid="profile-birth-date" />
+          <input
+            v-model="birthYear"
+            class="profile-input sm:col-span-2"
+            type="number"
+            min="1900"
+            :max="new Date().getFullYear() - 18"
+            placeholder="Год рождения (необязательно)"
+            data-testid="profile-birth-year"
+          />
         </div>
+        <p class="text-xs text-mystic-silver/60 mb-3">
+          Имя, фамилия и год рождения необязательны. Полная дата рождения не запрашивается. Персонализация
+          доступна только при отдельном согласии.
+        </p>
         <button
           class="memory-action primary"
-          :disabled="!firstName.trim() || !lastName.trim() || !birthDate"
+          :disabled="!personalizationConsentActive"
           @click="savePersonalization"
           data-testid="save-personalization"
         >
           Сохранить
         </button>
         <p v-if="personalizationSaved" class="text-xs text-mystic-accent mt-2">Сохранено</p>
+        <p v-if="!personalizationConsentActive" class="text-xs text-red-300/80 mt-2">
+          Согласие на персонализацию не предоставлено или отозвано.
+        </p>
         <p v-if="personalizationError" class="text-xs text-red-300 mt-2">{{ personalizationError }}</p>
 
         <div class="memory-head">
-          <span>Память AI</span>
+          <span>Память ИИ</span>
           <button
             v-if="store.personalization?.memoryRules.length"
             class="memory-action"
@@ -210,7 +218,7 @@ async function clearMemory() {
           </button>
         </div>
         <div v-if="!store.personalization?.memoryRules.length" class="text-sm text-mystic-silver/60">
-          AI пока ничего не сохранил для будущих раскладов.
+          ИИ пока ничего не сохранил для будущих раскладов.
         </div>
         <ul v-else class="memory-list">
           <li v-for="rule in store.personalization.memoryRules" :key="rule.id" class="memory-row">
@@ -219,6 +227,8 @@ async function clearMemory() {
           </li>
         </ul>
       </section>
+
+      <PrivacyCenter />
 
       <section class="mystic-card p-6" data-testid="profile-feedbacks">
         <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Последние отклики</div>

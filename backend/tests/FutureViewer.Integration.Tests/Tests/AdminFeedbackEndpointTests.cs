@@ -144,22 +144,10 @@ public sealed class AdminFeedbackEndpointTests : IClassFixture<IntegrationTestFi
         dto.ScheduledAt.Should().BeBefore(DateTime.UtcNow);
     }
 
-    [Fact]
-    public async Task Admin_run_notifications_returns_processed_count_zero_when_no_telegram()
-    {
-        var (adminClient, _) = await CreateAuthenticatedClient(asAdmin: true);
-
-        var response = await adminClient.PostAsync("/api/admin/feedbacks/run-notifications", null);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var payload = await response.Content.ReadFromJsonAsync<RunNotificationsResult>();
-        payload!.Processed.Should().Be(0);
-    }
-
     private async Task<Guid> CreateReading(HttpClient client)
     {
         var created = await client.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "What should I focus on?" });
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "What should I focus on?", SaveToHistory = true });
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var reading = await created.Content.ReadFromJsonAsync<ReadingResult>();
         return reading!.Id;
@@ -221,6 +209,7 @@ public sealed class AdminFeedbackEndpointTests : IClassFixture<IntegrationTestFi
         var user = await users.GetByIdAsync(auth.UserId);
         user!.SubscriptionStatus = SubscriptionStatus.Active;
         user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+        user.HistoryEnabled = true;
         await users.UpdateAsync(user);
 
         return (client, auth);
@@ -238,8 +227,4 @@ public sealed class AdminFeedbackEndpointTests : IClassFixture<IntegrationTestFi
         public int Total { get; init; }
     }
 
-    private sealed class RunNotificationsResult
-    {
-        public int Processed { get; init; }
-    }
 }

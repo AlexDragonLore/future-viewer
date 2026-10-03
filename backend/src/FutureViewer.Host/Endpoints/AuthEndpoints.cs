@@ -8,16 +8,24 @@ public static class AuthEndpoints
 {
     public static IEndpointRouteBuilder MapAuth(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/auth").WithTags("Auth");
+        var group = app.MapGroup("/api/auth")
+            .WithTags("Auth")
+            .RequireRateLimiting("auth");
 
         group.MapPost("/register", async (
             RegisterRequest request,
             IValidator<RegisterRequest> validator,
             AuthService service,
+            HttpContext ctx,
             CancellationToken ct) =>
         {
             await validator.ValidateAndThrowAsync(request, ct);
-            var response = await service.RegisterAsync(request, ct);
+            var response = await service.RegisterAsync(
+                request,
+                ctx.Connection.RemoteIpAddress?.ToString(),
+                ctx.Request.Headers.UserAgent.ToString(),
+                ctx.TraceIdentifier,
+                ct);
             return Results.Accepted(value: response);
         });
 

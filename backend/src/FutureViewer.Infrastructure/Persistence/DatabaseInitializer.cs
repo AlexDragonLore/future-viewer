@@ -1,6 +1,8 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using FutureViewer.Infrastructure.Compliance;
 
 namespace FutureViewer.Infrastructure.Persistence;
 
@@ -52,7 +54,45 @@ public static class DatabaseInitializer
         await SeedAnnouncementsAsync(db, ct);
 
         if (config is not null)
+        {
+            await SeedLegalDocumentsAsync(db, ct);
             await SeedAdminsAsync(db, config, ct);
+        }
+    }
+
+    public static async Task SeedLegalDocumentsAsync(AppDbContext db, CancellationToken ct = default)
+    {
+        // These are the exact published texts served to the browser. Documentary
+        // approval metadata must not deactivate working registration on startup.
+        foreach (var content in PublishedLegalDocuments.All)
+        {
+            var existing = await db.LegalDocuments.AsTracking().SingleOrDefaultAsync(
+                x => x.DocumentType == content.Type && x.Version == content.Version, ct);
+            if (existing is not null && existing.ContentHash != content.ContentHash)
+                throw new InvalidOperationException("A published legal version cannot change its content hash.");
+
+            await db.LegalDocuments
+                .Where(x => x.DocumentType == content.Type && x.IsActive && x.Version != content.Version)
+                .ExecuteUpdateAsync(x => x.SetProperty(d => d.IsActive, false), ct);
+            if (existing is null)
+            {
+                var now = DateTime.UtcNow;
+                await db.LegalDocuments.AddAsync(new LegalDocument
+                {
+                    DocumentType = content.Type,
+                    Version = content.Version,
+                    ContentHash = content.ContentHash,
+                    PublishedAt = now,
+                    EffectiveAt = now,
+                    IsActive = true
+                }, ct);
+            }
+            else
+            {
+                existing.IsActive = true;
+            }
+        }
+        await db.SaveChangesAsync(ct);
     }
 
     public static async Task SeedAdminsAsync(AppDbContext db, IConfiguration config, CancellationToken ct = default)
@@ -162,7 +202,6 @@ public static class DatabaseInitializer
         [
             new("first_reading", "Первый расклад", "Сделайте свой первый расклад", "/achievements/first_reading.svg", 10, 10),
             new("first_feedback", "Первый отклик", "Ответьте на первый запрос обратной связи", "/achievements/first_feedback.svg", 20, 10),
-            new("telegram_linked", "На связи", "Привяжите Telegram аккаунт", "/achievements/telegram_linked.svg", 30, 10),
             new("streak_3", "Три дня подряд", "Делайте расклады 3 дня подряд", "/achievements/streak_3.svg", 40, 20),
             new("streak_7", "Неделя мудрости", "Делайте расклады 7 дней подряд", "/achievements/streak_7.svg", 50, 50),
             new("streak_30", "Месяц просветления", "Делайте расклады 30 дней подряд", "/achievements/streak_30.svg", 60, 100),
@@ -174,4 +213,5 @@ public static class DatabaseInitializer
             new("high_five", "Пятёрка десяток", "Получите 5 раз оценку 10/10", "/achievements/high_five.svg", 120, 100)
         ];
     }
+
 }

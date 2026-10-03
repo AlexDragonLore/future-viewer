@@ -2,5 +2,12 @@
 **/obj
 **/*.user
 **/*.user.secrets
+**/secrets.json
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
 tests/
 *.DotSettings.user

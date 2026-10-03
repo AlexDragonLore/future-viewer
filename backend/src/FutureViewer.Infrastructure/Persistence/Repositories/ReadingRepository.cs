@@ -37,7 +37,7 @@ public sealed class ReadingRepository : IReadingRepository
         return await _db.Readings
             .Include(r => r.Cards)
             .ThenInclude(c => c.Card)
-            .Where(r => r.UserId == userId && r.DeletedFromHistoryAt == null)
+            .Where(r => r.UserId == userId && r.SavedToHistory && r.DeletedFromHistoryAt == null)
             .OrderByDescending(r => r.CreatedAt)
             .Take(take)
             .ToListAsync(ct);
@@ -68,6 +68,16 @@ public sealed class ReadingRepository : IReadingRepository
                         && r.CreatedAt >= todayUtc
                         && r.CreatedAt < tomorrowUtc)
             .CountAsync(ct);
+    }
+
+    public async Task<bool> AttachGuestAsync(Guid id, Guid userId, CancellationToken ct = default)
+    {
+        // One atomic update prevents two accounts claiming the same guest reading.
+        var updated = await _db.Readings
+            .Where(r => r.Id == id && (r.UserId == null || r.UserId == userId)
+                        && !r.SavedToHistory && r.DeletedFromHistoryAt == null)
+            .ExecuteUpdateAsync(update => update.SetProperty(r => r.UserId, userId), ct);
+        return updated == 1;
     }
 
     public Task<int> CountByUserAsync(Guid userId, CancellationToken ct = default)

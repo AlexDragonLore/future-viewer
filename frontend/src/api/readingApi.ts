@@ -1,5 +1,11 @@
 import { httpClient } from './httpClient'
+import { accountSessionVersion, clearAccountSession } from '@/utils/accountSession'
 import type { DeckType, Reading, SpreadType, SpreadInfo } from '@/types'
+import type { GuestContinuation } from '@/utils/guestReading'
+
+export interface GuestReadingResponse extends GuestContinuation {
+  reading: Reading
+}
 
 export interface ReadingStreamHandlers {
   onCards: (reading: Reading) => void
@@ -29,11 +35,29 @@ type StreamEvent =
   | { type: 'error'; message?: string }
 
 export const readingApi = {
+  async createGuest(question: string, deckType: DeckType, signal?: AbortSignal): Promise<GuestReadingResponse> {
+    const { data } = await httpClient.post<GuestReadingResponse>('/api/readings/guest', {
+      spreadType: 1, question, deckType,
+    }, { signal })
+    return data
+  },
+
+  async guestPreview(ticket: string): Promise<Reading> {
+    const { data } = await httpClient.post<Reading>('/api/readings/guest/preview', { ticket })
+    return data
+  },
+
+  async unlockGuest(ticket: string): Promise<Reading> {
+    const { data } = await httpClient.post<Reading>('/api/readings/guest/unlock', { ticket })
+    return data
+  },
+
   async create(
     spreadType: SpreadType,
     question: string,
     deckType: DeckType,
     questionWarningAcknowledged = false,
+    saveToHistory = false,
   ): Promise<Reading> {
     const { data } = await httpClient.post<Reading>('/api/readings', {
       spreadType,
@@ -42,6 +66,7 @@ export const readingApi = {
       clientDate: todayLocal(),
       clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       questionWarningAcknowledged,
+      saveToHistory,
     })
     return data
   },
@@ -68,9 +93,16 @@ export const readingApi = {
     handlers: ReadingStreamHandlers,
     signal?: AbortSignal,
     questionWarningAcknowledged = false,
+    saveToHistory = false,
   ): Promise<void> {
     const baseURL = (httpClient.defaults.baseURL ?? '').replace(/\/$/, '')
     const token = localStorage.getItem('fv_token')
+    const session = accountSessionVersion()
+    const assertCurrentSession = () => {
+      if (session !== accountSessionVersion() || token !== localStorage.getItem('fv_token')) {
+        throw new DOMException('Сеанс завершён', 'AbortError')
+      }
+    }
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (token) headers.Authorization = `Bearer ${token}`
@@ -87,6 +119,7 @@ export const readingApi = {
           clientDate: todayLocal(),
           clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           questionWarningAcknowledged,
+          saveToHistory,
         }),
         signal,
       })
@@ -95,6 +128,7 @@ export const readingApi = {
       throw e
     }
 
+    assertCurrentSession()
     if (!response.ok || !response.body) {
       let message = 'Не удалось создать расклад'
       let code: string | undefined
@@ -109,8 +143,11 @@ export const readingApi = {
         // body not JSON — keep default message
       }
       if (response.status === 401 && localStorage.getItem('fv_token')) {
+        clearAccountSession()
         localStorage.removeItem('fv_token')
         localStorage.removeItem('fv_email')
+        localStorage.removeItem('fv_user_id')
+        localStorage.removeItem('fv_is_admin')
         if (typeof window !== 'undefined' && window.location.pathname !== '/auth') {
           window.location.assign('/auth')
         }
@@ -129,6 +166,7 @@ export const readingApi = {
     let streamError: Error | null = null
 
     const handleLine = (line: string) => {
+      assertCurrentSession()
       const evt = parseEvent(line)
       if (!evt) return
       switch (evt.type) {
@@ -151,6 +189,7 @@ export const readingApi = {
     try {
       while (true) {
         const { value, done } = await reader.read()
+        assertCurrentSession()
         if (done) break
         buffer += decoder.decode(value, { stream: true })
 
@@ -166,10 +205,14 @@ export const readingApi = {
       const trailing = buffer.trim()
       if (trailing) handleLine(trailing)
     } catch (e) {
+      await reader.cancel().catch(() => undefined)
       handlers.onError?.(e)
       throw e
+    } finally {
+      reader.releaseLock()
     }
 
+    assertCurrentSession()
     if (streamError) {
       handlers.onError?.(streamError)
       throw streamError

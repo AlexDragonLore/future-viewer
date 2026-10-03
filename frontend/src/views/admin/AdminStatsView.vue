@@ -62,12 +62,6 @@ function refresh(): void {
         test-id="admin-stat-readings-week"
       />
       <AdminStatTile
-        label="Фидбеков к рассылке"
-        :value="store.stats.pendingFeedbacksToNotify"
-        hint="Pending, срок подошёл, с Telegram"
-        test-id="admin-stat-pending-notify"
-      />
-      <AdminStatTile
         label="Оценено за месяц"
         :value="store.stats.scoredFeedbacksThisMonth"
         hint="последние 30 дней"

@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using FutureViewer.Domain.Enums;
+using FutureViewer.Domain.Entities;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Integration.Tests.Fixtures;
@@ -29,7 +30,7 @@ public sealed class ProfileEndpointTests : IClassFixture<IntegrationTestFixture>
             {
                 FirstName = "Ada",
                 LastName = "Lovelace",
-                BirthDate = new DateOnly(1815, 12, 10)
+                BirthYear = 1990
             });
 
         update.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -40,7 +41,7 @@ public sealed class ProfileEndpointTests : IClassFixture<IntegrationTestFixture>
         profile.Should().NotBeNull();
         profile!.FirstName.Should().Be("Ada");
         profile.LastName.Should().Be("Lovelace");
-        profile.BirthDate.Should().Be(new DateOnly(1815, 12, 10));
+        profile.BirthYear.Should().Be(1990);
         profile.IsComplete.Should().BeTrue();
     }
 
@@ -55,6 +56,12 @@ public sealed class ProfileEndpointTests : IClassFixture<IntegrationTestFixture>
 
         var profile = await (await client.GetAsync("/api/profile/personalization"))
             .Content.ReadFromJsonAsync<PersonalizationDto>();
+        profile!.MemoryRules.Should().BeEmpty("automatic extraction is disabled");
+        var email = (await (await client.PostAsJsonAsync("/api/privacy/export", new ReauthenticationRequest { Password = "password123" }))
+            .Content.ReadFromJsonAsync<PrivacyExportDto>())!.Profile.Email;
+        await AddLegacyMemoryAsync(email);
+        profile = await (await client.GetAsync("/api/profile/personalization"))
+            .Content.ReadFromJsonAsync<PersonalizationDto>();
         profile!.MemoryRules.Should().HaveCount(1);
 
         var deleteOne = await client.DeleteAsync($"/api/profile/personalization/memory/{profile.MemoryRules[0].Id}");
@@ -66,12 +73,21 @@ public sealed class ProfileEndpointTests : IClassFixture<IntegrationTestFixture>
         createReading = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "remember me" });
         createReading.StatusCode.Should().Be(HttpStatusCode.Created);
+        await AddLegacyMemoryAsync(email);
 
         var clear = await client.DeleteAsync("/api/profile/personalization/memory");
         clear.StatusCode.Should().Be(HttpStatusCode.NoContent);
         profile = await (await client.GetAsync("/api/profile/personalization"))
             .Content.ReadFromJsonAsync<PersonalizationDto>();
         profile!.MemoryRules.Should().BeEmpty();
+    }
+
+    private async Task AddLegacyMemoryAsync(string email)
+    {
+        using var scope = _fixture.Services.CreateScope();
+        var user = await scope.ServiceProvider.GetRequiredService<IUserRepository>().GetByEmailAsync(email);
+        await scope.ServiceProvider.GetRequiredService<IUserMemoryRepository>()
+            .AddAsync(new UserMemoryRule { UserId = user!.Id, Text = "Existing memory from before extraction was disabled." });
     }
 
     private async Task<HttpClient> CreateAuthenticatedClient()

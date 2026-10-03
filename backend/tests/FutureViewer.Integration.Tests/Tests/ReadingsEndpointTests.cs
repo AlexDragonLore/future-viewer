@@ -46,16 +46,14 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
-    public async Task Post_reading_requires_personalization_profile()
+    public async Task Post_reading_does_not_require_optional_personalization_fields()
     {
         var client = await CreateAuthenticatedSubscribedClient(clearProfile: true);
 
         var response = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "What should I notice?" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-        body!["error"].ToString().Should().Be("profile_required");
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     [Fact]
@@ -134,7 +132,7 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Fact]
-    public async Task Post_validate_question_returns_subscription_required_payload_for_free_user()
+    public async Task Post_validate_question_blocks_rejected_question_without_offering_paid_bypass()
     {
         var client = await CreateAuthenticatedClient();
 
@@ -145,21 +143,22 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
         body!["status"].ToString().Should().Be("rejected");
         body["canContinue"].ToString().Should().Be("False");
-        body["requiresSubscription"].ToString().Should().Be("True");
-        body["suggestedQuestion"].ToString().Should().Contain("rejected");
+        body["requiresSubscription"].ToString().Should().Be("False");
+        body["suggestedQuestion"].Should().BeNull();
+        body["blockCode"].ToString().Should().Be("rejected");
     }
 
     [Fact]
-    public async Task Post_reading_requires_subscription_for_invalid_free_question()
+    public async Task Post_reading_blocks_rejected_question_for_free_user()
     {
         var client = await CreateAuthenticatedClient();
 
         var response = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "rejected" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         var body = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
-        body!["error"].ToString().Should().Be("question_requires_subscription");
+        body!["error"].ToString().Should().Be("ai_privacy_blocked");
     }
 
     [Fact]
@@ -195,8 +194,10 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     public async Task Get_reading_by_id_returns_reading()
     {
         var client = await CreateAuthenticatedSubscribedClient();
+        (await client.PutAsJsonAsync("/api/privacy/settings/history", new UpdateHistorySettingRequest { Enabled = true }))
+            .EnsureSuccessStatusCode();
         var createResponse = await client.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q" });
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "q", SaveToHistory = true });
         var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
 
         var getResponse = await client.GetAsync($"/api/readings/{created!.Id}");
@@ -218,14 +219,44 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     public async Task Get_reading_by_id_of_other_user_returns_not_found()
     {
         var owner = await CreateAuthenticatedSubscribedClient();
+        (await owner.PutAsJsonAsync("/api/privacy/settings/history", new UpdateHistorySettingRequest { Enabled = true }))
+            .EnsureSuccessStatusCode();
         var createResponse = await owner.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "private" });
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "private", SaveToHistory = true });
         var created = await createResponse.Content.ReadFromJsonAsync<ReadingResult>();
 
         var intruder = await CreateAuthenticatedSubscribedClient();
         var response = await intruder.GetAsync($"/api/readings/{created!.Id}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task History_requires_both_account_and_per_reading_opt_in()
+    {
+        var client = await CreateAuthenticatedSubscribedClient();
+        var withoutAccountOptIn = await client.PostAsJsonAsync("/api/readings", new CreateReadingRequest
+        {
+            SpreadType = SpreadType.SingleCard,
+            Question = "What can I reflect on today?",
+            SaveToHistory = true
+        });
+        withoutAccountOptIn.StatusCode.Should().Be(HttpStatusCode.Created);
+        (await client.PutAsJsonAsync("/api/privacy/settings/history", new UpdateHistorySettingRequest { Enabled = true }))
+            .EnsureSuccessStatusCode();
+        var withoutReadingOptIn = await client.PostAsJsonAsync("/api/readings", new CreateReadingRequest
+        {
+            SpreadType = SpreadType.SingleCard,
+            Question = "What can I reflect on tomorrow?",
+            SaveToHistory = false
+        });
+        withoutReadingOptIn.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var history = await (await client.GetAsync("/api/readings/history"))
+            .Content.ReadFromJsonAsync<List<ReadingResult>>();
+        history.Should().BeEmpty();
+        var created = await withoutAccountOptIn.Content.ReadFromJsonAsync<ReadingResult>();
+        (await client.GetAsync($"/api/readings/{created!.Id}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     private async Task<HttpClient> CreateAuthenticatedSubscribedClient(bool clearProfile = false)
@@ -241,7 +272,7 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
         {
             user.FirstName = null;
             user.LastName = null;
-            user.BirthDate = null;
+            user.BirthYear = null;
         }
         await users.UpdateAsync(user);
 

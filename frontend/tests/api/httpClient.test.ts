@@ -31,3 +31,24 @@ describe('extractApiError', () => {
     expect(extractApiError({}, 'fallback')).toBe('fallback')
   })
 })
+
+describe('HTTP session boundary', () => {
+  it('discards a prior account response after logout or account change', async () => {
+    const { httpClient } = await import('@/api/httpClient')
+    const { clearAccountSession } = await import('@/utils/accountSession')
+    let finish!: () => void
+    let dispatched!: () => void
+    const started = new Promise<void>((resolve) => { dispatched = resolve })
+    const response = httpClient.get('/api/privacy/settings', {
+      adapter: (config) => new Promise((resolve) => {
+        finish = () => resolve({ data: { historyEnabled: true }, status: 200, statusText: 'OK', headers: {}, config })
+        dispatched()
+      }),
+    })
+    const assertion = expect(response).rejects.toMatchObject({ code: 'ERR_CANCELED' })
+    await started
+    clearAccountSession()
+    finish()
+    await assertion
+  })
+})

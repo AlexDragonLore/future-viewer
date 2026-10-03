@@ -8,7 +8,6 @@ const createMock = vi.fn()
 const createSyntheticMock = vi.fn()
 const updateMock = vi.fn()
 const deleteMock = vi.fn()
-const runNotificationsMock = vi.fn()
 const getStatsMock = vi.fn()
 
 vi.mock('@/api/adminApi', () => ({
@@ -18,7 +17,6 @@ vi.mock('@/api/adminApi', () => ({
     createSyntheticFeedback: (...args: unknown[]) => createSyntheticMock(...args),
     updateFeedback: (...args: unknown[]) => updateMock(...args),
     deleteFeedback: (...args: unknown[]) => deleteMock(...args),
-    runNotifications: (...args: unknown[]) => runNotificationsMock(...args),
     getStats: (...args: unknown[]) => getStatsMock(...args),
   },
 }))
@@ -53,7 +51,6 @@ describe('useAdminStore', () => {
     createSyntheticMock.mockReset()
     updateMock.mockReset()
     deleteMock.mockReset()
-    runNotificationsMock.mockReset()
     getStatsMock.mockReset()
   })
 
@@ -104,13 +101,6 @@ describe('useAdminStore', () => {
     expect(store.feedbackTotal).toBe(0)
   })
 
-  it('runNotifications surfaces processed count', async () => {
-    runNotificationsMock.mockResolvedValue({ processed: 4 })
-    const store = useAdminStore()
-    const result = await store.runNotifications()
-    expect(result).toBe(4)
-    expect(store.feedbackToast).toContain('4')
-  })
 
   it('loadStats populates stats and clears error', async () => {
     getStatsMock.mockResolvedValue({
@@ -119,7 +109,6 @@ describe('useAdminStore', () => {
       activeSubscriptions: 3,
       readingsToday: 5,
       readingsThisWeek: 25,
-      pendingFeedbacksToNotify: 1,
       scoredFeedbacksThisMonth: 12,
     })
     const store = useAdminStore()

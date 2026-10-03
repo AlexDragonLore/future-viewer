@@ -11,13 +11,33 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.ToTable("users");
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
+        b.Property(x => x.PrivacySubjectId).HasColumnName("privacy_subject_id").IsRequired();
+        b.HasIndex(x => x.PrivacySubjectId).IsUnique();
         b.Property(x => x.Email).HasColumnName("email").IsRequired().HasMaxLength(256);
         b.HasIndex(x => x.Email).IsUnique();
         b.Property(x => x.PasswordHash).HasColumnName("password_hash").IsRequired();
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.FirstName).HasColumnName("first_name").HasMaxLength(80);
         b.Property(x => x.LastName).HasColumnName("last_name").HasMaxLength(80);
-        b.Property(x => x.BirthDate).HasColumnName("birth_date");
+        b.Property(x => x.BirthYear).HasColumnName("birth_year");
+        b.Property(x => x.IsAdultConfirmed)
+            .HasColumnName("is_adult_confirmed")
+            .IsRequired()
+            .HasDefaultValue(false);
+        b.Property(x => x.HistoryEnabled)
+            .HasColumnName("history_enabled")
+            .IsRequired()
+            .HasDefaultValue(false);
+        b.Property(x => x.AccountStatus)
+            .HasColumnName("account_status")
+            .HasConversion<int>()
+            .IsRequired()
+            .HasDefaultValue(Domain.Enums.UserAccountStatus.Active);
+        b.Property(x => x.SecurityVersion)
+            .HasColumnName("security_version")
+            .IsRequired()
+            .HasDefaultValue(1);
+        b.Property(x => x.AccountDeletionRequestedAt).HasColumnName("account_deletion_requested_at");
 
         b.Property(x => x.IsAdmin)
             .HasColumnName("is_admin")
@@ -50,11 +70,6 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("yukassa_subscription_id")
             .HasMaxLength(128);
 
-        b.Property(x => x.TelegramChatId).HasColumnName("telegram_chat_id");
-        b.Property(x => x.TelegramLinkToken)
-            .HasColumnName("telegram_link_token")
-            .HasMaxLength(64);
-        b.HasIndex(x => x.TelegramChatId).IsUnique();
 
         b.HasMany(x => x.Readings)
             .WithOne(x => x.User)
@@ -65,5 +80,10 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        b.HasMany(x => x.Consents)
+            .WithOne(x => x.User)
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

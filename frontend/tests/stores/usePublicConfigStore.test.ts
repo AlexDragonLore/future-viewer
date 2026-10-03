@@ -41,3 +41,21 @@ describe('usePublicConfigStore', () => {
     expect(store.loaded).toBe(true)
   })
 })
+
+describe('payments capability', () => {
+  it.each([undefined, null, false, 'true'])('stays disabled unless the backend returns boolean true (%s)', async (value) => {
+    setActivePinia(createPinia())
+    getConfig.mockResolvedValueOnce({ supportEmail: '', paymentsEnabled: value })
+    const store = usePublicConfigStore()
+    await store.load()
+    expect(store.paymentsEnabled).toBe(false)
+  })
+
+  it('accepts explicit payment enablement from the backend', async () => {
+    setActivePinia(createPinia())
+    getConfig.mockResolvedValueOnce({ supportEmail: '', paymentsEnabled: true })
+    const store = usePublicConfigStore()
+    await store.load()
+    expect(store.paymentsEnabled).toBe(true)
+  })
+})

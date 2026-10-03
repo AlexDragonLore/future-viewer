@@ -41,7 +41,7 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
             .GroupBy(ua => ua.UserId)
             .Select(g => new UserAchievementAgg(
                 g.Key,
-                g.Sum(x => x.Achievement.Points)))
+                g.Sum(x => x.Achievement!.Points)))
             .ToListAsync(ct);
 
         return await CombineAsync(feedback, achievements, take, ct);
@@ -63,7 +63,7 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
             .GroupBy(ua => ua.UserId)
             .Select(g => new UserAchievementAgg(
                 g.Key,
-                g.Sum(x => x.Achievement.Points)))
+                g.Sum(x => x.Achievement!.Points)))
             .ToListAsync(ct);
 
         return await CombineAsync(feedback, achievements, take, ct);
@@ -102,13 +102,13 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
 
         var userAchievementScore = await _db.UserAchievements
             .Where(ua => ua.UserId == userId)
-            .SumAsync(ua => (int?)ua.Achievement.Points, ct) ?? 0;
+            .SumAsync(ua => (int?)ua.Achievement!.Points, ct) ?? 0;
 
         var userMonthlyAchievementScore = await _db.UserAchievements
             .Where(ua => ua.UserId == userId
                          && ua.UnlockedAt >= monthFrom
                          && ua.UnlockedAt < monthTo)
-            .SumAsync(ua => (int?)ua.Achievement.Points, ct) ?? 0;
+            .SumAsync(ua => (int?)ua.Achievement!.Points, ct) ?? 0;
 
         int feedbackScore = userAll?.TotalScore ?? 0;
         int feedbackCount = userAll?.FeedbackCount ?? 0;
@@ -145,18 +145,19 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
         };
     }
 
-    private async Task<IReadOnlyList<LeaderboardEntryDto>> CombineAsync(
+    private Task<IReadOnlyList<LeaderboardEntryDto>> CombineAsync(
         IReadOnlyList<UserFeedbackAgg> feedback,
         IReadOnlyList<UserAchievementAgg> achievements,
         int take,
         CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         var feedbackByUser = feedback.ToDictionary(f => f.UserId);
         var achievementByUser = achievements.ToDictionary(a => a.UserId);
 
         var allUserIds = feedbackByUser.Keys.Union(achievementByUser.Keys).ToList();
         if (allUserIds.Count == 0)
-            return Array.Empty<LeaderboardEntryDto>();
+            return Task.FromResult<IReadOnlyList<LeaderboardEntryDto>>(Array.Empty<LeaderboardEntryDto>());
 
         var merged = allUserIds
             .Select(id =>
@@ -181,17 +182,11 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
             .Take(take)
             .ToList();
 
-        var userIds = merged.Select(r => r.UserId).ToList();
-        var emailMap = await _db.Users
-            .Where(u => userIds.Contains(u.Id))
-            .Select(u => new { u.Id, u.Email })
-            .ToDictionaryAsync(u => u.Id, u => u.Email, ct);
-
-        return merged
+        IReadOnlyList<LeaderboardEntryDto> result = merged
             .Select((r, idx) => new LeaderboardEntryDto
             {
-                UserId = r.UserId,
-                DisplayName = MaskEmail(emailMap.TryGetValue(r.UserId, out var e) ? e : string.Empty),
+                EntryId = LeaderboardPublicIdentity.EntryIdForRank(idx + 1),
+                DisplayName = LeaderboardPublicIdentity.DisplayNameForRank(idx + 1),
                 TotalScore = r.TotalScore,
                 FeedbackScore = r.FeedbackScore,
                 AchievementScore = r.AchievementScore,
@@ -200,6 +195,7 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
                 Rank = idx + 1
             })
             .ToList();
+        return Task.FromResult(result);
     }
 
     private async Task<List<UserTotal>> ComputeAllTimeTotalsAsync(CancellationToken ct)
@@ -212,7 +208,7 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
 
         var achievements = await _db.UserAchievements
             .GroupBy(ua => ua.UserId)
-            .Select(g => new { UserId = g.Key, Total = g.Sum(x => x.Achievement.Points) })
+            .Select(g => new { UserId = g.Key, Total = g.Sum(x => x.Achievement!.Points) })
             .ToListAsync(ct);
 
         return MergeTotals(feedback.Select(x => (x.UserId, x.Total)), achievements.Select(x => (x.UserId, x.Total)));
@@ -233,7 +229,7 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
         var achievements = await _db.UserAchievements
             .Where(ua => ua.UnlockedAt >= from && ua.UnlockedAt < to)
             .GroupBy(ua => ua.UserId)
-            .Select(g => new { UserId = g.Key, Total = g.Sum(x => x.Achievement.Points) })
+            .Select(g => new { UserId = g.Key, Total = g.Sum(x => x.Achievement!.Points) })
             .ToListAsync(ct);
 
         return MergeTotals(feedback.Select(x => (x.UserId, x.Total)), achievements.Select(x => (x.UserId, x.Total)));
@@ -256,25 +252,6 @@ public sealed class LeaderboardRepository : ILeaderboardRepository
         var from = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
         var to = from.AddMonths(1);
         return (from, to);
-    }
-
-    internal static string MaskEmail(string email)
-    {
-        if (string.IsNullOrWhiteSpace(email)) return "***";
-        var at = email.IndexOf('@');
-        if (at <= 0) return "***";
-
-        var local = email[..at];
-        var domain = email[(at + 1)..];
-
-        var localMasked = local.Length switch
-        {
-            1 => "*",
-            2 => local[0] + "*",
-            _ => local[0] + new string('*', Math.Min(3, local.Length - 1))
-        };
-
-        return $"{localMasked}@{domain}";
     }
 
     private sealed record UserFeedbackAgg(Guid UserId, int TotalScore, int FeedbackCount, double AverageScore);

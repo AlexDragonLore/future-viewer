@@ -38,6 +38,7 @@ async function mountResult(withReading: Reading | null): Promise<{ wrapper: Retu
     routes: [
       { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/result', name: 'result', component: ResultView },
+      { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
     ],
   })
   router.push('/result')
@@ -49,6 +50,7 @@ async function mountResult(withReading: Reading | null): Promise<{ wrapper: Retu
 describe('ResultView', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    localStorage.clear()
   })
   afterEach(() => {
     vi.restoreAllMocks()
@@ -66,6 +68,20 @@ describe('ResultView', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('THREE CARD')
     expect(wrapper.text()).toContain('where to?')
+    expect(wrapper.find('[data-testid="ai-disclaimer"]').exists()).toBe(true)
+  })
+
+  it('sanitizes executable HTML in the streamed AI interpretation', async () => {
+    const { wrapper } = await mountResult({
+      ...sample,
+      interpretation: '<img src=x onerror="alert(1)"> [bad](javascript:alert(1))',
+    })
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+    const rendered = wrapper.get('.prose-mystic').html()
+    expect(rendered).not.toContain('<img')
+    expect(rendered).not.toContain('onerror')
+    expect(rendered).not.toContain('javascript:')
   })
 
   it('typewriter reveals interpretation over time', async () => {
@@ -140,5 +156,14 @@ describe('ResultView', () => {
     await wrapper.find('.glow-button').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('ends a guest preview with a registration link back to this result', async () => {
+    const { wrapper } = await mountResult({ ...sample, isPreview: true, interpretation: 'Первая половина…' })
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="guest-unlock"]').text()).toContain('полное толкование этой карты')
+    expect(wrapper.get('a.guest-register').attributes('href')).toBe('/auth?mode=register&redirect=/result')
+    expect(wrapper.text()).not.toContain('begin')
   })
 })

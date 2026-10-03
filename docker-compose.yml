@@ -1,4 +1,12 @@
 # Local development compose. Production server deployment uses docker-compose.prod.yml.
+name: ${FV_COMPOSE_PROJECT_NAME:-future-viewer-dev}
+
+x-default-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -16,6 +24,9 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    networks:
+      - data
+    logging: *default-logging
 
   backend:
     build:
@@ -32,25 +43,28 @@ services:
       Jwt__Secret: ${JWT_SECRET:-dev-secret-please-change-me-in-prod-32chars-minimum}
       Jwt__Issuer: future-viewer
       Jwt__Audience: future-viewer
+      Privacy__ExportEnabled: ${PRIVACY_EXPORT_ENABLED:-true}
       AI__Provider: ${AI_PROVIDER:-OpenAI}
+      AI__Enabled: ${AI_ENABLED:-true}
+      AI__RegistryPath: config/processors.json
       OpenAI__ApiKey: ${OPENAI_API_KEY:-}
       OpenAI__Model: ${OPENAI_MODEL:-gpt-4o}
-      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-}
+      OpenAI__BaseUrl: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
       DeepSeek__ApiKey: ${DEEPSEEK_API_KEY:-}
       DeepSeek__Model: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       DeepSeek__BaseUrl: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
-      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME:-FutureViewerBot}
-      Telegram__SiteUrl: ${TELEGRAM_SITE_URL:-http://localhost:5173}
-      Support__Email: ${SUPPORT_EMAIL:-support@vualgryaduschego.ru}
+      Support__Email: ${SUPPORT_EMAIL:-}
+      Email__Transport: ${EMAIL_TRANSPORT:-Smtp}
       Email__Host: ${EMAIL_HOST:-}
       Email__Port: ${EMAIL_PORT:-587}
       Email__Username: ${EMAIL_USERNAME:-}
       Email__Password: ${EMAIL_PASSWORD:-}
-      Email__From: ${EMAIL_FROM:-no-reply@vualgryaduschego.ru}
+      Email__From: ${EMAIL_FROM:-}
       Email__UseSsl: ${EMAIL_USE_SSL:-true}
       Email__FrontendUrl: ${EMAIL_FRONTEND_URL:-http://localhost:5173}
       Payment__Provider: ${PAYMENT_PROVIDER:-Yukassa}
+      Payment__Enabled: ${PAYMENT_ENABLED:-true}
+      Payment__WebhookEnabled: ${PAYMENT_WEBHOOK_ENABLED:-true}
       Yukassa__ShopId: ${YUKASSA_SHOP_ID:-}
       Yukassa__SecretKey: ${YUKASSA_SECRET_KEY:-}
       Yukassa__ReturnUrl: ${YUKASSA_RETURN_URL:-http://localhost:5173/payment/success}
@@ -68,6 +82,21 @@ services:
       YooMoney__Targets: ${YOOMONEY_TARGETS:-Доступ Future Viewer Pro}
     ports:
       - "5050:8080"
+    volumes:
+      - ./config:/app/config:ro
+      - data-protection-keys:/app/data-protection-keys
+    networks:
+      - proxy
+      - data
+      - egress
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging: *default-logging
 
   frontend:
     build:
@@ -83,23 +112,57 @@ services:
       VITE_GOOGLE_SITE_VERIFICATION: ${VITE_GOOGLE_SITE_VERIFICATION:-}
       VITE_YANDEX_VERIFICATION: ${VITE_YANDEX_VERIFICATION:-}
       VITE_YANDEX_METRICA_ID: ${VITE_YANDEX_METRICA_ID:-}
-      VITE_GOOGLE_ANALYTICS_ID: ${VITE_GOOGLE_ANALYTICS_ID:-}
-      VITE_MERCHANT_SERVICE_NAME: ${VITE_MERCHANT_SERVICE_NAME:-Future Viewer}
-      VITE_MERCHANT_OWNER_NAME: ${VITE_MERCHANT_OWNER_NAME:-Дунецев Александр Дмитриевич}
-      VITE_MERCHANT_TAX_STATUS: ${VITE_MERCHANT_TAX_STATUS:-самозанятый, плательщик налога на профессиональный доход}
-      VITE_MERCHANT_INN: ${VITE_MERCHANT_INN:-592108465422}
-      VITE_MERCHANT_PHONE: ${VITE_MERCHANT_PHONE:-79967669613}
-      VITE_MERCHANT_EMAIL: ${VITE_MERCHANT_EMAIL:-duntsev010@mail.ru}
-      VITE_MERCHANT_POSTAL_ADDRESS: ${VITE_MERCHANT_POSTAL_ADDRESS:-duntsev010@mail.ru}
-      VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-Доступ Future Viewer Pro}
-      VITE_PAID_PRODUCT_PRICE: ${VITE_PAID_PRODUCT_PRICE:-300 ₽}
-      VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-30 дней}
-      VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.}
+      VITE_MERCHANT_SERVICE_NAME: ${VITE_MERCHANT_SERVICE_NAME:-}
+      VITE_MERCHANT_OWNER_NAME: ${VITE_MERCHANT_OWNER_NAME:-}
+      VITE_MERCHANT_TAX_STATUS: ${VITE_MERCHANT_TAX_STATUS:-}
+      VITE_MERCHANT_INN: ${VITE_MERCHANT_INN:-}
+      VITE_MERCHANT_PHONE: ${VITE_MERCHANT_PHONE:-}
+      VITE_MERCHANT_EMAIL: ${VITE_MERCHANT_EMAIL:-}
+      VITE_MERCHANT_POSTAL_ADDRESS: ${VITE_MERCHANT_POSTAL_ADDRESS:-}
+      VITE_PAID_PRODUCT_TITLE: ${VITE_PAID_PRODUCT_TITLE:-}
+      VITE_PAID_PRODUCT_PRICE: ${VITE_PAID_PRODUCT_PRICE:-}
+      VITE_PAID_PRODUCT_PERIOD: ${VITE_PAID_PRODUCT_PERIOD:-}
+      VITE_PAID_PRODUCT_DESCRIPTION: ${VITE_PAID_PRODUCT_DESCRIPTION:-}
+      VITE_NPD_RECEIPT_PROCESS_VERIFIED: ${VITE_NPD_RECEIPT_PROCESS_VERIFIED:-false}
+      VITE_NPD_RECEIPT_PROCEDURE: ${VITE_NPD_RECEIPT_PROCEDURE:-}
+      VITE_SUPPORT_RESPONSE_TERM: ${VITE_SUPPORT_RESPONSE_TERM:-}
+      VITE_REFUND_METHOD: ${VITE_REFUND_METHOD:-}
+      VITE_CLAIM_REVIEW_PROCEDURE: ${VITE_CLAIM_REVIEW_PROCEDURE:-}
+      VITE_LEGAL_OPERATOR_VERIFIED: ${VITE_LEGAL_OPERATOR_VERIFIED:-false}
+      VITE_LEGAL_PROCESSORS_VERIFIED: ${VITE_LEGAL_PROCESSORS_VERIFIED:-false}
+      VITE_LEGAL_PROCESSORS_JSON: ${VITE_LEGAL_PROCESSORS_JSON:-}
+      VITE_LEGAL_DOCUMENT_VERSION: ${VITE_LEGAL_DOCUMENT_VERSION:-}
+      VITE_LEGAL_EFFECTIVE_AT: ${VITE_LEGAL_EFFECTIVE_AT:-}
+      VITE_LEGAL_OFFER_VERSION: ${VITE_LEGAL_OFFER_VERSION:-}
+      VITE_LEGAL_PRIVACY_VERSION: ${VITE_LEGAL_PRIVACY_VERSION:-}
+      VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION: ${VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION:-}
+      VITE_LEGAL_MARKETING_CONSENT_VERSION: ${VITE_LEGAL_MARKETING_CONSENT_VERSION:-}
+      VITE_LEGAL_COOKIES_VERSION: ${VITE_LEGAL_COOKIES_VERSION:-}
+      VITE_LEGAL_AI_DISCLAIMER_VERSION: ${VITE_LEGAL_AI_DISCLAIMER_VERSION:-}
+      VITE_LEGAL_DATA_REQUEST_VERSION: ${VITE_LEGAL_DATA_REQUEST_VERSION:-}
+      VITE_LEGAL_PROCESSORS_VERSION: ${VITE_LEGAL_PROCESSORS_VERSION:-}
+      VITE_LEGAL_READING_RETENTION: ${VITE_LEGAL_READING_RETENTION:-}
+      VITE_LEGAL_ACCOUNT_RETENTION: ${VITE_LEGAL_ACCOUNT_RETENTION:-}
+      VITE_LEGAL_CONSENT_RETENTION: ${VITE_LEGAL_CONSENT_RETENTION:-}
+      VITE_LEGAL_LOG_RETENTION: ${VITE_LEGAL_LOG_RETENTION:-}
+      VITE_LEGAL_BACKUP_RETENTION: ${VITE_LEGAL_BACKUP_RETENTION:-}
     ports:
       - "5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    networks:
+      - proxy
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+networks:
+  proxy:
+  data:
+    internal: true
+  egress:
 
 volumes:
+  data-protection-keys:
   pgdata:

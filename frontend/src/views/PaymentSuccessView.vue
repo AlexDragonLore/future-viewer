@@ -2,19 +2,35 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
+import { paymentApi } from '@/api/paymentApi'
+import { getPendingPayment, clearPendingPayment } from '@/utils/pendingPayment'
+import { trackGoalOnce } from '@/analytics/metrika'
 
 const router = useRouter()
 const auth = useAuthStore()
 const refreshing = ref(true)
+const orderPaid = ref<boolean | null>(null)
 
 onMounted(async () => {
   if (auth.isAuthenticated) {
+    const paymentId = getPendingPayment(auth.userId)
+    if (paymentId) {
+      orderPaid.value = false
+      try {
+        const payment = await paymentApi.status(paymentId)
+        if (payment.paid) {
+          orderPaid.value = true
+          trackGoalOnce('payment_completed', paymentId)
+          clearPendingPayment()
+        } else if (['canceled', 'failed'].includes(payment.status)) clearPendingPayment()
+      } catch { /* A failed check cannot imply a paid order. The user can retry. */ }
+    }
     await auth.refreshSubscription()
   }
   refreshing.value = false
 })
 
-const activated = computed(() => auth.isSubscribed)
+const activated = computed(() => orderPaid.value ?? auth.isSubscribed)
 
 function goHome() {
   router.replace('/')

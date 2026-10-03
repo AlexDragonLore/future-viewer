@@ -1,5 +1,9 @@
+using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Infrastructure.Persistence;
+using System.Net;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +15,7 @@ namespace FutureViewer.Integration.Tests.Fixtures;
 
 public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    private int _clientSequence;
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:17-alpine")
         .WithDatabase("future_viewer_tests")
@@ -20,6 +25,14 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
 
     public CapturingEmailSender EmailSender { get; } = new();
 
+    protected override void ConfigureClient(HttpClient client)
+    {
+        base.ConfigureClient(client);
+        // Independent simulated clients should not share TestServer's null peer IP.
+        // Keep rate limiting enabled, including repeated requests from one client.
+        client.DefaultRequestHeaders.Add("X-Test-Client-IP", $"2001:db8::{Interlocked.Increment(ref _clientSequence):x}");
+    }
+
     public async Task InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -28,6 +41,17 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.EnsureCreatedAsync();
         await DatabaseInitializer.SeedAsync(db);
+        var now = DateTime.UtcNow.AddMinutes(-1);
+        db.LegalDocuments.AddRange(Enum.GetValues<LegalDocumentType>().Select(type => new LegalDocument
+        {
+            DocumentType = type,
+            Version = AuthTestExtensions.LegalDocumentVersion,
+            ContentHash = new string('a', 64),
+            PublishedAt = now,
+            EffectiveAt = now,
+            IsActive = true
+        }));
+        await db.SaveChangesAsync();
     }
 
     public new async Task DisposeAsync()
@@ -49,6 +73,7 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
 
         builder.ConfigureServices(services =>
         {
+            services.AddTransient<IStartupFilter, TestClientAddressStartupFilter>();
             var dbContextOptions = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
             if (dbContextOptions is not null) services.Remove(dbContextOptions);
 
@@ -78,5 +103,20 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             if (linkDescriptor is not null) services.Remove(linkDescriptor);
             services.AddSingleton<IEmailLinkBuilder, FakeEmailLinkBuilder>();
         });
+    }
+
+    private sealed class TestClientAddressStartupFilter : IStartupFilter
+    {
+        public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+        {
+            app.Use(async (context, nextMiddleware) =>
+            {
+                if (IPAddress.TryParse(context.Request.Headers["X-Test-Client-IP"].FirstOrDefault(), out var address))
+                    context.Connection.RemoteIpAddress = address;
+                context.Request.Headers.Remove("X-Test-Client-IP");
+                await nextMiddleware(context);
+            });
+            next(app);
+        };
     }
 }

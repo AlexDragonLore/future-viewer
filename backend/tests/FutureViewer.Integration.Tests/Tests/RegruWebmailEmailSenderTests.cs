@@ -32,8 +32,8 @@ public sealed class RegruWebmailEmailSenderTests
     public void Constructor_rejects_invalid_explicit_transport_instead_of_disabling_verification(
         string username, string password, string from)
     {
-        // AuthService treats an unconfigured sender as development mode and verifies email
-        // automatically. An explicitly selected transport must fail closed at construction.
+        // AuthService requires real delivery for email ownership verification.
+        // An explicitly selected transport must fail closed at construction.
         var options = Options.Create(new EmailOptions
         {
             Transport = "RegruWebmail", Username = username, Password = password, From = from

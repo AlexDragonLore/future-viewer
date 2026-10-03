@@ -102,7 +102,7 @@ public sealed class FeedbackEndpointTests : IClassFixture<IntegrationTestFixture
     private async Task<(Guid ReadingId, string Token)> CreateReadingAndGetFeedback(HttpClient client, AuthResponse auth)
     {
         var created = await client.PostAsJsonAsync("/api/readings",
-            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "What should I focus on today?" });
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "What should I focus on today?", SaveToHistory = true });
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var reading = await created.Content.ReadFromJsonAsync<ReadingResult>();
 
@@ -126,6 +126,7 @@ public sealed class FeedbackEndpointTests : IClassFixture<IntegrationTestFixture
         var user = await users.GetByIdAsync(auth.UserId);
         user!.SubscriptionStatus = SubscriptionStatus.Active;
         user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+        user.HistoryEnabled = true;
         await users.UpdateAsync(user);
 
         return (client, auth);

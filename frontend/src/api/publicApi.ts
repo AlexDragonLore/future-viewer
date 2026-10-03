@@ -2,6 +2,8 @@ import { httpClient } from './httpClient'
 
 export interface PublicConfig {
   supportEmail: string
+  paymentsEnabled: boolean
+  paymentProduct?: { amount: number; currency: string; accessDays: number } | null
 }
 
 export const publicApi = {

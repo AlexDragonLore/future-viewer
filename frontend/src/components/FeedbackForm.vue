@@ -30,13 +30,14 @@ function onSubmit() {
 
 <template>
   <form class="feedback-form" @submit.prevent="onSubmit" data-testid="feedback-form">
-    <label class="feedback-label" for="feedback-self-report">Как ты следовал рекомендациям?</label>
+    <label class="feedback-label" for="feedback-self-report">Что произошло после интерпретации?</label>
     <textarea
       id="feedback-self-report"
       v-model="text"
       rows="6"
+      maxlength="2000"
       :disabled="busy"
-      placeholder="Расскажи подробно, что получилось, а что нет. Искренность важнее краткости."
+      placeholder="Опиши своими словами, что произошло. Не указывай контакты, диагнозы и данные других людей."
       class="feedback-textarea"
       data-testid="feedback-textarea"
     />

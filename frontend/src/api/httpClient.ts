@@ -1,11 +1,15 @@
-import axios, { AxiosError } from 'axios'
+import axios, { AxiosError, CanceledError } from 'axios'
+import { accountSessionVersion, clearAccountSession } from '@/utils/accountSession'
 
 export const httpClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
   headers: { 'Content-Type': 'application/json' },
 })
 
+const requestSessions = new WeakMap<object, number>()
+
 httpClient.interceptors.request.use((config) => {
+  requestSessions.set(config, accountSessionVersion())
   const token = localStorage.getItem('fv_token')
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
@@ -14,9 +18,18 @@ httpClient.interceptors.request.use((config) => {
 })
 
 httpClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (requestSessions.get(response.config) !== accountSessionVersion()) {
+      throw new CanceledError('Сеанс изменён. Повторите запрос.')
+    }
+    return response
+  },
   (error: AxiosError) => {
+    if (error.config && requestSessions.get(error.config) !== accountSessionVersion()) {
+      return Promise.reject(new CanceledError('Сеанс изменён. Повторите запрос.'))
+    }
     if (error.response?.status === 401 && localStorage.getItem('fv_token')) {
+      clearAccountSession()
       localStorage.removeItem('fv_token')
       localStorage.removeItem('fv_email')
       localStorage.removeItem('fv_user_id')

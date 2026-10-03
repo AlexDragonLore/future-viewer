@@ -7,15 +7,15 @@ import { FAQ_ITEMS } from '@/data/tarotSeoCatalog.js'
     <nav class="breadcrumbs" aria-label="Навигация">
       <RouterLink to="/">Главная</RouterLink>
       <span>/</span>
-      <span>FAQ</span>
+      <span>Вопросы и ответы</span>
     </nav>
 
     <header class="hero">
       <div class="seo-kicker">Вопросы о Таро</div>
-      <h1>FAQ по онлайн-раскладам</h1>
+      <h1>Вопросы и ответы об онлайн-раскладах</h1>
       <p>
         Короткие ответы на практические вопросы: как формулировать запрос, как читать перевернутые карты и где границы
-        AI-интерпретации.
+        интерпретации ИИ.
       </p>
     </header>
 

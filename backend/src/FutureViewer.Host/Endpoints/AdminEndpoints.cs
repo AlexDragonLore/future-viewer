@@ -2,7 +2,6 @@ using System.Security.Claims;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Services;
-using FutureViewer.Infrastructure.BackgroundServices;
 
 namespace FutureViewer.Host.Endpoints;
 
@@ -17,7 +16,6 @@ public static class AdminEndpoints
         MapFeedbackEndpoints(group);
         MapUserEndpoints(group);
         MapAchievementEndpoints(group);
-        MapTelegramEndpoints(group);
         MapStatsEndpoints(group);
 
         return app;
@@ -109,13 +107,6 @@ public static class AdminEndpoints
             return Results.NoContent();
         });
 
-        group.MapPost("/feedbacks/run-notifications", async (
-            FeedbackNotificationProcessor processor,
-            CancellationToken ct) =>
-        {
-            var processed = await processor.ProcessBatchAsync(ct);
-            return Results.Ok(new { processed });
-        });
     }
 
     private static void MapUserEndpoints(RouteGroupBuilder group)
@@ -217,33 +208,6 @@ public static class AdminEndpoints
         });
     }
 
-    private static void MapTelegramEndpoints(RouteGroupBuilder group)
-    {
-        group.MapDelete("/users/{id:guid}/telegram", async (
-            Guid id,
-            AdminService service,
-            HttpContext ctx,
-            CancellationToken ct) =>
-        {
-            var (actorId, actorEmail) = ctx.User.GetActor();
-            await service.UnlinkTelegramAsync(actorId, actorEmail, id, ct);
-            return Results.NoContent();
-        });
-
-        group.MapPut("/users/{id:guid}/telegram", async (
-            Guid id,
-            SetTelegramBody body,
-            AdminService service,
-            HttpContext ctx,
-            CancellationToken ct) =>
-        {
-            if (body is null) return Results.BadRequest();
-            var (actorId, actorEmail) = ctx.User.GetActor();
-            var result = await service.SetTelegramChatIdAsync(actorId, actorEmail, id, body.ChatId, ct);
-            return Results.Ok(new { linked = true, chatId = result.ChatId });
-        });
-    }
-
     private static (Guid Id, string Email) GetActor(this ClaimsPrincipal principal)
     {
         var id = principal.GetUserId() ?? throw new UnauthorizedException("Authentication required");
@@ -298,8 +262,4 @@ public static class AdminEndpoints
         public string Code { get; init; } = string.Empty;
     }
 
-    public sealed class SetTelegramBody
-    {
-        public long ChatId { get; init; }
-    }
 }

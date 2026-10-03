@@ -1,75 +1,79 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { createRouter, createMemoryHistory } from 'vue-router'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { SpreadType, SubscriptionStatusValue } from '@/types'
 
 const validateQuestionMock = vi.fn()
+const statusMock = vi.fn()
+const privacySettingsMock = vi.fn()
+
 vi.mock('@/api/readingApi', () => ({
   readingApi: {
-    spreads: vi.fn(async () => [
-      { type: SpreadType.SingleCard, name: 'One', cardCount: 1, positions: [] },
-      { type: SpreadType.ThreeCard, name: 'Three', cardCount: 3, positions: [] },
-      { type: SpreadType.CelticCross, name: 'Cross', cardCount: 10, positions: [] },
-    ]),
-    create: vi.fn(),
     validateQuestion: (...args: [unknown, unknown, unknown]) => validateQuestionMock(...args),
+    spreads: vi.fn(),
+    create: vi.fn(),
+    createStream: vi.fn(),
     get: vi.fn(),
     history: vi.fn(),
   },
 }))
 
-const statusMock = vi.fn()
 vi.mock('@/api/subscriptionApi', () => ({
-  subscriptionApi: {
-    status: (...args: []) => statusMock(...args),
-  },
+  subscriptionApi: { status: () => statusMock() },
 }))
 
-const personalizationMock = vi.fn()
-const updatePersonalizationMock = vi.fn()
-vi.mock('@/api/profileApi', () => ({
-  profileApi: {
-    personalization: (...args: []) => personalizationMock(...args),
-    updatePersonalization: (...args: [unknown]) => updatePersonalizationMock(...args),
-    deleteMemoryRule: vi.fn(),
-    clearMemory: vi.fn(),
+vi.mock('@/api/privacyApi', () => ({
+  privacyApi: {
+    settings: () => privacySettingsMock(),
+    consents: vi.fn(async () => []),
+    accountDeletionStatus: vi.fn(async () => null),
   },
 }))
 
 import HomeView from '@/views/HomeView.vue'
+import { useReadingStore } from '@/stores/useReadingStore'
 
-async function mountHome() {
+async function mountHome(setup?: () => void) {
   setActivePinia(createPinia())
+  setup?.()
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'home', component: HomeView },
       { path: '/reading', name: 'reading', component: { template: '<div>reading</div>' } },
       { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
-      { path: '/history', name: 'history', component: { template: '<div>hist</div>' } },
-      { path: '/glossary', name: 'glossary', component: { template: '<div>glossary</div>' } },
+      { path: '/history', name: 'history', component: { template: '<div>history</div>' } },
+      { path: '/faq', name: 'faq', component: { template: '<div>faq</div>' } },
       { path: '/tarot/decks/:slug', name: 'tarot-deck-seo', component: { template: '<div>deck</div>' } },
       { path: '/tarot/spreads/:slug', name: 'tarot-spread-seo', component: { template: '<div>spread</div>' } },
-      { path: '/faq', name: 'faq', component: { template: '<div>faq</div>' } },
-      { path: '/legal', name: 'legal', component: { template: '<div>legal</div>' } },
+      { path: '/legal/:document', component: { template: '<div>legal</div>' } },
     ],
   })
   router.push('/')
   await router.isReady()
   const wrapper = mount(HomeView, { global: { plugins: [router] } })
   await flushPromises()
-  return { wrapper, router }
+  return { wrapper, router, store: useReadingStore() }
 }
 
-describe('HomeView', () => {
+function authenticate() {
+  localStorage.setItem('fv_token', 'test-token')
+  localStorage.setItem('fv_email', 'u@x.test')
+}
+
+async function selectSingleCardAndType(wrapper: ReturnType<typeof mount>, question: string) {
+  await wrapper.findAll('.spread-option')[0].trigger('click')
+  await wrapper.find('textarea').setValue(question)
+}
+
+describe('HomeView privacy and question safety', () => {
   beforeEach(() => {
-    sessionStorage.clear()
     localStorage.clear()
-    statusMock.mockReset()
-    personalizationMock.mockReset()
-    updatePersonalizationMock.mockReset()
+    sessionStorage.clear()
     validateQuestionMock.mockReset()
+    statusMock.mockReset()
+    privacySettingsMock.mockReset()
     validateQuestionMock.mockResolvedValue({
       status: 'accepted',
       reason: 'ok',
@@ -86,149 +90,85 @@ describe('HomeView', () => {
       freeReadingsDailyLimit: 1,
       canCreateFreeReading: true,
     })
-    personalizationMock.mockResolvedValue({
-      firstName: 'Test',
-      lastName: 'User',
-      birthDate: '1990-01-01',
-      isComplete: true,
-      memoryRules: [],
-    })
-    updatePersonalizationMock.mockResolvedValue({
-      firstName: 'Test',
-      lastName: 'User',
-      birthDate: '1990-01-01',
-      isComplete: true,
-      memoryRules: [],
-    })
+    privacySettingsMock.mockResolvedValue({ historyEnabled: false })
   })
 
-  it('start button is disabled when question is empty', async () => {
+  it('keeps history saving off by default and shows the exact disclaimer', async () => {
+    authenticate()
     const { wrapper } = await mountHome()
-    const startBtn = wrapper.find('.glow-button')
-    expect((startBtn.element as HTMLButtonElement).disabled).toBe(true)
+    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(false)
+    expect(wrapper.get('[data-testid="ai-disclaimer"]').text()).toContain(
+      'Результат не является достоверным предсказанием, медицинской, юридической, психологической или финансовой консультацией',
+    )
   })
 
-  it('start button enables after typing a question', async () => {
+  it('does not require or collect profile fields before a reading', async () => {
+    authenticate()
     const { wrapper } = await mountHome()
-    await wrapper.find('textarea').setValue('What awaits me?')
-    const startBtn = wrapper.find('.glow-button')
-    expect((startBtn.element as HTMLButtonElement).disabled).toBe(false)
+    expect(wrapper.find('[data-testid="personalization-intro"]').exists()).toBe(false)
+    expect(wrapper.find('input[type="date"]').exists()).toBe(false)
   })
 
-  it('begin stores payload in sessionStorage and navigates to reading when authenticated', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
-    const { wrapper, router } = await mountHome()
-    const buttons = wrapper.findAll('.spread-option')
-    await buttons[0].trigger('click')
-    await wrapper.find('textarea').setValue('Question?')
-    await wrapper.find('.glow-button').trigger('click')
+  it('passes an accepted question through in-memory state without sessionStorage', async () => {
+    authenticate()
+    const { wrapper, router, store } = await mountHome()
+    await selectSingleCardAndType(wrapper, 'На что обратить внимание в проекте?')
+    await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
 
-    const stored = sessionStorage.getItem('fv_pending')
-    expect(stored).not.toBeNull()
-    const parsed = JSON.parse(stored!)
-    expect(parsed.question).toBe('Question?')
-    expect(parsed.spreadType).toBe(SpreadType.SingleCard)
     expect(validateQuestionMock).toHaveBeenCalled()
+    expect(store.pending).toMatchObject({
+      question: 'На что обратить внимание в проекте?',
+      spreadType: SpreadType.SingleCard,
+      validated: true,
+      saveToHistory: false,
+    })
+    expect(sessionStorage.getItem('fv_pending')).toBeNull()
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
-  it('begin redirects unauthenticated user to auth while saving payload', async () => {
-    const { wrapper, router } = await mountHome()
-    await wrapper.find('textarea').setValue('Question?')
-    await wrapper.find('.glow-button').trigger('click')
+  it('starts a guest single-card reading without authentication or validation round trip', async () => {
+    const { wrapper, router, store } = await mountHome()
+    await wrapper.find('textarea').setValue('Как посмотреть на новую задачу?')
+    await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
 
-    expect(sessionStorage.getItem('fv_pending')).not.toBeNull()
-    expect(router.currentRoute.value.name).toBe('auth')
+    expect(store.pending).toMatchObject({ question: 'Как посмотреть на новую задачу?', validated: true, spreadType: SpreadType.SingleCard, saveToHistory: false })
+    expect(sessionStorage.length).toBe(0)
+    expect(router.currentRoute.value.name).toBe('reading')
+    expect(validateQuestionMock).not.toHaveBeenCalled()
   })
 
-  it('asks authenticated user for personalization before first reading', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
-    personalizationMock.mockResolvedValue({
-      firstName: null,
-      lastName: null,
-      birthDate: null,
-      isComplete: false,
-      memoryRules: [],
-    })
-    const { wrapper, router } = await mountHome()
-    await wrapper.findAll('.spread-option')[0].trigger('click')
-    await wrapper.find('textarea').setValue('Question?')
-    expect(wrapper.find('[data-testid="personalization-intro"]').exists()).toBe(true)
-
-    await wrapper.find('[data-testid="first-name-input"]').setValue('Ada')
-    await wrapper.find('[data-testid="last-name-input"]').setValue('Lovelace')
-    await wrapper.find('[data-testid="birth-date-input"]').setValue('1815-12-10')
-    await wrapper.find('.glow-button').trigger('click')
+  it('lets a guest start with one click and a default question', async () => {
+    const { wrapper, router, store } = await mountHome()
+    expect(wrapper.find('.spread-option').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="save-to-history"]').exists()).toBe(false)
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeUndefined()
+    await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
-
-    expect(updatePersonalizationMock).toHaveBeenCalledWith({
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-      birthDate: '1815-12-10',
-    })
-    expect(validateQuestionMock).toHaveBeenCalled()
+    expect(store.pending?.question).toBe('На что мне сейчас стоит обратить внимание?')
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
-  it('shows subscription-only warning for free user when question needs rewrite', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
-    validateQuestionMock.mockResolvedValue({
-      status: 'needs_rewrite',
-      reason: 'Вопрос слишком общий.',
-      suggestedQuestion: 'На что мне стоит обратить внимание?',
-      message: 'На такие запросы можно ответить только с подпиской.',
-      canContinue: false,
-      requiresSubscription: true,
-    })
-    const { wrapper, router } = await mountHome()
-    await wrapper.findAll('.spread-option')[0].trigger('click')
-    await wrapper.find('textarea').setValue('что будет?')
-    await wrapper.find('.glow-button').trigger('click')
+  it.each([
+    ['email', 'Напиши ответ для user@host.ru'],
+    ['phone', 'Что будет с человеком +7 999 123-45-67?'],
+    ['diagnosis', 'Болен ли я раком?'],
+  ])('blocks a question containing %s before any API request', async (_caseName, text) => {
+    authenticate()
+    const { wrapper, router, store } = await mountHome()
+    await selectSingleCardAndType(wrapper, text)
+    await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
 
+    expect(validateQuestionMock).not.toHaveBeenCalled()
+    expect(store.pending).toBeNull()
     expect(router.currentRoute.value.name).toBe('home')
-    expect(sessionStorage.getItem('fv_pending')).toBeNull()
-    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
-      'На такие запросы можно ответить только с подпиской.',
-    )
-    expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
-      'На что мне стоит обратить внимание?',
-    )
+    expect(wrapper.get('[data-testid="question-validation"]').text()).toBeTruthy()
   })
 
-  it('forces subscription-only warning for free user even if validator says can continue', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
-    validateQuestionMock.mockResolvedValue({
-      status: 'needs_rewrite',
-      reason: 'Медицинская диагностика.',
-      suggestedQuestion: 'Какой следующий шаг мне стоит увидеть в этой ситуации?',
-      message: 'По такому запросу обычно не гадают. Вы уверены, что хотите продолжить?',
-      canContinue: true,
-      requiresSubscription: false,
-    })
-    const { wrapper, router } = await mountHome()
-    await wrapper.findAll('.spread-option')[0].trigger('click')
-    await wrapper.find('textarea').setValue('Болен ли я раком?')
-    await wrapper.find('.glow-button').trigger('click')
-    await flushPromises()
-
-    expect(router.currentRoute.value.name).toBe('home')
-    expect(sessionStorage.getItem('fv_pending')).toBeNull()
-    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
-      'На такие запросы можно ответить только с подпиской.',
-    )
-    expect(wrapper.find('[data-testid="question-warning-modal"]').exists()).toBe(false)
-  })
-
-  it('shows subscriber warning panel and continues after confirmation', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
+  it('never lets a subscriber override a rejected response', async () => {
+    authenticate()
     statusMock.mockResolvedValue({
       status: SubscriptionStatusValue.Active,
       expiresAt: '2030-01-01T00:00:00Z',
@@ -237,171 +177,58 @@ describe('HomeView', () => {
       freeReadingsDailyLimit: 1,
       canCreateFreeReading: true,
     })
-    validateQuestionMock.mockResolvedValue({
-      status: 'needs_rewrite',
-      reason: 'Вопрос слишком общий.',
-      suggestedQuestion: 'На что мне стоит обратить внимание?',
-      message: 'По такому запросу обычно не гадают. Вы уверены, что хотите продолжить?',
-      canContinue: true,
-      requiresSubscription: false,
-    })
-    const { wrapper, router } = await mountHome()
-    await wrapper.findAll('.spread-option')[0].trigger('click')
-    await wrapper.find('textarea').setValue('что будет?')
-    await wrapper.find('.glow-button').trigger('click')
-    await flushPromises()
-
-    expect(wrapper.find('[data-testid="question-warning-modal"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="continue-with-warning"]').text()).toContain('Продолжить с этим вопросом')
-    expect(router.currentRoute.value.name).toBe('home')
-
-    await wrapper.find('[data-testid="continue-with-warning"]').trigger('click')
-    await flushPromises()
-
-    const stored = JSON.parse(sessionStorage.getItem('fv_pending')!)
-    expect(stored.questionWarningAcknowledged).toBe(true)
-    expect(router.currentRoute.value.name).toBe('reading')
-  })
-
-  it('adds a fallback suggestion when validator rejects without one', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
     validateQuestionMock.mockResolvedValue({
       status: 'rejected',
-      reason: 'Вопрос не связан с реальной жизненной ситуацией.',
-      suggestedQuestion: null,
-      message: 'На такие запросы можно ответить только с подпиской.',
-      canContinue: false,
-      requiresSubscription: true,
+      reason: 'sensitive',
+      suggestedQuestion: 'Как обезличить вопрос?',
+      message: 'Исходный вопрос нельзя отправлять.',
+      canContinue: true,
+      requiresSubscription: false,
     })
-    const { wrapper } = await mountHome()
-    await wrapper.findAll('.spread-option')[0].trigger('click')
-    await wrapper.find('textarea').setValue('тест')
-    await wrapper.find('.glow-button').trigger('click')
+
+    const { wrapper, router, store } = await mountHome()
+    await selectSingleCardAndType(wrapper, 'Расскажи про другого человека')
+    await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
-      'На такие запросы можно ответить только с подпиской.',
-    )
-    expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
-      'Что мне важно понять про тему «тест»?',
-    )
+    expect(router.currentRoute.value.name).toBe('home')
+    expect(store.pending).toBeNull()
+    expect(wrapper.get('[data-testid="question-validation"]').text()).toContain('нельзя отправлять')
+    expect(wrapper.find('[data-testid="continue-with-warning"]').exists()).toBe(false)
   })
 
-  it('restores pending question and shows reading creation errors from reading screen', async () => {
-    sessionStorage.setItem('fv_pending', JSON.stringify({
-      spreadType: SpreadType.SingleCard,
-      question: 'тест',
-    }))
-    sessionStorage.setItem('fv_reading_error', JSON.stringify({
-      message: 'AI-провайдер не настроен.',
-    }))
+  it('passes the explicit per-reading history choice to pending state', async () => {
+    authenticate()
+    const { wrapper, store } = await mountHome()
+    await selectSingleCardAndType(wrapper, 'Какой аспект задачи рассмотреть?')
+    await wrapper.get('[data-testid="save-to-history"]').setValue(true)
+    await wrapper.get('button.glow-button').trigger('click')
+    await flushPromises()
+    expect(store.pending?.saveToHistory).toBe(true)
+  })
 
+  it('uses the account history preference as the initial authenticated choice', async () => {
+    authenticate()
+    privacySettingsMock.mockResolvedValue({ historyEnabled: true })
     const { wrapper } = await mountHome()
-
-    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toBe('тест')
-    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain('AI-провайдер не настроен.')
-    expect(sessionStorage.getItem('fv_pending')).toBeNull()
-    expect(sessionStorage.getItem('fv_reading_error')).toBeNull()
+    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(true)
   })
 
-  it('restores pending question and adds fallback suggestion for reading validation errors', async () => {
-    sessionStorage.setItem('fv_pending', JSON.stringify({
-      spreadType: SpreadType.SingleCard,
-      question: 'тест',
-    }))
-    sessionStorage.setItem('fv_question_validation', JSON.stringify({
-      message: 'Вопрос не связан с реальной жизненной ситуацией.',
-      suggestedQuestion: null,
-    }))
-
-    const { wrapper } = await mountHome()
-
-    expect((wrapper.find('textarea').element as HTMLTextAreaElement).value).toBe('тест')
-    expect(wrapper.find('[data-testid="question-validation"]').text()).toContain(
-      'Вопрос не связан с реальной жизненной ситуацией.',
-    )
-    expect(wrapper.find('[data-testid="apply-suggested-question"]').text()).toContain(
-      'Что мне важно понять про тему «тест»?',
-    )
-    expect(sessionStorage.getItem('fv_pending')).toBeNull()
-    expect(sessionStorage.getItem('fv_question_validation')).toBeNull()
-  })
-
-  it('shows subscription badge with remaining free quota when authenticated', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
-    const { wrapper } = await mountHome()
-    expect(wrapper.text()).toContain('Бесплатно сегодня: 1/1')
-  })
-
-  it('shows active subscription badge for subscriber', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
-    statusMock.mockResolvedValue({
-      status: SubscriptionStatusValue.Active,
-      expiresAt: '2030-01-01T00:00:00Z',
-      isActive: true,
-      freeReadingsUsedToday: 0,
-      freeReadingsDailyLimit: 1,
-      canCreateFreeReading: true,
+  it('shows a content-free workflow error without restoring a raw question from storage', async () => {
+    const { wrapper } = await mountHome(() => {
+      useReadingStore().setWorkflowIssue({ message: 'AI-интеграция временно отключена.' })
     })
-    const { wrapper } = await mountHome()
-    expect(wrapper.text()).toContain('Доступ активен')
+    expect(wrapper.get('[data-testid="question-validation"]').text()).toContain('временно отключена')
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('')
+    expect(sessionStorage.length).toBe(0)
   })
 
-  it('blocks free authenticated user from multi-card spread', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
+  it('still enforces the free product quota independently from question safety', async () => {
+    authenticate()
     const { wrapper } = await mountHome()
-    await wrapper.find('textarea').setValue('Any question?')
+    await wrapper.findAll('.spread-option')[1].trigger('click')
+    await wrapper.find('textarea').setValue('Какой аспект задачи рассмотреть?')
     expect(wrapper.find('[data-testid="block-warning"]').exists()).toBe(true)
-    const btn = wrapper.find('.glow-button').element as HTMLButtonElement
-    expect(btn.disabled).toBe(true)
-  })
-
-  it('blocks free authenticated user when daily quota exhausted', async () => {
-    localStorage.setItem('fv_token', 'test-token')
-    localStorage.setItem('fv_email', 'u@x.com')
-    statusMock.mockResolvedValue({
-      status: SubscriptionStatusValue.None,
-      expiresAt: null,
-      isActive: false,
-      freeReadingsUsedToday: 1,
-      freeReadingsDailyLimit: 1,
-      canCreateFreeReading: false,
-    })
-    const { wrapper } = await mountHome()
-    await wrapper.findAll('.spread-option')[0].trigger('click')
-    await wrapper.find('textarea').setValue('Any question?')
-    expect(wrapper.find('[data-testid="block-warning"]').exists()).toBe(true)
-    const btn = wrapper.find('.glow-button').element as HTMLButtonElement
-    expect(btn.disabled).toBe(true)
-  })
-
-  it('selecting a spread updates active state', async () => {
-    const { wrapper } = await mountHome()
-    const buttons = wrapper.findAll('.spread-option')
-    expect(buttons.length).toBeGreaterThanOrEqual(3)
-    await buttons[0].trigger('click')
-    expect(buttons[0].classes()).toContain('active')
-  })
-
-  it('renders current deck blurb with link to the SEO deck page', async () => {
-    const { wrapper } = await mountHome()
-    const blurb = wrapper.find('[data-testid="home-deck-blurb"]')
-    expect(blurb.exists()).toBe(true)
-    expect(blurb.text()).toContain('Rider–Waite–Smith')
-    expect(blurb.find('a').attributes('href')).toBe('/tarot/decks/rider-waite-smith')
-  })
-
-  it('renders spread blurb that updates when spread changes', async () => {
-    const { wrapper } = await mountHome()
-    const blurb = wrapper.find('[data-testid="home-spread-blurb"]')
-    expect(blurb.exists()).toBe(true)
-    expect(blurb.find('a').attributes('href')).toBe('/tarot/spreads/tri-karty')
-    const buttons = wrapper.findAll('.spread-option')
-    await buttons[0].trigger('click')
-    expect(wrapper.find('[data-testid="home-spread-blurb"] a').attributes('href')).toBe('/tarot/spreads/karta-dnya')
+    expect((wrapper.get('button.glow-button').element as HTMLButtonElement).disabled).toBe(true)
   })
 })

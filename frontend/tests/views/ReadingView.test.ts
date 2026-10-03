@@ -51,8 +51,15 @@ function buildReading(cardCount: number): Reading {
   }
 }
 
-async function mountReading() {
+async function mountReading(pending: Parameters<ReturnType<typeof useReadingStore>['setPending']>[0] | null = {
+  spreadType: SpreadType.SingleCard,
+  question: 'Question?',
+  questionWarningAcknowledged: false,
+  saveToHistory: false,
+  validated: true,
+}) {
   setActivePinia(createPinia())
+  if (pending) useReadingStore().setPending(pending)
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -72,11 +79,8 @@ describe('ReadingView', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     localStorage.clear()
+    localStorage.setItem('fv_token', 'test-token')
     sessionStorage.clear()
-    sessionStorage.setItem('fv_pending', JSON.stringify({
-      spreadType: SpreadType.SingleCard,
-      question: 'Question?',
-    }))
     createStreamMock.mockReset()
   })
 
@@ -102,37 +106,49 @@ describe('ReadingView', () => {
     expect(router.currentRoute.value.name).toBe('result')
   })
 
-  it('returns to home with a stored error when reading creation fails before cards arrive', async () => {
+  it('returns to home with an in-memory content-free error when reading creation fails before cards arrive', async () => {
     createStreamMock.mockRejectedValue(Object.assign(new Error('AI-провайдер не настроен.'), {
       response: { data: { message: 'AI-провайдер не настроен.' } },
     }))
 
-    const { router } = await mountReading()
+    const { router, store } = await mountReading()
 
     await flushPromises()
     await vi.runAllTimersAsync()
     await flushPromises()
 
     expect(router.currentRoute.value.name).toBe('home')
-    expect(sessionStorage.getItem('fv_reading_error')).toContain('AI-провайдер не настроен.')
+    expect(store.workflowIssue?.message).toContain('AI-провайдер не настроен.')
+    expect(sessionStorage.length).toBe(0)
   })
 
-  it('passes acknowledged question warning to the streaming API', async () => {
-    sessionStorage.setItem('fv_pending', JSON.stringify({
+  it('passes history choice to the streaming API and consumes raw pending state', async () => {
+    const pending = {
       spreadType: SpreadType.SingleCard,
       question: 'Question?',
-      questionWarningAcknowledged: true,
-    }))
+      questionWarningAcknowledged: false,
+      saveToHistory: true,
+      validated: true,
+    }
     createStreamMock.mockImplementation(async (_spreadType, _question, _deckType, handlers) => {
       handlers.onCards(buildReading(1))
       handlers.onDone()
     })
 
-    await mountReading()
+    const { store } = await mountReading(pending)
     await flushPromises()
 
     expect(createStreamMock).toHaveBeenCalled()
-    expect(createStreamMock.mock.calls[0][5]).toBe(true)
+    expect(createStreamMock.mock.calls[0][6]).toBe(true)
+    expect(store.pending).toBeNull()
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('does not start an unvalidated or missing pending request', async () => {
+    const { router } = await mountReading(null)
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('home')
+    expect(createStreamMock).not.toHaveBeenCalled()
   })
 
   it('uses a fixed viewport board without document-height layout shifts', async () => {

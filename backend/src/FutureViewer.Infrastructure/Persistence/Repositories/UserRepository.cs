@@ -19,12 +19,6 @@ public sealed class UserRepository : IUserRepository
     public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
 
-    public Task<User?> GetByLinkTokenAsync(string token, CancellationToken ct = default) =>
-        _db.Users.FirstOrDefaultAsync(u => u.TelegramLinkToken == token, ct);
-
-    public Task<User?> GetByTelegramChatIdAsync(long chatId, CancellationToken ct = default) =>
-        _db.Users.FirstOrDefaultAsync(u => u.TelegramChatId == chatId, ct);
-
     public Task<User?> GetByEmailVerificationTokenAsync(string token, CancellationToken ct = default) =>
         _db.Users.FirstOrDefaultAsync(u => u.EmailVerificationToken == token, ct);
 

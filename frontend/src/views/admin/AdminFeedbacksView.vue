@@ -38,9 +38,6 @@ function prevPage(): void {
   store.loadFeedbacks()
 }
 
-async function runNotifications(): Promise<void> {
-  await store.runNotifications()
-}
 </script>
 
 <template>
@@ -72,9 +69,6 @@ async function runNotifications(): Promise<void> {
         </select>
       </label>
       <div class="admin-actions ml-auto flex gap-2">
-        <button class="admin-btn" data-testid="admin-feedback-run-notifications" @click="runNotifications">
-          Запустить рассылку
-        </button>
         <button
           class="admin-btn primary"
           data-testid="admin-feedback-create"

@@ -1,10 +1,12 @@
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FutureViewer.DomainServices.Interfaces;
+using FutureViewer.Infrastructure.Compliance;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -22,7 +24,11 @@ public sealed class YukassaClient : IPaymentProvider
     private readonly YukassaOptions _options;
     private readonly ILogger<YukassaClient> _logger;
 
-    public YukassaClient(HttpClient http, IOptions<YukassaOptions> options, ILogger<YukassaClient> logger)
+    public YukassaClient(
+        HttpClient http,
+        IOptions<YukassaOptions> options,
+        ILogger<YukassaClient> logger,
+        IProcessorRegistryGuard? registry = null)
     {
         _http = http;
         _options = options.Value;
@@ -38,13 +44,42 @@ public sealed class YukassaClient : IPaymentProvider
         }
     }
 
+    public string ProviderName => "YooKassa";
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.ShopId)
+        && !string.IsNullOrWhiteSpace(_options.SecretKey)
+        && PaymentEndpointSafety.IsYukassaApi(_options.ApiBaseUrl)
+        && _options.MonthlyPriceAmount > 0 && decimal.Round(_options.MonthlyPriceAmount, 2) == _options.MonthlyPriceAmount
+        && string.Equals(_options.Currency, "RUB", StringComparison.OrdinalIgnoreCase);
+
+    public PaymentProductDescriptor Product => new()
+    {
+        TariffCode = "pro-30d",
+        Amount = _options.MonthlyPriceAmount,
+        Currency = _options.Currency,
+        AccessDays = 30
+    };
+
+    public bool IsWebhookSourceAllowed(string? sourceAddress)
+    {
+        if (!IPAddress.TryParse(sourceAddress, out var address)) return false;
+        if (address.IsIPv4MappedToIPv6) address = address.MapToIPv4();
+        return IsInCidr(address, "185.71.76.0", 27)
+               || IsInCidr(address, "185.71.77.0", 27)
+               || IsInCidr(address, "77.75.153.0", 25)
+               || address.Equals(IPAddress.Parse("77.75.156.11"))
+               || address.Equals(IPAddress.Parse("77.75.156.35"))
+               || IsInCidr(address, "77.75.154.128", 25)
+               || IsInCidr(address, "2a02:5180::", 32);
+    }
+
     public async Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
-        Guid userId,
-        string userEmail,
+        Guid publicOrderId,
+        string idempotencyKey,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(_options.ShopId) || string.IsNullOrWhiteSpace(_options.SecretKey))
             throw new InvalidOperationException("Yukassa credentials are not configured");
+        PaymentEndpointSafety.EnsureYukassaApi(_options.ApiBaseUrl);
 
         var request = new CreatePaymentRequest
         {
@@ -59,11 +94,11 @@ public sealed class YukassaClient : IPaymentProvider
                 Type = "redirect",
                 ReturnUrl = _options.ReturnUrl
             },
-            Description = $"Разовое продление доступа «Вуаль Грядущего» для {userEmail}",
+            Description = "Разовый доступ к сервису «Вуаль Грядущего» на 30 дней без автопродления",
             Metadata = new Dictionary<string, string>
             {
                 ["access_type"] = "manual_renewal",
-                ["user_id"] = userId.ToString()
+                ["order_id"] = publicOrderId.ToString("N")
             }
         };
 
@@ -71,13 +106,12 @@ public sealed class YukassaClient : IPaymentProvider
         {
             Content = JsonContent.Create(request, options: JsonOptions)
         };
-        message.Headers.Add("Idempotence-Key", Guid.NewGuid().ToString());
+        message.Headers.Add("Idempotence-Key", idempotencyKey);
 
         using var response = await _http.SendAsync(message, ct);
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("Yukassa payment creation failed: {Status} {Body}", response.StatusCode, errorBody);
+            _logger.LogError("YooKassa payment creation failed: status={Status}", response.StatusCode);
             throw new InvalidOperationException($"Yukassa payment creation failed: {response.StatusCode}");
         }
 
@@ -100,36 +134,37 @@ public sealed class YukassaClient : IPaymentProvider
         if (string.IsNullOrWhiteSpace(paymentId)) return null;
         if (string.IsNullOrWhiteSpace(_options.ShopId) || string.IsNullOrWhiteSpace(_options.SecretKey))
             throw new InvalidOperationException("Yukassa credentials are not configured");
+        PaymentEndpointSafety.EnsureYukassaApi(_options.ApiBaseUrl);
 
         using var response = await _http.GetAsync($"payments/{Uri.EscapeDataString(paymentId)}", ct);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return null;
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogWarning("Yukassa payment verification failed: {Status} {Body}", response.StatusCode, errorBody);
+            _logger.LogWarning("YooKassa payment verification failed: status={Status}", response.StatusCode);
             return null;
         }
 
         var payment = await response.Content.ReadFromJsonAsync<PaymentDetailResponse>(JsonOptions, ct);
         if (payment is null) return null;
+        if (!string.Equals(payment.Id, paymentId, StringComparison.Ordinal)) return null;
 
         if (payment.Amount is null
-            || !decimal.TryParse(payment.Amount.Value, NumberStyles.Number, CultureInfo.InvariantCulture, out var paidAmount)
-            || paidAmount < _options.MonthlyPriceAmount
-            || !string.Equals(payment.Amount.Currency, _options.Currency, StringComparison.OrdinalIgnoreCase))
+            || !decimal.TryParse(payment.Amount.Value, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var paidAmount)
+            || paidAmount <= 0
+            || !string.Equals(payment.Amount.Currency, "RUB", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning(
-                "Yukassa payment {PaymentId} rejected: amount/currency mismatch (got {Amount} {Currency}, expected {ExpectedAmount} {ExpectedCurrency})",
-                payment.Id, payment.Amount?.Value, payment.Amount?.Currency, _options.MonthlyPriceAmount, _options.Currency);
+                "Yukassa payment {PaymentId} rejected: invalid amount or currency",
+                payment.Id);
             return null;
         }
 
-        Guid? userId = null;
+        Guid? orderId = null;
         if (payment.Metadata is not null
-            && payment.Metadata.TryGetValue("user_id", out var userIdStr)
-            && Guid.TryParse(userIdStr, out var parsed))
+            && payment.Metadata.TryGetValue("order_id", out var orderIdString)
+            && Guid.TryParseExact(orderIdString, "N", out var parsed))
         {
-            userId = parsed;
+            orderId = parsed;
         }
 
         return new PaymentVerification
@@ -137,7 +172,10 @@ public sealed class YukassaClient : IPaymentProvider
             PaymentId = payment.Id,
             Status = payment.Status,
             Paid = payment.Paid,
-            UserId = userId
+            UserId = null,
+            OrderId = orderId,
+            Amount = paidAmount,
+            Currency = payment.Amount.Currency
         };
     }
 
@@ -157,26 +195,46 @@ public sealed class YukassaClient : IPaymentProvider
                 _ => PaymentWebhookEventType.Unknown
             };
 
-            Guid? userId = null;
+            Guid? orderId = null;
             if (envelope.Object.Metadata is not null
-                && envelope.Object.Metadata.TryGetValue("user_id", out var userIdStr)
-                && Guid.TryParse(userIdStr, out var parsed))
+                && envelope.Object.Metadata.TryGetValue("order_id", out var orderIdString)
+                && Guid.TryParseExact(orderIdString, "N", out var parsed))
             {
-                userId = parsed;
+                orderId = parsed;
             }
 
             return new PaymentWebhookEvent
             {
                 Type = type,
                 PaymentId = envelope.Object.Id,
-                UserId = userId
+                UserId = null,
+                OrderId = orderId
             };
         }
-        catch (JsonException ex)
+        catch (JsonException)
         {
-            _logger.LogWarning(ex, "Failed to parse Yukassa webhook body");
+            _logger.LogWarning("Failed to parse YooKassa webhook body; content was not logged");
             return null;
         }
+    }
+
+    private static bool IsInCidr(IPAddress address, string networkText, int prefixLength)
+    {
+        var network = IPAddress.Parse(networkText);
+        var addressBytes = address.GetAddressBytes();
+        var networkBytes = network.GetAddressBytes();
+        if (addressBytes.Length != networkBytes.Length) return false;
+
+        var fullBytes = prefixLength / 8;
+        var remainingBits = prefixLength % 8;
+        for (var i = 0; i < fullBytes; i++)
+        {
+            if (addressBytes[i] != networkBytes[i]) return false;
+        }
+
+        if (remainingBits == 0) return true;
+        var mask = (byte)(0xff << (8 - remainingBits));
+        return (addressBytes[fullBytes] & mask) == (networkBytes[fullBytes] & mask);
     }
 
     private sealed class CreatePaymentRequest

@@ -3,7 +3,6 @@ import type { LeaderboardEntry } from '@/types'
 
 defineProps<{
   entries: LeaderboardEntry[]
-  highlightUserId?: string | null
   emptyText?: string
 }>()
 
@@ -33,8 +32,7 @@ function medal(rank: number): string {
       <tbody>
         <tr
           v-for="entry in entries"
-          :key="entry.userId"
-          :class="{ highlight: highlightUserId && entry.userId === highlightUserId }"
+          :key="entry.entryId"
           data-testid="leaderboard-row"
         >
           <td class="rank-col">
@@ -57,9 +55,8 @@ function medal(rank: number): string {
     <ul class="leaderboard-cards" data-testid="leaderboard-mobile-list">
       <li
         v-for="entry in entries"
-        :key="`mobile-${entry.userId}`"
+        :key="`mobile-${entry.entryId}`"
         class="leaderboard-card"
-        :class="{ highlight: highlightUserId && entry.userId === highlightUserId }"
       >
         <div class="mobile-rank">
           <span class="medal" v-if="medal(entry.rank)">{{ medal(entry.rank) }}</span>

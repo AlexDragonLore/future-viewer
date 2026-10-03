@@ -13,7 +13,12 @@ vi.mock('@/api/readingApi', () => ({
     create: vi.fn(),
     get: vi.fn(),
     history: () => historyMock(),
-    delete: (id: string) => deleteMock(id),
+  },
+}))
+
+vi.mock('@/api/privacyApi', () => ({
+  privacyApi: {
+    deleteReading: (id: string, password: string) => deleteMock(id, password),
   },
 }))
 
@@ -91,15 +96,36 @@ describe('HistoryView', () => {
     expect(wrapper.text()).toContain('Nope')
   })
 
+  it('keeps the history and allows retry after a failed deletion', async () => {
+    historyMock.mockResolvedValue([sample])
+    deleteMock.mockRejectedValue({ response: { data: { message: 'Неверный пароль' } } })
+    const wrapper = await mountHistory()
+    await flushPromises()
+    await wrapper.get('[data-testid="delete-reading"]').trigger('click')
+    await wrapper.get('[data-testid="reading-deletion-password"]').setValue('wrong-password')
+    await wrapper.get('[data-testid="delete-reading-form"]').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Неверный пароль')
+    expect(wrapper.find('a[href="/reading/r1"]').exists()).toBe(true)
+    expect((wrapper.get('[data-testid="reading-deletion-password"]').element as HTMLInputElement).value).toBe('')
+    await wrapper.get('[data-testid="cancel-delete-reading"]').trigger('click')
+    expect(wrapper.find('[data-testid="delete-reading-form"]').exists()).toBe(false)
+  })
+
   it('deletes a reading from the rendered history after confirmation', async () => {
     historyMock.mockResolvedValue([sample])
     const wrapper = await mountHistory()
     await flushPromises()
 
     await wrapper.find('[data-testid="delete-reading"]').trigger('click')
+    expect(deleteMock).not.toHaveBeenCalled()
+    const password = wrapper.get('[data-testid="reading-deletion-password"]')
+    expect(password.attributes('type')).toBe('password')
+    await password.setValue('current-password')
+    await wrapper.get('[data-testid="delete-reading-form"]').trigger('submit')
     await flushPromises()
 
-    expect(deleteMock).toHaveBeenCalledWith('r1')
+    expect(deleteMock).toHaveBeenCalledWith('r1', 'current-password')
     expect(wrapper.text()).toContain('Пока что пусто')
   })
 })

@@ -6,12 +6,26 @@ export interface PaymentCreation {
   status: string
 }
 
+export interface PaymentOfferAcceptance {
+  offerAccepted: boolean
+  offerVersion: string
+}
+
+export interface PaymentStatus {
+  status: string
+  paid: boolean
+}
+
 export const paymentApi = {
-  async createAccessPayment(): Promise<PaymentCreation> {
-    const { data } = await httpClient.post<PaymentCreation>('/api/payments/subscribe')
+  async status(paymentId: string): Promise<PaymentStatus> {
+    const { data } = await httpClient.get<PaymentStatus>(`/api/payments/${encodeURIComponent(paymentId)}/status`)
     return data
   },
-  async subscribe(): Promise<PaymentCreation> {
-    return paymentApi.createAccessPayment()
+  async createAccessPayment(acceptance: PaymentOfferAcceptance): Promise<PaymentCreation> {
+    const { data } = await httpClient.post<PaymentCreation>('/api/payments/subscribe', acceptance)
+    return data
+  },
+  async subscribe(acceptance: PaymentOfferAcceptance): Promise<PaymentCreation> {
+    return paymentApi.createAccessPayment(acceptance)
   },
 }

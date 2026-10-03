@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { extractApiError } from '@/api/httpClient'
+import { extractOneTimeToken } from '@/utils/oneTimeToken'
+import { getGuestContinuation } from '@/utils/guestReading'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,7 +14,8 @@ const status = ref<'pending' | 'ok' | 'error'>('pending')
 const message = ref<string | null>(null)
 
 onMounted(async () => {
-  const token = route.query.token as string | undefined
+  const token = extractOneTimeToken(route.hash, route.query.token)
+  if (token) window.history.replaceState(null, '', route.path)
   if (!token) {
     status.value = 'error'
     message.value = 'Ссылка недействительна.'
@@ -22,7 +25,7 @@ onMounted(async () => {
     await auth.verifyEmail(token)
     status.value = 'ok'
     message.value = 'Email подтверждён. Перенаправляем вас…'
-    setTimeout(() => router.replace('/'), 1200)
+    setTimeout(() => router.replace(getGuestContinuation() ? '/result' : '/'), 1200)
   } catch (e) {
     status.value = 'error'
     message.value = extractApiError(e)

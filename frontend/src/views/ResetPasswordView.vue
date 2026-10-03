@@ -1,18 +1,25 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { extractApiError } from '@/api/httpClient'
+import { extractOneTimeToken } from '@/utils/oneTimeToken'
+import { getGuestContinuation } from '@/utils/guestReading'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
-const token = computed(() => (route.query.token as string | undefined) ?? '')
+const token = ref('')
 const password = ref('')
 const confirm = ref('')
 const busy = ref(false)
 const error = ref<string | null>(null)
+
+onMounted(() => {
+  token.value = extractOneTimeToken(route.hash, route.query.token)
+  if (token.value) window.history.replaceState(null, '', route.path)
+})
 
 async function submit() {
   if (!token.value) {
@@ -27,7 +34,7 @@ async function submit() {
   error.value = null
   try {
     await auth.resetPassword(token.value, password.value)
-    router.replace('/')
+    router.replace(getGuestContinuation() ? '/result' : '/')
   } catch (e) {
     error.value = extractApiError(e)
   } finally {

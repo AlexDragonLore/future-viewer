@@ -9,6 +9,7 @@ public interface IReadingRepository
     Task<IReadOnlyList<Reading>> GetHistoryAsync(Guid userId, int take = 50, CancellationToken ct = default);
     Task<IReadOnlyList<Reading>> GetByUserAsync(Guid userId, int take, CancellationToken ct = default);
     Task UpdateAsync(Reading reading, CancellationToken ct = default);
+    Task<bool> AttachGuestAsync(Guid id, Guid userId, CancellationToken ct = default);
     Task<int> CountTodayByUserAsync(Guid userId, CancellationToken ct = default);
     Task<int> CountByUserAsync(Guid userId, CancellationToken ct = default);
     Task<int> CountAsync(CancellationToken ct = default);

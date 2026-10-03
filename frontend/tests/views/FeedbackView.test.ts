@@ -84,6 +84,20 @@ describe('FeedbackView', () => {
     expect(wrapper.find('[data-testid="feedback-interpretation"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="feedback-form"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="feedback-result"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ai-disclaimer"]').exists()).toBe(true)
+  })
+
+  it('sanitizes executable HTML in a stored interpretation', async () => {
+    getByTokenMock.mockResolvedValue({
+      ...pendingFeedback(),
+      interpretation: '<img src=x onerror="alert(1)"> [bad](javascript:alert(1))',
+    })
+    const { wrapper } = await mountFeedback('tok-xss')
+    await flushPromises()
+    const rendered = wrapper.get('[data-testid="feedback-interpretation"] .prose-mystic').html()
+    expect(rendered).not.toContain('<img')
+    expect(rendered).not.toContain('onerror')
+    expect(rendered).not.toContain('javascript:')
   })
 
   it('shows result without the form when feedback is already scored', async () => {

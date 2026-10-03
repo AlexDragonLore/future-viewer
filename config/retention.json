@@ -1,0 +1,129 @@
+{
+  "$schema": "./schemas/retention.schema.json",
+  "schema_version": 1,
+  "manual_approved": false,
+  "reviewed_at": null,
+  "policies": [
+    {
+      "policy_id": "account-profile",
+      "data_categories": ["account", "profile"],
+      "trigger": "account_active_or_legal_hold",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "account_deletion_job",
+      "backup_handling": null,
+      "status": "proposed",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "reading-history",
+      "data_categories": ["question", "cards", "ai_interpretation"],
+      "trigger": "history_opt_in_until_user_deletion",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "reading_or_history_deletion",
+      "backup_handling": null,
+      "status": "proposed",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "technical-logs",
+      "data_categories": ["technical_event_metadata"],
+      "trigger": "event_written",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "log_rotation",
+      "backup_handling": "logs_must_not_be_in_database_backups",
+      "status": "proposed",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "backup-rotation",
+      "data_categories": ["encrypted_database_backup"],
+      "trigger": "backup_created",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "approved_backup_rotation_and_deletion_ledger_replay",
+      "backup_handling": null,
+      "status": "blocked",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "legal-evidence",
+      "data_categories": ["consent_evidence", "financial_records", "audit_events"],
+      "trigger": "legal_event_recorded",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "separate_restricted_evidence_store",
+      "backup_handling": null,
+      "status": "blocked",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "authentication-one-time-tokens",
+      "data_categories": ["email_verification_token_hash", "password_reset_token_hash"],
+      "trigger": "token_issued_or_reissued",
+      "retention_period": "technical maximum: verification 24h; password reset 1h; legal approval pending",
+      "legal_basis_reference": null,
+      "deletion_mechanism": "one_time_clear_on_use_reissue_or_account_deletion",
+      "backup_handling": null,
+      "status": "proposed",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "feedback-records",
+      "data_categories": ["feedback_token", "feedback_text", "feedback_score", "notification_status"],
+      "trigger": "feedback_created",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "account_deletion_cascade_or_approved_feedback_cleanup",
+      "backup_handling": null,
+      "status": "blocked",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "privacy-request-ledgers",
+      "data_categories": ["data_subject_request", "data_deletion_job", "deletion_result_reference"],
+      "trigger": "privacy_request_received",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "approved_pseudonymous_legal_evidence_cleanup",
+      "backup_handling": null,
+      "status": "blocked",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "payment-order-records",
+      "data_categories": ["payment_order", "provider_operation_id", "amount_currency_tariff", "npd_receipt_status"],
+      "trigger": "payment_order_created",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "approved_financial_record_retention_and_pseudonymization",
+      "backup_handling": null,
+      "status": "blocked",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "support-mailbox",
+      "data_categories": ["support_email", "claim_or_request_free_text", "attachments"],
+      "trigger": "message_received_by_external_mailbox",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "external_mailbox_procedure_not_selected",
+      "backup_handling": null,
+      "status": "blocked",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "ci-cd-artifacts",
+      "data_categories": ["source", "build_metadata", "security_reports", "deployment_metadata"],
+      "trigger": "ci_workflow_run",
+      "retention_period": null,
+      "legal_basis_reference": null,
+      "deletion_mechanism": "github_retention_settings_not_verified",
+      "backup_handling": "customer_content_and_database_exports_prohibited",
+      "status": "blocked",
+      "manual_approved": false
+    }
+  ]
+}

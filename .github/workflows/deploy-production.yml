@@ -1,51 +1,92 @@
 name: deploy-production
 
 on:
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
 
 concurrency:
   group: deploy-production
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  backend-ci:
+    uses: ./.github/workflows/backend.yml
+
+  frontend-ci:
+    uses: ./.github/workflows/frontend.yml
+
+  release-compliance:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: write
     env:
-      DEPLOY_BRANCH: ${{ github.ref_name }}
+      APP_DOMAIN: alex-taro.ru
+      FV_COMPOSE_PROJECT_NAME: future-viewer
+      FV_SHARED_EDGE_PORT: '18080'
+      FV_ENV_FILE: .env.production.example
+      POSTGRES_PASSWORD: ci-only-not-a-production-secret
+      JWT_SECRET: ci-only-not-a-production-secret-at-least-32-characters
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fail-closed compliance release gate
+        run: node scripts/check-compliance.mjs --scope=release
+
+      - name: Verify legal build facts are generated only from approved registries
+        run: node scripts/export-legal-build-env.mjs >/dev/null
+
+      - name: Validate production Compose model
+        run: docker compose -f docker-compose.prod.yml -f docker-compose.prod.prebuilt.yml -p future-viewer config --quiet
+
+  deploy:
+    needs: [backend-ci, frontend-ci, release-compliance]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://alex-taro.ru
+    permissions:
+      contents: read
+    env:
+      DEPLOY_BRANCH: main
       IMAGE_TAG: ${{ github.sha }}
       PRODUCTION_HOST: ${{ secrets.PRODUCTION_HOST }}
       PRODUCTION_PORT: ${{ vars.PRODUCTION_PORT || '22' }}
-      PRODUCTION_APP_DIR: ${{ vars.PRODUCTION_APP_DIR || '/opt/future-viewer' }}
+      PRODUCTION_APP_DIR: ${{ vars.PRODUCTION_APP_DIR || '/opt/fv-app' }}
       PRODUCTION_DEPLOY_USER: ${{ vars.PRODUCTION_DEPLOY_USER || 'deploy' }}
-      PRODUCTION_ROOT_USER: ${{ vars.PRODUCTION_ROOT_USER || 'root' }}
       PRODUCTION_DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
-      PRODUCTION_ROOT_SSH_KEY: ${{ secrets.PRODUCTION_ROOT_SSH_KEY }}
-      PRODUCTION_HEALTH_URL: ${{ vars.PRODUCTION_HEALTH_URL || 'https://alex-taro.ru/health' }}
-      VITE_API_URL: ${{ vars.VITE_API_URL || '' }}
-      VITE_SITE_URL: ${{ vars.VITE_SITE_URL || 'https://alex-taro.ru' }}
+      PRODUCTION_KNOWN_HOSTS: ${{ secrets.PRODUCTION_KNOWN_HOSTS }}
+      PRODUCTION_HEALTH_URL: https://alex-taro.ru/health
+      OTHER_COMPOSE_PROJECT_NAME: ${{ vars.OTHER_COMPOSE_PROJECT_NAME || 'janetka' }}
+      APP_DOMAIN: alex-taro.ru
+      FV_COMPOSE_PROJECT_NAME: future-viewer
+      FV_SHARED_EDGE_PORT: ${{ vars.FV_SHARED_EDGE_PORT || '18080' }}
+      PRIVACY_EXPORT_ENABLED: ${{ vars.PRIVACY_EXPORT_ENABLED || 'true' }}
+      AI_ENABLED: ${{ vars.AI_ENABLED || 'true' }}
+      AI_PROVIDER: ${{ vars.AI_PROVIDER || '' }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_MODEL: ${{ vars.OPENAI_MODEL || '' }}
+      OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL || '' }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+      DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL || '' }}
+      DEEPSEEK_BASE_URL: ${{ vars.DEEPSEEK_BASE_URL || '' }}
+      SUPPORT_EMAIL: ${{ vars.SUPPORT_EMAIL || '' }}
+      EMAIL_TRANSPORT: ${{ vars.EMAIL_TRANSPORT || '' }}
+      EMAIL_HOST: ${{ vars.EMAIL_HOST || '' }}
+      EMAIL_PORT: ${{ vars.EMAIL_PORT || '587' }}
+      EMAIL_USERNAME: ${{ vars.EMAIL_USERNAME || '' }}
+      EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM || '' }}
+      EMAIL_USE_SSL: 'true'
       VITE_GOOGLE_SITE_VERIFICATION: ${{ vars.VITE_GOOGLE_SITE_VERIFICATION || '' }}
       VITE_YANDEX_VERIFICATION: ${{ vars.VITE_YANDEX_VERIFICATION || '' }}
       VITE_YANDEX_METRICA_ID: ${{ vars.VITE_YANDEX_METRICA_ID || '' }}
-      VITE_GOOGLE_ANALYTICS_ID: ${{ vars.VITE_GOOGLE_ANALYTICS_ID || '' }}
-      VITE_MERCHANT_SERVICE_NAME: ${{ vars.VITE_MERCHANT_SERVICE_NAME || 'Future Viewer' }}
-      VITE_MERCHANT_OWNER_NAME: ${{ vars.VITE_MERCHANT_OWNER_NAME || 'Дунецев Александр Дмитриевич' }}
-      VITE_MERCHANT_TAX_STATUS: ${{ vars.VITE_MERCHANT_TAX_STATUS || 'самозанятый, плательщик налога на профессиональный доход' }}
-      VITE_MERCHANT_INN: ${{ vars.VITE_MERCHANT_INN || '592108465422' }}
-      VITE_MERCHANT_PHONE: ${{ vars.VITE_MERCHANT_PHONE || '79967669613' }}
-      VITE_MERCHANT_EMAIL: ${{ vars.VITE_MERCHANT_EMAIL || 'duntsev010@mail.ru' }}
-      VITE_MERCHANT_POSTAL_ADDRESS: ${{ vars.VITE_MERCHANT_POSTAL_ADDRESS || 'duntsev010@mail.ru' }}
-      VITE_PAID_PRODUCT_TITLE: ${{ vars.VITE_PAID_PRODUCT_TITLE || 'Доступ Future Viewer Pro' }}
-      VITE_PAID_PRODUCT_PRICE: ${{ vars.VITE_PAID_PRODUCT_PRICE || '300 ₽' }}
-      VITE_PAID_PRODUCT_PERIOD: ${{ vars.VITE_PAID_PRODUCT_PERIOD || '30 дней' }}
-      VITE_PAID_PRODUCT_DESCRIPTION: ${{ vars.VITE_PAID_PRODUCT_DESCRIPTION || 'Цифровая услуга доступа к безлимитным Таро-раскладам в онлайн-сервисе Future Viewer без автопродления.' }}
-      PAYMENT_PROVIDER: ${{ vars.PAYMENT_PROVIDER || 'Yukassa' }}
+      PAYMENT_ENABLED: ${{ vars.PAYMENT_ENABLED || 'true' }}
+      PAYMENT_WEBHOOK_ENABLED: ${{ vars.PAYMENT_WEBHOOK_ENABLED || 'true' }}
+      PAYMENT_PROVIDER: ${{ vars.PAYMENT_PROVIDER || '' }}
       YUKASSA_SHOP_ID: ${{ secrets.YUKASSA_SHOP_ID }}
       YUKASSA_SECRET_KEY: ${{ secrets.YUKASSA_SECRET_KEY }}
       YUKASSA_CURRENCY: ${{ vars.YUKASSA_CURRENCY || 'RUB' }}
@@ -60,146 +101,203 @@ jobs:
       YOOMONEY_MONTHLY_PRICE_AMOUNT: ${{ vars.YOOMONEY_MONTHLY_PRICE_AMOUNT || '300' }}
       YOOMONEY_TARGETS: ${{ vars.YOOMONEY_TARGETS || 'Доступ Future Viewer Pro' }}
     steps:
-      - name: Check deploy configuration
-        id: config
+      - uses: actions/checkout@v4
+
+      - name: Validate deployment configuration
         run: |
           set -Eeuo pipefail
-          missing=0
-          if [ -z "$PRODUCTION_HOST" ]; then echo "::warning::PRODUCTION_HOST secret is required"; missing=1; fi
-          if [ -z "$PRODUCTION_DEPLOY_SSH_KEY" ]; then echo "::warning::PRODUCTION_DEPLOY_SSH_KEY secret is required"; missing=1; fi
-          if [ -z "$PRODUCTION_ROOT_SSH_KEY" ]; then echo "::warning::PRODUCTION_ROOT_SSH_KEY secret is required"; missing=1; fi
-          if [ -z "$DEPLOY_BRANCH" ]; then echo "::warning::DEPLOY_BRANCH is empty"; missing=1; fi
-
-          if [ "$missing" -eq 1 ]; then
-            echo "deploy_ready=false" >> "$GITHUB_OUTPUT"
-            echo "Production deploy skipped because required SSH configuration is missing."
-          else
-            echo "deploy_ready=true" >> "$GITHUB_OUTPUT"
+          for required_name in \
+            PRODUCTION_HOST \
+            PRODUCTION_DEPLOY_SSH_KEY \
+            PRODUCTION_KNOWN_HOSTS \
+            PRODUCTION_APP_DIR \
+            PRODUCTION_DEPLOY_USER; do
+            if [ -z "${!required_name:-}" ]; then
+              echo "::error::$required_name is required"
+              exit 1
+            fi
+          done
+          [ "$PRODUCTION_APP_DIR" = "/opt/fv-app" ] || {
+            echo "::error::PRODUCTION_APP_DIR must be the dedicated /opt/fv-app directory"
+            exit 1
+          }
+          [ "$PAYMENT_ENABLED" = "true" ] || [ "$PAYMENT_ENABLED" = "false" ] || {
+            echo "::error::PAYMENT_ENABLED must be true or false"
+            exit 1
+          }
+          [ "$PAYMENT_WEBHOOK_ENABLED" = "true" ] || [ "$PAYMENT_WEBHOOK_ENABLED" = "false" ] || {
+            echo "::error::PAYMENT_WEBHOOK_ENABLED must be true or false"
+            exit 1
+          }
+          if [ "$PAYMENT_ENABLED" = "true" ]; then
+            [ "$PAYMENT_WEBHOOK_ENABLED" = "true" ] || {
+              echo "::error::PAYMENT_WEBHOOK_ENABLED must be true when payments are enabled"
+              exit 1
+            }
+            case "${PAYMENT_PROVIDER:-Yukassa}" in
+              Yukassa|yukassa|YooKassa|yookassa)
+                # Empty GitHub secrets preserve the existing server credentials.
+                # The merged server env is checked before replacing configuration.
+                ;;
+              YooMoney|yoomoney)
+                # Credentials are validated after merging with the server env.
+                ;;
+              *)
+                echo "::error::Unknown PAYMENT_PROVIDER"
+                exit 1
+                ;;
+            esac
           fi
 
-      - uses: actions/checkout@v4
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Export approved legal facts
+        run: node scripts/export-legal-build-env.mjs >> "$GITHUB_ENV"
+
+      - name: Validate runtime switches and validation script
+        run: |
+          set -Eeuo pipefail
+          [ "$AI_ENABLED" = "true" ] || [ "$AI_ENABLED" = "false" ] || {
+            echo "::error::AI_ENABLED must be true or false"
+            exit 1
+          }
+          [ "$EMAIL_USE_SSL" = "true" ] || {
+            echo "::error::EMAIL_USE_SSL must remain true in production"
+            exit 1
+          }
+
+      - name: Check runtime validator syntax
+        run: bash -n deploy/validate-runtime-env.sh
 
       - name: Build backend image
-        if: steps.config.outputs.deploy_ready == 'true'
-        run: |
-          set -Eeuo pipefail
-          docker build \
-            --tag "future-viewer-backend:$IMAGE_TAG" \
-            ./backend
+        run: docker build --tag "future-viewer-backend:$IMAGE_TAG" ./backend
 
       - name: Build frontend image
-        if: steps.config.outputs.deploy_ready == 'true'
         run: |
-          set -Eeuo pipefail
           docker build \
-            --build-arg "VITE_API_URL=$VITE_API_URL" \
-            --build-arg "VITE_SITE_URL=$VITE_SITE_URL" \
+            --build-arg VITE_API_URL= \
+            --build-arg VITE_SITE_URL=https://alex-taro.ru \
             --build-arg "VITE_GOOGLE_SITE_VERIFICATION=$VITE_GOOGLE_SITE_VERIFICATION" \
             --build-arg "VITE_YANDEX_VERIFICATION=$VITE_YANDEX_VERIFICATION" \
             --build-arg "VITE_YANDEX_METRICA_ID=$VITE_YANDEX_METRICA_ID" \
-            --build-arg "VITE_GOOGLE_ANALYTICS_ID=$VITE_GOOGLE_ANALYTICS_ID" \
-            --build-arg "VITE_MERCHANT_SERVICE_NAME=$VITE_MERCHANT_SERVICE_NAME" \
-            --build-arg "VITE_MERCHANT_OWNER_NAME=$VITE_MERCHANT_OWNER_NAME" \
-            --build-arg "VITE_MERCHANT_TAX_STATUS=$VITE_MERCHANT_TAX_STATUS" \
-            --build-arg "VITE_MERCHANT_INN=$VITE_MERCHANT_INN" \
-            --build-arg "VITE_MERCHANT_PHONE=$VITE_MERCHANT_PHONE" \
-            --build-arg "VITE_MERCHANT_EMAIL=$VITE_MERCHANT_EMAIL" \
-            --build-arg "VITE_MERCHANT_POSTAL_ADDRESS=$VITE_MERCHANT_POSTAL_ADDRESS" \
-            --build-arg "VITE_PAID_PRODUCT_TITLE=$VITE_PAID_PRODUCT_TITLE" \
-            --build-arg "VITE_PAID_PRODUCT_PRICE=$VITE_PAID_PRODUCT_PRICE" \
-            --build-arg "VITE_PAID_PRODUCT_PERIOD=$VITE_PAID_PRODUCT_PERIOD" \
-            --build-arg "VITE_PAID_PRODUCT_DESCRIPTION=$VITE_PAID_PRODUCT_DESCRIPTION" \
+            --build-arg "VITE_MERCHANT_SERVICE_NAME=${VITE_MERCHANT_SERVICE_NAME:-}" \
+            --build-arg "VITE_MERCHANT_OWNER_NAME=${VITE_MERCHANT_OWNER_NAME:-}" \
+            --build-arg "VITE_MERCHANT_TAX_STATUS=${VITE_MERCHANT_TAX_STATUS:-}" \
+            --build-arg "VITE_MERCHANT_INN=${VITE_MERCHANT_INN:-}" \
+            --build-arg "VITE_MERCHANT_EMAIL=${VITE_MERCHANT_EMAIL:-}" \
+            --build-arg "VITE_MERCHANT_POSTAL_ADDRESS=${VITE_MERCHANT_POSTAL_ADDRESS:-}" \
+            --build-arg "VITE_PAID_PRODUCT_TITLE=${VITE_PAID_PRODUCT_TITLE:-}" \
+            --build-arg "VITE_PAID_PRODUCT_PRICE=${VITE_PAID_PRODUCT_PRICE:-}" \
+            --build-arg "VITE_PAID_PRODUCT_PERIOD=${VITE_PAID_PRODUCT_PERIOD:-}" \
+            --build-arg "VITE_PAID_PRODUCT_DESCRIPTION=${VITE_PAID_PRODUCT_DESCRIPTION:-}" \
+            --build-arg "VITE_NPD_RECEIPT_PROCESS_VERIFIED=${VITE_NPD_RECEIPT_PROCESS_VERIFIED:-false}" \
+            --build-arg "VITE_NPD_RECEIPT_PROCEDURE=${VITE_NPD_RECEIPT_PROCEDURE:-}" \
+            --build-arg "VITE_SUPPORT_RESPONSE_TERM=${VITE_SUPPORT_RESPONSE_TERM:-}" \
+            --build-arg "VITE_REFUND_METHOD=${VITE_REFUND_METHOD:-}" \
+            --build-arg "VITE_CLAIM_REVIEW_PROCEDURE=${VITE_CLAIM_REVIEW_PROCEDURE:-}" \
+            --build-arg "VITE_LEGAL_OPERATOR_VERIFIED=${VITE_LEGAL_OPERATOR_VERIFIED:-false}" \
+            --build-arg "VITE_LEGAL_PROCESSORS_VERIFIED=${VITE_LEGAL_PROCESSORS_VERIFIED:-false}" \
+            --build-arg "VITE_LEGAL_PROCESSORS_JSON=${VITE_LEGAL_PROCESSORS_JSON:-}" \
+            --build-arg "VITE_LEGAL_EFFECTIVE_AT=${VITE_LEGAL_EFFECTIVE_AT:-}" \
+            --build-arg "VITE_LEGAL_OFFER_VERSION=${VITE_LEGAL_OFFER_VERSION:-}" \
+            --build-arg "VITE_LEGAL_PRIVACY_VERSION=${VITE_LEGAL_PRIVACY_VERSION:-}" \
+            --build-arg "VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION=${VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION:-}" \
+            --build-arg "VITE_LEGAL_MARKETING_CONSENT_VERSION=${VITE_LEGAL_MARKETING_CONSENT_VERSION:-}" \
+            --build-arg "VITE_LEGAL_COOKIES_VERSION=${VITE_LEGAL_COOKIES_VERSION:-}" \
+            --build-arg "VITE_LEGAL_AI_DISCLAIMER_VERSION=${VITE_LEGAL_AI_DISCLAIMER_VERSION:-}" \
+            --build-arg "VITE_LEGAL_DATA_REQUEST_VERSION=${VITE_LEGAL_DATA_REQUEST_VERSION:-}" \
+            --build-arg "VITE_LEGAL_PROCESSORS_VERSION=${VITE_LEGAL_PROCESSORS_VERSION:-}" \
+            --build-arg "VITE_LEGAL_READING_RETENTION=${VITE_LEGAL_READING_RETENTION:-}" \
+            --build-arg "VITE_LEGAL_ACCOUNT_RETENTION=${VITE_LEGAL_ACCOUNT_RETENTION:-}" \
+            --build-arg "VITE_LEGAL_CONSENT_RETENTION=${VITE_LEGAL_CONSENT_RETENTION:-}" \
+            --build-arg "VITE_LEGAL_LOG_RETENTION=${VITE_LEGAL_LOG_RETENTION:-}" \
+            --build-arg "VITE_LEGAL_BACKUP_RETENTION=${VITE_LEGAL_BACKUP_RETENTION:-}" \
             --target prod \
             --tag "future-viewer-frontend:$IMAGE_TAG" \
             ./frontend
 
-      - name: Pack images
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Pack deployment images
         run: |
           set -Eeuo pipefail
           docker save "future-viewer-backend:$IMAGE_TAG" "future-viewer-frontend:$IMAGE_TAG" \
-            | gzip -1 > /tmp/future-viewer-images.tar.gz
+            | gzip -1 > "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
 
-      - name: Configure SSH
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Configure pinned SSH trust
         run: |
           set -Eeuo pipefail
           install -m 700 -d ~/.ssh
           printf '%s\n' "$PRODUCTION_DEPLOY_SSH_KEY" > ~/.ssh/future_viewer_deploy
-          printf '%s\n' "$PRODUCTION_ROOT_SSH_KEY" > ~/.ssh/future_viewer_root
-          chmod 600 ~/.ssh/future_viewer_deploy ~/.ssh/future_viewer_root
-          ssh-keyscan -p "$PRODUCTION_PORT" "$PRODUCTION_HOST" >> ~/.ssh/known_hosts
+          printf '%s\n' "$PRODUCTION_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/future_viewer_deploy ~/.ssh/known_hosts
 
-      - name: Prepare server Docker storage
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Capture production rollback state
+        id: capture
         run: |
           set -Eeuo pipefail
-          ssh \
-            -i ~/.ssh/future_viewer_root \
-            -p "$PRODUCTION_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
-            "bash -s" <<'REMOTE'
-          set -Eeuo pipefail
-          rm -f /tmp/future-viewer-images-*.tar.gz
-          docker system prune -af
-          df -h /
-          REMOTE
-
-      - name: Update server repository
-        if: steps.config.outputs.deploy_ready == 'true'
-        run: |
-          set -Eeuo pipefail
-          ssh \
-            -i ~/.ssh/future_viewer_deploy \
-            -p "$PRODUCTION_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
+          ssh -i ~/.ssh/future_viewer_deploy -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
             "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST" \
-            "DEPLOY_BRANCH='$DEPLOY_BRANCH' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
+            "IMAGE_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$APP_DIR"
-          git fetch origin "$DEPLOY_BRANCH:refs/remotes/origin/$DEPLOY_BRANCH"
+          env_file="/opt/fv-app/.env.production"
+          state_dir="$APP_DIR/deployments"
+          install -d -m 700 "$state_dir"
+          [ -f "$env_file" ] || { echo "$env_file is missing" >&2; exit 1; }
+          [ "$(stat -c '%a' "$env_file")" = "600" ] || { echo "$env_file must have mode 600" >&2; exit 1; }
 
-          current_branch="$(git rev-parse --abbrev-ref HEAD)"
-          if [ "$current_branch" != "$DEPLOY_BRANCH" ]; then
-            git switch "$DEPLOY_BRANCH" 2>/dev/null || git switch -c "$DEPLOY_BRANCH" "origin/$DEPLOY_BRANCH"
+          previous_revision="$(git rev-parse HEAD)"
+          git cat-file -e "$previous_revision^{commit}"
+          printf '%s\n' "$previous_revision" > "$state_dir/previous-revision-$IMAGE_TAG"
+
+          backend_id="$(docker compose --env-file "$env_file" -f docker-compose.prod.yml -f docker-compose.prod.prebuilt.yml -p future-viewer ps -q backend 2>/dev/null || true)"
+          frontend_id="$(docker compose --env-file "$env_file" -f docker-compose.prod.yml -f docker-compose.prod.prebuilt.yml -p future-viewer ps -q frontend 2>/dev/null || true)"
+          previous_tag=""
+          if [ -n "$backend_id" ] && [ -n "$frontend_id" ]; then
+            backend_image="$(docker inspect --format '{{.Config.Image}}' "$backend_id")"
+            frontend_image="$(docker inspect --format '{{.Config.Image}}' "$frontend_id")"
+            backend_tag="${backend_image##*:}"
+            frontend_tag="${frontend_image##*:}"
+            if [ "$backend_tag" = "$frontend_tag" ] && [ "$backend_tag" != "$backend_image" ]; then
+              previous_tag="$backend_tag"
+            fi
           fi
-
-          git merge --ff-only "origin/$DEPLOY_BRANCH"
+          printf '%s\n' "$previous_tag" > "$state_dir/previous-tag-$IMAGE_TAG"
+          cp "$env_file" "$state_dir/env-before-$IMAGE_TAG"
+          chmod 600 \
+            "$state_dir/previous-revision-$IMAGE_TAG" \
+            "$state_dir/previous-tag-$IMAGE_TAG" \
+            "$state_dir/env-before-$IMAGE_TAG"
           REMOTE
 
-      - name: Upload images to server
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Update exact production revision
         run: |
           set -Eeuo pipefail
-          scp \
-            -i ~/.ssh/future_viewer_root \
-            -P "$PRODUCTION_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            /tmp/future-viewer-images.tar.gz \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST:/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+          ssh -i ~/.ssh/future_viewer_deploy -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST" \
+            "DEPLOY_BRANCH='$DEPLOY_BRANCH' IMAGE_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$APP_DIR"
+          git fetch origin "$DEPLOY_BRANCH"
+          remote_sha="$(git rev-parse FETCH_HEAD)"
+          [ "$remote_sha" = "$IMAGE_TAG" ] || {
+            echo "Remote branch advanced or does not match the reviewed deployment SHA" >&2
+            exit 1
+          }
+          git switch "$DEPLOY_BRANCH"
+          git merge --ff-only "$IMAGE_TAG"
+          REMOTE
 
-      - name: Upload production env overrides
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Upload images and validated production configuration overlay
         run: |
           set -Eeuo pipefail
-          if { [ -z "$YUKASSA_SHOP_ID" ] && [ -n "$YUKASSA_SECRET_KEY" ]; } || { [ -n "$YUKASSA_SHOP_ID" ] && [ -z "$YUKASSA_SECRET_KEY" ]; }; then
-            echo "::warning::Set both YUKASSA_SHOP_ID and YUKASSA_SECRET_KEY secrets for production payments."
-          fi
-          case "$PAYMENT_PROVIDER" in
-            YooMoney|yoomoney)
-              if [ -z "$YOOMONEY_RECEIVER" ] || [ -z "$YOOMONEY_NOTIFICATION_SECRET" ]; then
-                echo "::warning::Set YOOMONEY_RECEIVER and YOOMONEY_NOTIFICATION_SECRET secrets when PAYMENT_PROVIDER=YooMoney."
-              fi
-              ;;
-          esac
+          scp -i ~/.ssh/future_viewer_deploy -P "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz" \
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST:/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
 
           umask 077
           overlay="$(mktemp)"
+          trap 'rm -f "$overlay"' EXIT
           quote_env_value() {
             local value="$1"
             value="${value//\\/\\\\}"
@@ -209,138 +307,212 @@ jobs:
             printf '"%s"' "$value"
           }
           write_overlay_line() {
+            # Empty optional vars/secrets must not erase working server values.
+            [ -n "$2" ] || return 0
             printf '%s=%s\n' "$1" "$(quote_env_value "$2")"
           }
           {
+            write_overlay_line APP_DOMAIN "$APP_DOMAIN"
+            write_overlay_line FV_COMPOSE_PROJECT_NAME "$FV_COMPOSE_PROJECT_NAME"
+            write_overlay_line FV_SHARED_EDGE_PORT "$FV_SHARED_EDGE_PORT"
+            write_overlay_line PRIVACY_EXPORT_ENABLED "$PRIVACY_EXPORT_ENABLED"
+            write_overlay_line AI_ENABLED "$AI_ENABLED"
+            write_overlay_line AI_PROVIDER "$AI_PROVIDER"
+            write_overlay_line OPENAI_API_KEY "$OPENAI_API_KEY"
+            write_overlay_line OPENAI_MODEL "$OPENAI_MODEL"
+            write_overlay_line OPENAI_BASE_URL "$OPENAI_BASE_URL"
+            write_overlay_line DEEPSEEK_API_KEY "$DEEPSEEK_API_KEY"
+            write_overlay_line DEEPSEEK_MODEL "$DEEPSEEK_MODEL"
+            write_overlay_line DEEPSEEK_BASE_URL "$DEEPSEEK_BASE_URL"
+            write_overlay_line SUPPORT_EMAIL "$SUPPORT_EMAIL"
+            write_overlay_line EMAIL_TRANSPORT "$EMAIL_TRANSPORT"
+            write_overlay_line EMAIL_HOST "$EMAIL_HOST"
+            write_overlay_line EMAIL_PORT "$EMAIL_PORT"
+            write_overlay_line EMAIL_USERNAME "$EMAIL_USERNAME"
+            write_overlay_line EMAIL_PASSWORD "$EMAIL_PASSWORD"
+            write_overlay_line EMAIL_FROM "$EMAIL_FROM"
+            write_overlay_line EMAIL_USE_SSL "$EMAIL_USE_SSL"
+            write_overlay_line PAYMENT_ENABLED "$PAYMENT_ENABLED"
+            write_overlay_line PAYMENT_WEBHOOK_ENABLED "$PAYMENT_WEBHOOK_ENABLED"
             write_overlay_line PAYMENT_PROVIDER "$PAYMENT_PROVIDER"
-            if [ -n "$YUKASSA_SHOP_ID" ]; then
-              write_overlay_line YUKASSA_SHOP_ID "$YUKASSA_SHOP_ID"
-            fi
-            if [ -n "$YUKASSA_SECRET_KEY" ]; then
-              write_overlay_line YUKASSA_SECRET_KEY "$YUKASSA_SECRET_KEY"
-            fi
+            write_overlay_line YUKASSA_SHOP_ID "$YUKASSA_SHOP_ID"
+            write_overlay_line YUKASSA_SECRET_KEY "$YUKASSA_SECRET_KEY"
             write_overlay_line YUKASSA_CURRENCY "$YUKASSA_CURRENCY"
             write_overlay_line YUKASSA_MONTHLY_PRICE_AMOUNT "$YUKASSA_MONTHLY_PRICE_AMOUNT"
             write_overlay_line YUKASSA_API_BASE_URL "$YUKASSA_API_BASE_URL"
-            if [ -n "$YOOMONEY_RECEIVER" ]; then
-              write_overlay_line YOOMONEY_RECEIVER "$YOOMONEY_RECEIVER"
-            fi
-            if [ -n "$YOOMONEY_NOTIFICATION_SECRET" ]; then
-              write_overlay_line YOOMONEY_NOTIFICATION_SECRET "$YOOMONEY_NOTIFICATION_SECRET"
-            fi
+            write_overlay_line YOOMONEY_RECEIVER "$YOOMONEY_RECEIVER"
+            write_overlay_line YOOMONEY_NOTIFICATION_SECRET "$YOOMONEY_NOTIFICATION_SECRET"
             write_overlay_line YOOMONEY_QUICKPAY_URL "$YOOMONEY_QUICKPAY_URL"
             write_overlay_line YOOMONEY_QUICKPAY_FORM "$YOOMONEY_QUICKPAY_FORM"
             write_overlay_line YOOMONEY_PAYMENT_TYPE "$YOOMONEY_PAYMENT_TYPE"
             write_overlay_line YOOMONEY_CURRENCY_CODE "$YOOMONEY_CURRENCY_CODE"
             write_overlay_line YOOMONEY_MONTHLY_PRICE_AMOUNT "$YOOMONEY_MONTHLY_PRICE_AMOUNT"
             write_overlay_line YOOMONEY_TARGETS "$YOOMONEY_TARGETS"
+            write_overlay_line VITE_MERCHANT_SERVICE_NAME "${VITE_MERCHANT_SERVICE_NAME:-}"
+            write_overlay_line VITE_MERCHANT_OWNER_NAME "${VITE_MERCHANT_OWNER_NAME:-}"
+            write_overlay_line VITE_MERCHANT_TAX_STATUS "${VITE_MERCHANT_TAX_STATUS:-}"
+            write_overlay_line VITE_MERCHANT_INN "${VITE_MERCHANT_INN:-}"
+            write_overlay_line VITE_MERCHANT_EMAIL "${VITE_MERCHANT_EMAIL:-}"
+            write_overlay_line VITE_MERCHANT_POSTAL_ADDRESS "${VITE_MERCHANT_POSTAL_ADDRESS:-}"
+            write_overlay_line VITE_PAID_PRODUCT_TITLE "${VITE_PAID_PRODUCT_TITLE:-}"
+            write_overlay_line VITE_PAID_PRODUCT_PRICE "${VITE_PAID_PRODUCT_PRICE:-}"
+            write_overlay_line VITE_PAID_PRODUCT_PERIOD "${VITE_PAID_PRODUCT_PERIOD:-}"
+            write_overlay_line VITE_PAID_PRODUCT_DESCRIPTION "${VITE_PAID_PRODUCT_DESCRIPTION:-}"
+            write_overlay_line VITE_NPD_RECEIPT_PROCESS_VERIFIED "${VITE_NPD_RECEIPT_PROCESS_VERIFIED:-}"
+            write_overlay_line VITE_NPD_RECEIPT_PROCEDURE "${VITE_NPD_RECEIPT_PROCEDURE:-}"
+            write_overlay_line VITE_SUPPORT_RESPONSE_TERM "${VITE_SUPPORT_RESPONSE_TERM:-}"
+            write_overlay_line VITE_REFUND_METHOD "${VITE_REFUND_METHOD:-}"
+            write_overlay_line VITE_CLAIM_REVIEW_PROCEDURE "${VITE_CLAIM_REVIEW_PROCEDURE:-}"
+            write_overlay_line VITE_LEGAL_OPERATOR_VERIFIED "${VITE_LEGAL_OPERATOR_VERIFIED:-}"
+            write_overlay_line VITE_LEGAL_PROCESSORS_VERIFIED "${VITE_LEGAL_PROCESSORS_VERIFIED:-}"
+            write_overlay_line VITE_LEGAL_PROCESSORS_JSON "${VITE_LEGAL_PROCESSORS_JSON:-}"
+            write_overlay_line VITE_LEGAL_EFFECTIVE_AT "${VITE_LEGAL_EFFECTIVE_AT:-}"
+            write_overlay_line VITE_LEGAL_OFFER_VERSION "${VITE_LEGAL_OFFER_VERSION:-}"
+            write_overlay_line VITE_LEGAL_PRIVACY_VERSION "${VITE_LEGAL_PRIVACY_VERSION:-}"
+            write_overlay_line VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION "${VITE_LEGAL_PERSONAL_DATA_CONSENT_VERSION:-}"
+            write_overlay_line VITE_LEGAL_MARKETING_CONSENT_VERSION "${VITE_LEGAL_MARKETING_CONSENT_VERSION:-}"
+            write_overlay_line VITE_LEGAL_COOKIES_VERSION "${VITE_LEGAL_COOKIES_VERSION:-}"
+            write_overlay_line VITE_LEGAL_AI_DISCLAIMER_VERSION "${VITE_LEGAL_AI_DISCLAIMER_VERSION:-}"
+            write_overlay_line VITE_LEGAL_DATA_REQUEST_VERSION "${VITE_LEGAL_DATA_REQUEST_VERSION:-}"
+            write_overlay_line VITE_LEGAL_PROCESSORS_VERSION "${VITE_LEGAL_PROCESSORS_VERSION:-}"
+            write_overlay_line VITE_LEGAL_READING_RETENTION "${VITE_LEGAL_READING_RETENTION:-}"
+            write_overlay_line VITE_LEGAL_ACCOUNT_RETENTION "${VITE_LEGAL_ACCOUNT_RETENTION:-}"
+            write_overlay_line VITE_LEGAL_CONSENT_RETENTION "${VITE_LEGAL_CONSENT_RETENTION:-}"
+            write_overlay_line VITE_LEGAL_LOG_RETENTION "${VITE_LEGAL_LOG_RETENTION:-}"
+            write_overlay_line VITE_LEGAL_BACKUP_RETENTION "${VITE_LEGAL_BACKUP_RETENTION:-}"
           } > "$overlay"
-
-          scp \
-            -i ~/.ssh/future_viewer_root \
-            -P "$PRODUCTION_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
+          scp -i ~/.ssh/future_viewer_deploy -P "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
             "$overlay" \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST:/tmp/future-viewer-env-overrides-$IMAGE_TAG"
-          rm -f "$overlay"
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST:/tmp/future-viewer-env-overrides-$IMAGE_TAG"
+          ssh -i ~/.ssh/future_viewer_deploy -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST" \
+            "chmod 600 '/tmp/future-viewer-env-overrides-$IMAGE_TAG'"
 
-      - name: Run production deploy
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Deploy project-scoped resources
+        id: deploy
         run: |
           set -Eeuo pipefail
-          ssh \
-            -i ~/.ssh/future_viewer_root \
-            -p "$PRODUCTION_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
+          ssh -i ~/.ssh/future_viewer_deploy -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST" \
             "IMAGE_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
           set -Eeuo pipefail
           cd "$APP_DIR"
           env_file="/opt/fv-app/.env.production"
           override_file="/tmp/future-viewer-env-overrides-$IMAGE_TAG"
-          if [ -s "$override_file" ]; then
-            install -d -m 700 "$(dirname "$env_file")"
-            if [ ! -f "$env_file" ]; then
-              install -m 600 /dev/null "$env_file"
-            fi
+          archive_file="/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+          [ -f "$env_file" ] || { echo "$env_file is missing" >&2; exit 1; }
+          [ "$(stat -c '%a' "$env_file")" = "600" ] || { echo "$env_file must have mode 600" >&2; exit 1; }
 
-            tmp_env="$(mktemp)"
+          if [ -s "$override_file" ]; then
+            temporary_env="$(mktemp)"
             awk -F= '
-              NR == FNR {
-                key = $0
-                sub(/=.*/, "", key)
-                overrides[key] = $0
-                order[++count] = key
-                next
-              }
-              {
-                key = $0
-                sub(/=.*/, "", key)
-                if (key in overrides) {
-                  print overrides[key]
-                  seen[key] = 1
-                  next
-                }
-                print
-              }
-              END {
-                for (i = 1; i <= count; i++) {
-                  key = order[i]
-                  if (!(key in seen)) print overrides[key]
-                }
-              }
-            ' "$override_file" "$env_file" > "$tmp_env"
-            install -m 600 "$tmp_env" "$env_file"
-            rm -f "$tmp_env" "$override_file"
+              NR == FNR { key=$0; sub(/=.*/, "", key); overrides[key]=$0; order[++count]=key; next }
+              { key=$0; sub(/=.*/, "", key); if (key in overrides) { print overrides[key]; seen[key]=1; next } print }
+              END { for (i=1; i<=count; i++) { key=order[i]; if (!(key in seen)) print overrides[key] } }
+            ' "$override_file" "$env_file" > "$temporary_env"
+            if ! bash deploy/validate-runtime-env.sh --env-file "$temporary_env"; then
+              rm -f "$temporary_env"
+              exit 1
+            fi
+            install -m 600 "$temporary_env" "$env_file"
+            rm -f "$temporary_env" "$override_file"
           fi
 
-          docker load -i "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
+          bash deploy/validate-runtime-env.sh --env-file "$env_file"
+
+          docker load -i "$archive_file"
           FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
-            --env-file /opt/fv-app/.env.production \
+            --env-file "$env_file" \
             -f docker-compose.prod.yml \
             -f docker-compose.prod.prebuilt.yml \
             -p future-viewer \
-            config >/dev/null
+            config --quiet
           FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
-            --env-file /opt/fv-app/.env.production \
+            --env-file "$env_file" \
             -f docker-compose.prod.yml \
             -f docker-compose.prod.prebuilt.yml \
             -p future-viewer \
-            pull postgres caddy
-          FV_IMAGE_TAG="$IMAGE_TAG" docker compose \
-            --env-file /opt/fv-app/.env.production \
-            -f docker-compose.prod.yml \
-            -f docker-compose.prod.prebuilt.yml \
-            -p future-viewer \
-            up -d --no-build
-          rm -f "/tmp/future-viewer-images-$IMAGE_TAG.tar.gz"
-          docker image prune -af
+            up -d --no-build --remove-orphans
+          rm -f "$archive_file"
           REMOTE
 
-      - name: Verify production containers
-        if: steps.config.outputs.deploy_ready == 'true'
+      - name: Verify production containers, isolation and health
         run: |
           set -Eeuo pipefail
-          ssh \
-            -i ~/.ssh/future_viewer_root \
-            -p "$PRODUCTION_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            "$PRODUCTION_ROOT_USER@$PRODUCTION_HOST" \
-            "cd '$PRODUCTION_APP_DIR' && FV_IMAGE_TAG='$IMAGE_TAG' docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -f docker-compose.prod.prebuilt.yml -p future-viewer ps"
+          ssh -i ~/.ssh/future_viewer_deploy -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST" \
+            "APP_DIR='$PRODUCTION_APP_DIR' OTHER_PROJECT='$OTHER_COMPOSE_PROJECT_NAME' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$APP_DIR"
+          docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps
+          FV_ENV_FILE=/opt/fv-app/.env.production \
+            FV_COMPOSE_PROJECT_NAME=future-viewer \
+            FV_OTHER_COMPOSE_PROJECT_NAME="$OTHER_PROJECT" \
+            FV_REQUIRE_OTHER_PROJECT=true \
+            ./scripts/check-project-isolation.sh
+          REMOTE
 
-      - name: Verify production health
-        if: steps.config.outputs.deploy_ready == 'true'
-        run: |
-          set -Eeuo pipefail
           for attempt in $(seq 1 20); do
-            if curl -fsS "$PRODUCTION_HEALTH_URL"; then
+            if curl --fail --silent --show-error "$PRODUCTION_HEALTH_URL" >/dev/null; then
+              headers="$(curl --fail --silent --show-error --head https://alex-taro.ru/)"
+              grep -qi '^strict-transport-security:' <<< "$headers"
+              grep -qi '^content-security-policy:' <<< "$headers"
+              grep -qi '^x-content-type-options:[[:space:]]*nosniff' <<< "$headers"
               exit 0
             fi
             echo "Health check failed, retry $attempt/20"
             sleep 5
           done
-          echo "Production health check failed after retries"
+          echo "Production health check failed after retries" >&2
+          exit 1
+
+      - name: Roll back failed deployment
+        if: failure() && steps.capture.outcome == 'success'
+        run: |
+          set -Eeuo pipefail
+          ssh -i ~/.ssh/future_viewer_deploy -p "$PRODUCTION_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            "$PRODUCTION_DEPLOY_USER@$PRODUCTION_HOST" \
+            "FAILED_TAG='$IMAGE_TAG' APP_DIR='$PRODUCTION_APP_DIR' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+          cd "$APP_DIR"
+          state_dir="$APP_DIR/deployments"
+          cleanup_failed_artifacts() {
+            rm -f \
+              "/tmp/future-viewer-env-overrides-$FAILED_TAG" \
+              "/tmp/future-viewer-images-$FAILED_TAG.tar.gz"
+          }
+          trap cleanup_failed_artifacts EXIT
+          previous_tag="$(cat "$state_dir/previous-tag-$FAILED_TAG")"
+          previous_revision="$(cat "$state_dir/previous-revision-$FAILED_TAG")"
+          [ -n "$previous_tag" ] || { echo "No previous image tag is available for automatic rollback" >&2; exit 1; }
+          git cat-file -e "$previous_revision^{commit}"
+          git switch --detach "$previous_revision"
+          install -m 600 "$state_dir/env-before-$FAILED_TAG" /opt/fv-app/.env.production
+          FV_IMAGE_TAG="$previous_tag" docker compose \
+            --env-file /opt/fv-app/.env.production \
+            -f docker-compose.prod.yml \
+            -f docker-compose.prod.prebuilt.yml \
+            -p future-viewer \
+            config --quiet
+          FV_IMAGE_TAG="$previous_tag" docker compose \
+            --env-file /opt/fv-app/.env.production \
+            -f docker-compose.prod.yml \
+            -f docker-compose.prod.prebuilt.yml \
+            -p future-viewer \
+            up -d --no-build --remove-orphans
+          REMOTE
+
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error "$PRODUCTION_HEALTH_URL" >/dev/null; then
+              echo "Rollback health check passed."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Rollback completed but health verification failed" >&2
           exit 1

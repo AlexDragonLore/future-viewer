@@ -1,14 +1,32 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { readingApi } from '@/api/readingApi'
+import { privacyApi } from '@/api/privacyApi'
 import { extractApiError } from '@/api/httpClient'
 import type { Reading } from '@/types'
 import { Trash2 } from 'lucide-vue-next'
+import { useReadingStore } from '@/stores/useReadingStore'
 
 const readings = ref<Reading[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const deletingIds = ref<Set<string>>(new Set())
+const pendingDeletion = ref<Reading | null>(null)
+const deletionPassword = ref('')
+const passwordInput = ref<HTMLInputElement | null>(null)
+
+async function confirmDeletion(reading: Reading) {
+  pendingDeletion.value = reading
+  deletionPassword.value = ''
+  error.value = null
+  await nextTick()
+  passwordInput.value?.focus()
+}
+
+function cancelDeletion() {
+  pendingDeletion.value = null
+  deletionPassword.value = ''
+}
 
 onMounted(async () => {
   try {
@@ -20,19 +38,27 @@ onMounted(async () => {
   }
 })
 
-async function deleteReading(reading: Reading) {
-  if (!confirm('Удалить расклад полностью из истории? После удаления он больше не будет показываться в личном архиве.')) {
+async function deleteReading() {
+  const reading = pendingDeletion.value
+  if (!reading || deletingIds.value.has(reading.id)) return
+  const password = deletionPassword.value
+  if (password.length < 8) {
+    error.value = 'Удаление отменено: требуется повторная аутентификация текущим паролем.'
     return
   }
 
   deletingIds.value = new Set(deletingIds.value).add(reading.id)
   error.value = null
   try {
-    await readingApi.delete(reading.id)
+    await privacyApi.deleteReading(reading.id, password)
+    const activeReading = useReadingStore()
+    if (activeReading.current?.id === reading.id) activeReading.reset()
     readings.value = readings.value.filter((item) => item.id !== reading.id)
+    cancelDeletion()
   } catch (e) {
     error.value = extractApiError(e, 'Не удалось удалить расклад')
   } finally {
+    deletionPassword.value = ''
     const next = new Set(deletingIds.value)
     next.delete(reading.id)
     deletingIds.value = next
@@ -48,12 +74,12 @@ async function deleteReading(reading: Reading) {
     </header>
 
     <div v-if="loading" class="text-center text-mystic-silver/60">загружаю…</div>
-    <div v-else-if="error" class="text-center text-red-300">{{ error }}</div>
-    <div v-else-if="readings.length === 0" class="text-center text-mystic-silver/60">
+    <div v-if="error" role="alert" class="text-center text-red-300 mb-4">{{ error }}</div>
+    <div v-if="!loading && !error && readings.length === 0" class="text-center text-mystic-silver/60">
       Пока что пусто. Сделай первый расклад.
     </div>
 
-    <ul v-else class="space-y-4">
+    <ul v-if="!loading && readings.length" class="space-y-4">
       <li v-for="r in readings" :key="r.id" class="history-item mystic-card">
         <RouterLink
           :to="{ name: 'reading-detail', params: { id: r.id } }"
@@ -73,7 +99,7 @@ async function deleteReading(reading: Reading) {
             :disabled="deletingIds.has(r.id)"
             aria-label="Удалить расклад полностью"
             data-testid="delete-reading"
-            @click="deleteReading(r)"
+            @click="confirmDeletion(r)"
           >
             <Trash2 :size="16" aria-hidden="true" />
             <span>{{ deletingIds.has(r.id) ? 'Удаляю...' : 'Удалить из истории' }}</span>
@@ -81,6 +107,28 @@ async function deleteReading(reading: Reading) {
         </div>
       </li>
     </ul>
+
+    <form v-if="pendingDeletion" class="mystic-card deletion-confirmation mt-5 p-5" data-testid="delete-reading-form" @submit.prevent="deleteReading">
+      <h2 class="text-mystic-accent mb-2">Удалить выбранный расклад?</h2>
+      <p class="text-sm text-mystic-silver/70 mb-3">«{{ pendingDeletion.question }}» будет удалён вместе со связанными данными. Действие нельзя отменить.</p>
+      <label for="reading-deletion-password" class="text-sm">Текущий пароль</label>
+      <input
+        id="reading-deletion-password"
+        ref="passwordInput"
+        v-model="deletionPassword"
+        type="password"
+        autocomplete="current-password"
+        required
+        minlength="8"
+        :disabled="deletingIds.has(pendingDeletion.id)"
+        class="w-full my-3 p-3 rounded-lg bg-black/30 border border-mystic-accent/30"
+        data-testid="reading-deletion-password"
+      />
+      <div class="flex flex-wrap gap-3">
+        <button type="submit" class="delete-reading" :disabled="deletingIds.has(pendingDeletion.id)" data-testid="confirm-delete-reading">Подтвердить удаление</button>
+        <button type="button" :disabled="deletingIds.has(pendingDeletion.id)" data-testid="cancel-delete-reading" @click="cancelDeletion">Отмена</button>
+      </div>
+    </form>
 
     <div class="text-center mt-8">
       <RouterLink to="/" class="glow-button inline-block">Новый расклад</RouterLink>

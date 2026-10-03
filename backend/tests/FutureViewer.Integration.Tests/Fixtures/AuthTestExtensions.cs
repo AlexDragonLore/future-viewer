@@ -7,6 +7,28 @@ namespace FutureViewer.Integration.Tests.Fixtures;
 
 public static class AuthTestExtensions
 {
+    public const string LegalDocumentVersion = "test-v1";
+
+    public static RegisterRequest CreateRegistrationRequest(string email, string password) => new()
+    {
+        Email = email,
+        Password = password,
+        OfferAccepted = true,
+        PrivacyAcknowledged = true,
+        PersonalDataConsentAccepted = true,
+        AgeConfirmed18 = true,
+        DocumentVersions = new LegalDocumentVersionsDto
+        {
+            Offer = LegalDocumentVersion,
+            Privacy = LegalDocumentVersion,
+            PersonalDataConsent = LegalDocumentVersion,
+            MarketingConsent = LegalDocumentVersion,
+            Cookies = LegalDocumentVersion
+        },
+        OptionalConsents = new OptionalConsentSelectionDto(),
+        CollectionSource = "registration"
+    };
+
     public static async Task<AuthResponse> RegisterAndLoginAsync(
         this IntegrationTestFixture fixture,
         HttpClient client,
@@ -14,7 +36,7 @@ public static class AuthTestExtensions
         string password)
     {
         var register = await client.PostAsJsonAsync("/api/auth/register",
-            new RegisterRequest { Email = email, Password = password });
+            CreateRegistrationRequest(email, password));
         register.EnsureSuccessStatusCode();
 
         using (var scope = fixture.Services.CreateScope())
@@ -27,7 +49,7 @@ public static class AuthTestExtensions
             user.EmailVerificationSentAt = null;
             user.FirstName = "Test";
             user.LastName = "User";
-            user.BirthDate = new DateOnly(1990, 1, 1);
+            user.BirthYear = 1990;
             await users.UpdateAsync(user);
         }
 

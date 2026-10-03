@@ -31,6 +31,7 @@ future-viewer/
 # 1. Секреты бэкенда
 cd backend/src/FutureViewer.Host
 dotnet user-secrets set "AI:Provider" "OpenAI"       # или "DeepSeek"
+dotnet user-secrets set "AI:Enabled" "true"          # только после test registry approval
 dotnet user-secrets set "OpenAI:ApiKey" "sk-..."     # если AI:Provider=OpenAI
 dotnet user-secrets set "DeepSeek:ApiKey" "<key>"    # если AI:Provider=DeepSeek
 dotnet user-secrets set "Jwt:Secret" "$(openssl rand -base64 48)"
@@ -46,7 +47,7 @@ dotnet user-secrets set "Email:From" "no-reply@example.com"
 dotnet user-secrets set "Email:UseSsl" "true"
 dotnet user-secrets set "Email:FrontendUrl" "http://localhost:5173"
 
-# Контакт саппорта в футере (по умолчанию — support@vualgryaduschego.ru):
+# Подтверждённый контакт саппорта в футере (без repository default):
 dotnet user-secrets set "Support:Email" "support@example.com"
 
 # 2. Поднять всё через docker-compose
@@ -74,6 +75,8 @@ endpoint не подходят и дают `401 invalid_credentials` с опис
 docker compose up -d postgres
 
 Payment__Provider=Yukassa \
+Payment__Enabled=true \
+Payment__WebhookEnabled=true \
 Yukassa__ShopId=<test-shop-id> \
 Yukassa__SecretKey=<test-secret-key> \
 Yukassa__ReturnUrl=http://localhost:5174/payment/success \
@@ -107,6 +110,8 @@ YooMoney на `/api/payments/webhook`.
 docker compose up -d postgres
 
 Payment__Provider=YooMoney \
+Payment__Enabled=true \
+Payment__WebhookEnabled=true \
 YooMoney__Receiver=<yoomoney-wallet-number> \
 YooMoney__NotificationSecret=<http-notification-secret> \
 YooMoney__ReturnUrl=http://localhost:5174/payment/success \
@@ -132,108 +137,55 @@ VITE_API_URL=http://localhost:5050 npm run dev -- --host 127.0.0.1 --port 5174 -
 Для production success redirect используйте `https://alex-taro.ru/payment/success`.
 YooMoney отправляет уведомление методом `POST` с
 `Content-Type: application/x-www-form-urlencoded`; app принимает кодом `200 OK`.
-Для smoke без реальной оплаты можно создать оплату тестовым пользователем, взять
-`paymentId`/`label` из ответа `/api/payments/subscribe` и отправить на webhook
-подписанный тестовый payload с тем же `label`. Подпись `sign` — HMAC-SHA256 в
-hex lower-case по URL-encoded строке всех параметров уведомления, кроме `sign`,
-отсортированных по имени, с секретом `YooMoney__NotificationSecret`.
+Для webhook smoke используйте только официальный test fixture/способ проверки,
+соответствующий фактически заключённому договору и актуальной документации
+провайдера. Самодельный алгоритм подписи или ручная активация по redirect не
+допускаются.
 
 > Важно: если реальный `OPENAI_API_KEY` когда-либо попадал в локальный `.env`,
 > shell history, логи или чат, считайте его скомпрометированным и перевыпустите
 > ключ в кабинете OpenAI. Реальные секреты не должны коммититься.
 
-## Production: один сервер
+## Production
 
-Production-запуск рассчитан на чистый Ubuntu/Debian-сервер с Docker,
-Docker Compose и доменом. До запуска убедитесь, что A-запись домена указывает на
-IP сервера: Caddy автоматически получит HTTPS-сертификат для этого домена.
+Доступность интеграций определяется фактической конфигурацией: официальный HTTPS endpoint и ключ выбранного AI-провайдера, рабочий почтовый транспорт, credentials платёжного провайдера и включённая обработка вебхуков. Явный operational flag `false` по-прежнему отключает соответствующую функцию. Неизвестные документарные сведения остаются незаполненными и не блокируют регистрацию, расклады или оплату.
 
-```bash
-apt update && apt install docker.io docker-compose git -y
-mkdir -p /opt/fv-app
-git clone <repo-url> /opt/future-viewer
-cd /opt/future-viewer
-bash init.sh
-```
+Почта production уже настроена через существующий ящик REG.RU и HTTPS transport `RegruWebmail`; пересоздавать ящик или заменять его credentials не требуется. Пустые GitHub Secrets не перезаписывают рабочие значения в серверном env. Итоговая конфигурация проверяется после объединения с серверными значениями, до замены env и перезапуска контейнеров. Обработка оплаты по-прежнему требует подтверждённого вебхука; success redirect сам по себе доступ не активирует.
 
-`init.sh`:
+На общем сервере application Compose stack не владеет публичными `80/443`: host-level shared edge маршрутизирует exact hostname `alex-taro.ru` на отдельный loopback port Future Viewer. Контейнеры, БД/user, networks, volumes, env, secrets, logs и backups должны быть отделены от janetka.ru.
 
-- создает `/opt/fv-app/.env.production` с правами `600`, если файла еще нет;
-- спрашивает домен, AI provider, provider API key, email админа, support email и опциональные
-  Telegram/SMTP/YooKassa настройки;
-- генерирует `JWT_SECRET` и пароль Postgres;
-- запускает `docker-compose.prod.yml` с Postgres, backend, production frontend и
-  Caddy reverse proxy на `80/443`.
+Канонические инструкции:
 
-Production-секреты живут только в `/opt/fv-app/.env.production`. В репозитории
-есть только шаблон [`.env.production.example`](.env.production.example).
+- [deployment runbook](docs/compliance/DEPLOYMENT_RUNBOOK.md);
+- [rollback runbook](docs/compliance/ROLLBACK_RUNBOOK.md);
+- [shared-host isolation](docs/compliance/SHARED_HOST_ISOLATION.md);
+- [backup/restore](docs/compliance/BACKUP_RESTORE_RUNBOOK.md);
+- [manual actions](docs/compliance/MANUAL_ACTIONS.md).
+- [REG.RU HTTPS email transport](deploy/regru-webmail.md);
+- [настройка Яндекс Директа и подсчёт лидов](docs/yandex-direct-setup.md).
 
-Обновление уже поднятого сервера:
+Workflow запускается только для `main`, требует backend/frontend/security/release-compliance checks и protected GitHub environment. Он использует один pinned-host-key, non-root deploy credential, exact commit SHA, project-scoped Compose и до изменения сохраняет предыдущие Git revision, image tag и env для rollback. Отсутствующая конфигурация завершает job ошибкой; host-wide Docker prune запрещён.
+
+Проверка production:
 
 ```bash
-cd /opt/future-viewer
-git pull
-bash init.sh
-```
-
-### Автодеплой через GitHub Actions
-
-Workflow [`.github/workflows/deploy-production.yml`](.github/workflows/deploy-production.yml)
-запускается автоматически на push в `main` или `master`, а также вручную через
-`workflow_dispatch`.
-
-Автодеплой собирает backend/frontend Docker images в GitHub Actions, чистит
-неиспользуемые Docker-слои на сервере, передает готовые images потоком через SSH
-в `docker load` и запускает production compose с
-[`docker-compose.prod.prebuilt.yml`](docker-compose.prod.prebuilt.yml). Сервер в
-этом режиме не выполняет `docker compose up --build`; `init.sh` остаётся для
-первичной установки и ручного полного rebuild.
-
-Нужные GitHub Secrets:
-
-- `PRODUCTION_HOST` — SSH host, например `alex-taro.ru`.
-- `PRODUCTION_DEPLOY_SSH_KEY` — private key пользователя, который может выполнять
-  `git fetch/merge` в production checkout.
-- `PRODUCTION_ROOT_SSH_KEY` — private key пользователя, который может запускать
-  Docker/Compose команды и читать `/opt/fv-app/.env.production`.
-- `YUKASSA_SHOP_ID` и `YUKASSA_SECRET_KEY` — опциональные credentials магазина
-  ЮKassa для приёма оплат. Если заданы, workflow обновит эти значения в
-  `/opt/fv-app/.env.production` перед перезапуском compose.
-
-Если эти secrets не заданы, workflow не падает, а пропускает деплой с warning.
-После добавления secrets следующий push в `main`/`master` запустит полный деплой.
-
-Опциональные GitHub Variables:
-
-- `PRODUCTION_PORT` — SSH port, по умолчанию `22`.
-- `PRODUCTION_APP_DIR` — checkout на сервере, по умолчанию `/opt/future-viewer`.
-- `PRODUCTION_DEPLOY_USER` — по умолчанию `deploy`.
-- `PRODUCTION_ROOT_USER` — по умолчанию `root`.
-- `PRODUCTION_HEALTH_URL` — health-check URL, по умолчанию
-  `https://alex-taro.ru/health`.
-- `YUKASSA_CURRENCY`, `YUKASSA_MONTHLY_PRICE_AMOUNT`, `YUKASSA_API_BASE_URL` —
-  опциональные настройки ЮKassa, по умолчанию `RUB`, `300`,
-  `https://api.yookassa.ru/v3/`.
-
-Текущая production-схема использует два SSH-подключения: `deploy` обновляет git
-checkout, затем `root` загружает готовые images и перезапускает compose. Это
-нужно, потому что production env файл закрыт правами root.
-
-Полезные команды диагностики:
-
-```bash
+cd /opt/fv-app
 docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps
-docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer logs -f backend
-curl -I https://<your-domain>/health
+curl -fsS https://alex-taro.ru/health
 ```
 
 ## Тесты
 
 ```bash
 dotnet test backend/FutureViewer.slnx
+cd frontend
+npm run type-check
+npm test
+npm run test:e2e
+npm run build
 ```
 
-Integration-тесты сами поднимают Postgres через Testcontainers — нужен запущенный Docker daemon.
+Backend integration-тесты сами поднимают Postgres через Testcontainers — нужен запущенный Docker daemon. Playwright E2E автоматически запускают локальный Vite и проверяют desktop/mobile Chromium; перед первым локальным запуском выполните `npx playwright install chromium`.
 
 ## Планы реализации
 

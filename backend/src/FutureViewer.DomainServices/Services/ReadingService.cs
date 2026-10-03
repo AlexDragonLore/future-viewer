@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
@@ -17,7 +18,8 @@ public sealed class ReadingService
     private readonly FeedbackService _feedback;
     private readonly PersonalizationService _personalization;
     private readonly IAIQuestionValidator _questionValidator;
-    private readonly IAIMemoryExtractor _memoryExtractor;
+    private readonly IAiPrivacyGateway _privacyGateway;
+    private readonly IUserRepository _users;
     private readonly ILogger<ReadingService> _logger;
 
     public ReadingService(
@@ -29,7 +31,9 @@ public sealed class ReadingService
         PersonalizationService personalization,
         IAIQuestionValidator questionValidator,
         IAIMemoryExtractor memoryExtractor,
-        ILogger<ReadingService> logger)
+        IUserRepository users,
+        ILogger<ReadingService> logger,
+        IAiPrivacyGateway? privacyGateway = null)
     {
         _repo = repo;
         _deck = deck;
@@ -38,20 +42,51 @@ public sealed class ReadingService
         _feedback = feedback;
         _personalization = personalization;
         _questionValidator = questionValidator;
-        _memoryExtractor = memoryExtractor;
+        _ = memoryExtractor; // Kept in the constructor for binary/test compatibility; extraction is disabled.
+        _users = users;
         _logger = logger;
+        _privacyGateway = privacyGateway ?? new AiPrivacyGateway();
     }
 
-    public async Task<ReadingResult> CreateAsync(
+    public Task<ReadingResult> CreateAsync(
         CreateReadingRequest request,
         Guid? userId,
         CancellationToken ct = default)
+        => CreateCoreAsync(request, userId ?? throw new UnauthorizedException("Authentication required"), ct);
+
+    public Task<ReadingResult> CreateGuestAsync(CreateReadingRequest request, CancellationToken ct = default)
     {
+        if (request.SpreadType != SpreadType.SingleCard)
+            throw new QuestionValidationException("guest_single_card_only", "Без регистрации можно открыть одну карту.");
+        return CreateCoreAsync(request, null, ct);
+    }
+
+    public async Task<ReadingResult> UnlockGuestAsync(ReadingResult reading, Guid userId, CancellationToken ct = default)
+    {
+        if (!await _repo.AttachGuestAsync(reading.Id, userId, ct))
+            throw new NotFoundException("Этот расклад уже недоступен. Начните новый расклад.");
+        return reading;
+    }
+
+    private async Task<ReadingResult> CreateCoreAsync(
+        CreateReadingRequest request,
+        Guid? userId,
+        CancellationToken ct)
+    {
+        var privacy = _privacyGateway.Prepare(request.Question, AiPrivacyOperation.TarotInterpretation);
+        EnsureAllowed(privacy);
         var spread = Spread.From(request.SpreadType);
-        var promptContext = await PreparePromptContextAsync(request, userId, ct);
-        var uid = userId ?? throw new UnauthorizedException("Authentication required");
-        await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
-        var questionValidation = await ValidateQuestionAccessAsync(request, uid, ct);
+        var promptContext = userId is not null
+            ? await PreparePromptContextAsync(request, userId, ct)
+            : new UserPromptContext { Today = DateOnly.FromDateTime(DateTime.UtcNow), MemoryRules = [] };
+        if (userId is { } uid)
+            await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
+        var saveToHistory = userId is { } historyUserId
+            && await IsHistoryStorageAllowedAsync(historyUserId, request.SaveToHistory, ct);
+        var questionValidation = await ValidateQuestionAccessAsync(
+            privacy.SafeText,
+            request.QuestionWarningAcknowledged,
+            ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -69,24 +104,35 @@ public sealed class ReadingService
             cards.Select(c => c.CardId).ToList(),
             ct);
 
-        var interpretationQuestion = BuildQuestionForInterpretation(request.Question, questionValidation);
-        var interpretation = await _interpreter.InterpretAsync(
-            spread, interpretationQuestion, cards, request.DeckType, variantNotes, promptContext, ct);
-
         var reading = new Reading
         {
             UserId = userId,
             SpreadType = spread.Type,
-            Question = request.Question,
-            AiInterpretation = interpretation.Text,
-            AiModel = interpretation.Model,
+            Question = saveToHistory ? privacy.SafeText : string.Empty,
+            SavedToHistory = saveToHistory,
+            AiInterpretation = null,
+            AiModel = _interpreter.Model,
             DeckType = request.DeckType,
             Cards = cards
         };
 
+        // DB-first after deterministic minimization: no raw text crosses the AI boundary
+        // before a local operational record exists. With history off the row contains no
+        // question or interpretation and is used only for quota/accounting.
         await _repo.AddAsync(reading, ct);
 
-        if (reading.UserId is not null)
+        var interpretationQuestion = BuildQuestionForInterpretation(privacy.SafeText, questionValidation);
+        var interpretation = await _interpreter.InterpretAsync(
+            spread, interpretationQuestion, cards, request.DeckType, variantNotes, promptContext, ct);
+
+        if (saveToHistory)
+        {
+            reading.AiInterpretation = interpretation.Text;
+            reading.AiModel = interpretation.Model;
+            await _repo.UpdateAsync(reading, ct);
+        }
+
+        if (saveToHistory && reading.UserId is not null)
         {
             try
             {
@@ -98,13 +144,16 @@ public sealed class ReadingService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to schedule feedback for reading {ReadingId}", reading.Id);
+                _logger.LogWarning(
+                    "Failed to schedule feedback for reading {ReadingId}; errorType={ErrorType}",
+                    reading.Id,
+                    ex.GetType().Name);
             }
-
-            await RememberAsync(reading.UserId.Value, request.Question, interpretation.Text, promptContext, ct);
         }
 
-        return Map(reading, spread);
+        // AI memory remains disabled until a separately versioned personalization
+        // consent is active and a privacy-reviewed structured schema is available.
+        return Map(reading, spread, privacy.SafeText, interpretation.Text);
     }
 
     public async IAsyncEnumerable<ReadingStreamEvent> CreateStreamAsync(
@@ -112,11 +161,17 @@ public sealed class ReadingService
         Guid? userId,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        var privacy = _privacyGateway.Prepare(request.Question, AiPrivacyOperation.TarotInterpretation);
+        EnsureAllowed(privacy);
         var spread = Spread.From(request.SpreadType);
         var promptContext = await PreparePromptContextAsync(request, userId, ct);
         var uid = userId ?? throw new UnauthorizedException("Authentication required");
         await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
-        var questionValidation = await ValidateQuestionAccessAsync(request, uid, ct);
+        var saveToHistory = await IsHistoryStorageAllowedAsync(uid, request.SaveToHistory, ct);
+        var questionValidation = await ValidateQuestionAccessAsync(
+            privacy.SafeText,
+            request.QuestionWarningAcknowledged,
+            ct);
         var drawn = await _deck.DrawAsync(spread.CardCount, ct);
 
         var cards = drawn
@@ -138,35 +193,32 @@ public sealed class ReadingService
         {
             UserId = userId,
             SpreadType = spread.Type,
-            Question = request.Question,
+            Question = saveToHistory ? privacy.SafeText : string.Empty,
+            SavedToHistory = saveToHistory,
             AiInterpretation = null,
             AiModel = _interpreter.Model,
             DeckType = request.DeckType,
             Cards = cards
         };
 
-        yield return new ReadingStreamEvent.Cards(Map(reading, spread));
+        // Persist the minimized local record before external AI streaming begins.
+        await _repo.AddAsync(reading, ct);
+        yield return new ReadingStreamEvent.Cards(Map(reading, spread, privacy.SafeText, null));
 
         var sb = new StringBuilder();
-        var persisted = false;
         try
         {
-            var interpretationQuestion = BuildQuestionForInterpretation(request.Question, questionValidation);
+            var interpretationQuestion = BuildQuestionForInterpretation(privacy.SafeText, questionValidation);
             await foreach (var delta in _interpreter.InterpretStreamAsync(
                 spread, interpretationQuestion, cards, request.DeckType, variantNotes, promptContext, ct))
             {
-                if (!persisted)
-                {
-                    await _repo.AddAsync(reading, ct);
-                    persisted = true;
-                }
                 sb.Append(delta);
                 yield return new ReadingStreamEvent.Chunk(delta);
             }
         }
         finally
         {
-            if (persisted && sb.Length > 0)
+            if (saveToHistory && sb.Length > 0)
             {
                 reading.AiInterpretation = sb.ToString();
                 try
@@ -179,7 +231,7 @@ public sealed class ReadingService
                 }
             }
 
-            if (persisted && reading.UserId is not null)
+            if (saveToHistory && sb.Length > 0 && reading.UserId is not null)
             {
                 try
                 {
@@ -187,11 +239,11 @@ public sealed class ReadingService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to schedule feedback for streaming reading {ReadingId}", reading.Id);
+                    _logger.LogWarning(
+                        "Failed to schedule feedback for streaming reading {ReadingId}; errorType={ErrorType}",
+                        reading.Id,
+                        ex.GetType().Name);
                 }
-
-                if (sb.Length > 0)
-                    await RememberAsync(reading.UserId.Value, request.Question, sb.ToString(), promptContext, CancellationToken.None);
             }
         }
 
@@ -204,7 +256,7 @@ public sealed class ReadingService
             ?? throw new NotFoundException($"Reading {id} not found");
         if (reading.UserId != userId)
             throw new NotFoundException($"Reading {id} not found");
-        if (reading.DeletedFromHistoryAt is not null)
+        if (!reading.SavedToHistory || reading.DeletedFromHistoryAt is not null)
             throw new NotFoundException($"Reading {id} not found");
         var spread = Spread.From(reading.SpreadType);
         return Map(reading, spread);
@@ -245,28 +297,36 @@ public sealed class ReadingService
             ct);
     }
 
-    private async Task<QuestionValidationResult> ValidateQuestionAccessAsync(
-        CreateReadingRequest request,
+    private async Task<bool> IsHistoryStorageAllowedAsync(
         Guid userId,
+        bool requested,
         CancellationToken ct)
     {
-        var validation = await _questionValidator.ValidateAsync(request.Question, ct);
+        if (!requested) return false;
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new UnauthorizedException("Authentication required");
+        return user.HistoryEnabled;
+    }
+
+    private async Task<QuestionValidationResult> ValidateQuestionAccessAsync(
+        string safeQuestion,
+        bool warningAcknowledged,
+        CancellationToken ct)
+    {
+        var validation = await _questionValidator.ValidateAsync(safeQuestion, ct);
         if (validation.Status == QuestionValidationStatus.Accepted)
             return validation;
 
         var suggestedQuestion = validation.SuggestedQuestion
-            ?? QuestionValidationHeuristics.BuildFallbackSuggestion(request.Question);
+            ?? QuestionValidationHeuristics.BuildFallbackSuggestion(safeQuestion);
 
-        var hasActiveSubscription = await _subscription.HasActiveSubscriptionAsync(userId, ct);
-        if (!hasActiveSubscription)
-        {
-            throw new QuestionRequiresSubscriptionException(
-                QuestionValidationPolicy.SubscriptionRequiredMessage,
+        if (validation.Status == QuestionValidationStatus.Rejected)
+            throw new AiPrivacyBlockedException(
+                validation.BlockCode ?? "unsafe_question",
                 validation.Reason,
-                suggestedQuestion);
-        }
+                validation.SafeResponse);
 
-        if (!request.QuestionWarningAcknowledged)
+        if (!warningAcknowledged)
         {
             throw new QuestionWarningAcknowledgementRequiredException(
                 QuestionValidationPolicy.SubscriberWarningMessage,
@@ -294,43 +354,30 @@ public sealed class ReadingService
             ?? QuestionValidationHeuristics.BuildFallbackSuggestion(question);
 
         var sb = new StringBuilder();
-        sb.AppendLine(question);
-        sb.AppendLine();
-        sb.AppendLine("Системная пометка: валидатор отметил этот вопрос как неподходящий для прямого гадания.");
-        sb.Append("Причина: ").AppendLine(validation.Reason);
+        // Never append the original rejected/rewritten text. Only the locally-created,
+        // non-identifying suggestion may cross the external boundary.
         sb.Append("Безопасная формулировка: ").AppendLine(suggestedQuestion);
-        sb.AppendLine("Не давай медицинских, юридических, финансовых гарантий, точных фактов, инструкций контроля или опасных советов. Если исходный вопрос просит именно это, мягко переведи ответ к размышлению, возможностям, рискам и следующему безопасному шагу пользователя.");
+        sb.AppendLine("Дай только возможный взгляд для личной рефлексии; не давай медицинских, юридических или финансовых указаний и не утверждай будущие события как факты.");
         return sb.ToString();
     }
 
-    private async Task RememberAsync(
-        Guid userId,
-        string question,
-        string interpretation,
-        UserPromptContext promptContext,
-        CancellationToken ct)
+    private static void EnsureAllowed(AiPrivacyDecision decision)
     {
-        try
-        {
-            var rules = await _memoryExtractor.ExtractAsync(new MemoryExtractionContext
-            {
-                Question = question,
-                Interpretation = interpretation,
-                PromptContext = promptContext
-            }, ct);
-            await _personalization.SaveExtractedMemoryAsync(userId, rules, ct);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to extract memory for user {UserId}", userId);
-        }
+        if (!decision.CanSendExternally)
+            throw new AiPrivacyBlockedException(
+                decision.ReasonCode,
+                decision.UserMessage,
+                decision.SafeResponse);
     }
 
     private static ReadingResult Map(Reading reading, Spread spread)
+        => Map(reading, spread, reading.Question, reading.AiInterpretation);
+
+    private static ReadingResult Map(
+        Reading reading,
+        Spread spread,
+        string question,
+        string? interpretation)
     {
         var cards = reading.Cards
             .OrderBy(c => c.Position)
@@ -357,10 +404,10 @@ public sealed class ReadingService
             Id = reading.Id,
             SpreadType = reading.SpreadType,
             SpreadName = spread.Name,
-            Question = reading.Question,
+            Question = question,
             CreatedAt = reading.CreatedAt,
             Cards = cards,
-            Interpretation = reading.AiInterpretation,
+            Interpretation = interpretation,
             DeckType = reading.DeckType
         };
     }

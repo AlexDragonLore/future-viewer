@@ -12,4 +12,6 @@ public sealed class QuestionValidationResult
     public required QuestionValidationStatus Status { get; init; }
     public required string Reason { get; init; }
     public string? SuggestedQuestion { get; init; }
+    public string? BlockCode { get; init; }
+    public string? SafeResponse { get; init; }
 }

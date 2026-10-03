@@ -4,7 +4,7 @@ public sealed class PersonalizationDto
 {
     public string? FirstName { get; init; }
     public string? LastName { get; init; }
-    public DateOnly? BirthDate { get; init; }
+    public int? BirthYear { get; init; }
     public bool IsComplete { get; init; }
     public required IReadOnlyList<UserMemoryRuleDto> MemoryRules { get; init; }
 }

@@ -1,0 +1,71 @@
+# Existing production edge compatibility. Copy the reviewed file to
+# /opt/fv-app/legacy-edge.Caddyfile; do not overwrite the other site's block.
+# This Caddy receives public traffic directly. Leave incoming X-Forwarded-*
+# untrusted; Caddy's default behavior replaces spoofable client values.
+{$APP_DOMAIN} {
+    encode zstd gzip
+
+    header {
+        -Server
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; connect-src 'self' https://mc.yandex.ru; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data: blob: https://mc.yandex.ru; object-src 'none'; script-src 'self' https://mc.yandex.ru; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests"
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+        Permissions-Policy "camera=(), geolocation=(), microphone=(), payment=(), usb=()"
+        X-Frame-Options "DENY"
+        Cross-Origin-Opener-Policy "same-origin"
+    }
+
+    @api path /api/*
+    handle @api {
+        request_body {
+            max_size 1MB
+        }
+        header Cache-Control "no-store"
+        reverse_proxy backend:8080
+    }
+
+    handle /health {
+        header Cache-Control "no-store"
+        reverse_proxy backend:8080
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}
+
+www.{$APP_DOMAIN} {
+    redir https://{$APP_DOMAIN}{uri} permanent
+}
+
+# Retain the existing HTTP-by-IP entry point. The frontend intentionally accepts
+# only the canonical hostname, so normalize that upstream Host for this route.
+http://80.87.104.245 {
+    encode zstd gzip
+
+    @api path /api/*
+    handle @api {
+        request_body {
+            max_size 1MB
+        }
+        header Cache-Control "no-store"
+        reverse_proxy backend:8080
+    }
+
+    handle /health {
+        header Cache-Control "no-store"
+        reverse_proxy backend:8080
+    }
+
+    handle {
+        reverse_proxy frontend:80 {
+            header_up Host {$APP_DOMAIN}
+        }
+    }
+}
+
+janetka.ru, www.janetka.ru {
+    encode zstd gzip
+    reverse_proxy janetka-site:80
+}

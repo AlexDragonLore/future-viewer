@@ -36,25 +36,6 @@ public sealed class FeedbackRepository : IFeedbackRepository
     public Task<ReadingFeedback?> GetByReadingIdAsync(Guid readingId, CancellationToken ct = default) =>
         _db.ReadingFeedbacks.FirstOrDefaultAsync(f => f.ReadingId == readingId, ct);
 
-    public async Task<IReadOnlyList<ReadingFeedback>> GetPendingToNotifyAsync(
-        DateTime before,
-        int batch,
-        CancellationToken ct = default)
-    {
-        return await _db.ReadingFeedbacks
-            .Include(f => f.User)
-            .Include(f => f.Reading)
-            .Where(f => f.Status == FeedbackStatus.Pending
-                        && f.ScheduledAt <= before
-                        && f.User != null
-                        && f.User.TelegramChatId != null
-                        && f.Reading != null
-                        && f.Reading.DeletedFromHistoryAt == null)
-            .OrderBy(f => f.ScheduledAt)
-            .Take(batch)
-            .ToListAsync(ct);
-    }
-
     public async Task<IReadOnlyList<ReadingFeedback>> GetScoredByUserAsync(
         Guid userId,
         CancellationToken ct = default)
@@ -86,16 +67,6 @@ public sealed class FeedbackRepository : IFeedbackRepository
         await _db.SaveChangesAsync(ct);
     }
 
-    public async Task<bool> MarkNotifiedAsync(Guid feedbackId, DateTime notifiedAt, CancellationToken ct = default)
-    {
-        var updated = await _db.ReadingFeedbacks
-            .Where(f => f.Id == feedbackId && f.Status == FeedbackStatus.Pending)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(f => f.Status, FeedbackStatus.Notified)
-                .SetProperty(f => f.NotifiedAt, notifiedAt), ct);
-        return updated > 0;
-    }
-
     public async Task<IReadOnlyList<ReadingFeedback>> SearchAsync(
         Guid? userId,
         FeedbackStatus? status,
@@ -123,16 +94,6 @@ public sealed class FeedbackRepository : IFeedbackRepository
         if (status.HasValue) query = query.Where(f => f.Status == status.Value);
         return query.CountAsync(ct);
     }
-
-    public Task<int> CountPendingToNotifyAsync(DateTime before, CancellationToken ct = default) =>
-        _db.ReadingFeedbacks.CountAsync(
-            f => f.Status == FeedbackStatus.Pending
-                 && f.ScheduledAt <= before
-                 && f.User != null
-                 && f.User.TelegramChatId != null
-                 && f.Reading != null
-                 && f.Reading.DeletedFromHistoryAt == null,
-            ct);
 
     public Task<int> CountScoredSinceAsync(DateTime fromUtc, CancellationToken ct = default) =>
         _db.ReadingFeedbacks.CountAsync(

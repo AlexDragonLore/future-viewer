@@ -6,6 +6,9 @@ using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Integration.Tests.Fixtures;
+using FutureViewer.Infrastructure.Payment;
+using FutureViewer.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureViewer.Integration.Tests.Tests;
@@ -27,6 +30,105 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         var response = await client.GetAsync("/api/subscription/status");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task Subscribe_is_unavailable_until_payment_and_activation_are_both_enabled(
+        bool enabled, bool webhookEnabled)
+    {
+        using var factory = _fixture.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.PostConfigure<PaymentOptions>(options =>
+            {
+                options.Enabled = enabled;
+                options.WebhookEnabled = webhookEnabled;
+            })));
+        using var client = factory.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client,
+            $"payment-switch-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var response = await client.PostAsJsonAsync("/api/payments/subscribe", new CreatePaymentRequest
+        {
+            OfferAccepted = true,
+            OfferVersion = AuthTestExtensions.LegalDocumentVersion
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("feature_disabled");
+    }
+
+    [Fact]
+    public async Task Disabled_webhook_does_not_acknowledge_payment_as_processed()
+    {
+        using var factory = _fixture.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+            services.PostConfigure<PaymentOptions>(options => options.WebhookEnabled = false)));
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/payments/webhook", new { });
+
+        response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
+        (await response.Content.ReadAsStringAsync()).Should().Contain("feature_disabled");
+    }
+
+    [Fact]
+    public async Task Checkout_records_acceptance_of_the_current_offer_for_the_actual_order()
+    {
+        var provider = new CheckoutProvider();
+        using var factory = _fixture.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.PostConfigure<PaymentOptions>(options =>
+            {
+                options.Enabled = true;
+                options.WebhookEnabled = true;
+            });
+            services.AddSingleton<IPaymentProvider>(provider);
+        }));
+        using var client = factory.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client,
+            $"checkout-consent-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var missing = await client.PostAsJsonAsync("/api/payments/subscribe", new CreatePaymentRequest());
+        missing.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var stale = await client.PostAsJsonAsync("/api/payments/subscribe", new CreatePaymentRequest
+        {
+            OfferAccepted = true,
+            OfferVersion = "outdated-offer"
+        });
+        stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        provider.Calls.Should().Be(0);
+        var response = await client.PostAsJsonAsync("/api/payments/subscribe", new CreatePaymentRequest
+        {
+            OfferAccepted = true,
+            OfferVersion = AuthTestExtensions.LegalDocumentVersion
+        });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var payment = await response.Content.ReadFromJsonAsync<PaymentCreationDto>();
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var order = await db.PaymentOrders.SingleAsync(x => x.PublicId == Guid.Parse(payment!.PaymentId));
+        var consent = await db.UserConsents.SingleAsync(x =>
+            x.UserId == auth.UserId && x.CollectionSource == $"checkout:{order.PublicId:N}");
+        consent.ConsentType.Should().Be(ConsentType.OfferAcceptance);
+        consent.DocumentVersion.Should().Be(AuthTestExtensions.LegalDocumentVersion);
+        consent.ContentHash.Should().Be(new string('a', 64));
+        consent.AcceptedAt.Should().BeBefore(DateTime.UtcNow.AddSeconds(1));
+        provider.Calls.Should().Be(1);
+
+        var renewed = await client.PostAsJsonAsync("/api/payments/subscribe", new CreatePaymentRequest
+        {
+            OfferAccepted = true,
+            OfferVersion = AuthTestExtensions.LegalDocumentVersion
+        });
+        renewed.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await db.UserConsents.CountAsync(x => x.UserId == auth.UserId
+            && x.ConsentType == ConsentType.OfferAcceptance && x.RevokedAt == null))
+            .Should().Be(3, "registration and each checkout retain their own unrevoked acceptance evidence");
+        provider.Calls.Should().Be(2);
     }
 
     [Fact]
@@ -108,5 +210,31 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         var second = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "second" });
         second.StatusCode.Should().Be((HttpStatusCode)429);
+    }
+
+    private sealed class CheckoutProvider : IPaymentProvider
+    {
+        public int Calls { get; private set; }
+        public string ProviderName => "checkout-test";
+        public PaymentProductDescriptor Product => new()
+        {
+            TariffCode = "pro-30d", Amount = 300m, Currency = "RUB", AccessDays = 30
+        };
+
+        public Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
+            Guid publicOrderId, string idempotencyKey, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(new PaymentCreationResult
+            {
+                PaymentId = $"checkout-test-{publicOrderId:N}",
+                ConfirmationUrl = "https://provider.example/checkout",
+                Status = "pending"
+            });
+        }
+
+        public PaymentWebhookEvent? ParseWebhook(string body) => null;
+        public Task<PaymentVerification?> VerifyPaymentAsync(string paymentId, CancellationToken ct = default) =>
+            Task.FromResult<PaymentVerification?>(null);
     }
 }

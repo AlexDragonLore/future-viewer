@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alex-taro.ru/schemas/processors.schema.json",
+  "title": "Future Viewer processor registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "reviewed_at", "providers"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "reviewed_at": { "type": ["string", "null"], "format": "date" },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "provider_name",
+          "provider_type",
+          "purpose",
+          "legal_entity",
+          "country",
+          "endpoint",
+          "additional_endpoints",
+          "data_categories",
+          "retention",
+          "uses_data_for_training",
+          "cross_border_transfer",
+          "contract_reference",
+          "enabled",
+          "manual_approved"
+        ],
+        "properties": {
+          "provider_name": { "type": "string", "minLength": 1 },
+          "provider_type": {
+            "type": "string",
+            "enum": ["hosting", "storage", "backup", "ai", "messaging", "email", "payment", "web_asset", "source_ci", "analytics", "monitoring", "dns", "certificate_authority", "other"]
+          },
+          "purpose": { "type": "string", "minLength": 1 },
+          "legal_entity": { "type": ["string", "null"] },
+          "country": { "type": ["string", "null"] },
+          "endpoint": { "type": ["string", "null"] },
+          "additional_endpoints": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "data_categories": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "retention": { "type": ["string", "null"] },
+          "uses_data_for_training": { "type": ["boolean", "null"] },
+          "cross_border_transfer": { "type": ["boolean", "null"] },
+          "contract_reference": { "type": ["string", "null"] },
+          "enabled": { "type": "boolean" },
+          "manual_approved": { "type": "boolean" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "provider_type": { "const": "email" } }, "required": ["provider_type"] },
+            "then": {
+              "properties": {
+                "endpoint": { "anyOf": [{ "type": "null" }, { "type": "string", "pattern": "^(smtps|smtp\\+starttls|https)://" }] },
+                "additional_endpoints": { "type": "array", "items": { "type": "string", "pattern": "^(smtps|smtp\\+starttls|https)://" } }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "provider_type": { "const": "storage" } }, "required": ["provider_type"] },
+            "then": {
+              "properties": {
+                "endpoint": { "anyOf": [{ "type": "null" }, { "type": "string", "pattern": "^(https|postgresql)://" }] },
+                "additional_endpoints": { "type": "array", "items": { "type": "string", "pattern": "^(https|postgresql)://" } }
+              }
+            }
+          },
+          {
+            "if": { "properties": { "provider_type": { "const": "backup" } }, "required": ["provider_type"] },
+            "then": {
+              "properties": {
+                "endpoint": { "anyOf": [{ "type": "null" }, { "type": "string", "pattern": "^(https|file)://" }] },
+                "additional_endpoints": { "type": "array", "items": { "type": "string", "pattern": "^(https|file)://" } }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": { "provider_type": { "not": { "enum": ["email", "storage", "backup"] } } },
+              "required": ["provider_type"]
+            },
+            "then": {
+              "properties": {
+                "endpoint": { "anyOf": [{ "type": "null" }, { "type": "string", "pattern": "^https://" }] },
+                "additional_endpoints": { "type": "array", "items": { "type": "string", "pattern": "^https://" } }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

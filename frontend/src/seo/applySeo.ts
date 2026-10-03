@@ -1,10 +1,6 @@
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import {
-  SEO_CONTENT_ROUTES,
-  buildStructuredDataForRoute,
-  findSeoContentRouteByPath,
-  type SeoContentRoute,
-} from '@/data/tarotSeoCatalog.js'
+import { SEO_CONTENT_ROUTES } from '@/data/tarotSeoCatalog.js'
+import { buildSeoStructuredData } from './structuredData.js'
 import seoData from './routes.json'
 
 interface SeoRoute {
@@ -122,10 +118,7 @@ function setStructuredData(route: SeoRoute | undefined, index: boolean) {
     return
   }
 
-  const contentRoute =
-    findSeoContentRouteByPath(route.path) ??
-    (route.contentKind ? (route as SeoContentRoute) : undefined)
-  const data = buildStructuredDataForRoute(contentRoute as SeoContentRoute, {
+  const data = buildSeoStructuredData(route, {
     siteUrl: cleanSiteUrl(import.meta.env.VITE_SITE_URL),
     siteName: config.siteName,
     defaultImage: config.defaultImage,

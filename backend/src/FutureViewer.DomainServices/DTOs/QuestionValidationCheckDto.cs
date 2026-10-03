@@ -8,4 +8,6 @@ public sealed class QuestionValidationCheckDto
     public required string Message { get; init; }
     public required bool CanContinue { get; init; }
     public required bool RequiresSubscription { get; init; }
+    public string? BlockCode { get; init; }
+    public string? SafeResponse { get; init; }
 }

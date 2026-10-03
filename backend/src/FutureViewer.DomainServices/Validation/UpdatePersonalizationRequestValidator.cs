@@ -7,10 +7,11 @@ public sealed class UpdatePersonalizationRequestValidator : AbstractValidator<Up
 {
     public UpdatePersonalizationRequestValidator()
     {
-        RuleFor(x => x.FirstName).NotEmpty().MaximumLength(80);
-        RuleFor(x => x.LastName).NotEmpty().MaximumLength(80);
-        RuleFor(x => x.BirthDate)
-            .LessThanOrEqualTo(DateOnly.FromDateTime(DateTime.UtcNow))
-            .WithMessage("Birth date cannot be in the future.");
+        RuleFor(x => x.FirstName).MaximumLength(80);
+        RuleFor(x => x.LastName).MaximumLength(80);
+        RuleFor(x => x.BirthYear)
+            .InclusiveBetween(1900, DateTime.UtcNow.Year)
+            .When(x => x.BirthYear.HasValue)
+            .WithMessage("Birth year is outside the supported range.");
     }
 }

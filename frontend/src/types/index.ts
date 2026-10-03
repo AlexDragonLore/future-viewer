@@ -29,6 +29,7 @@ export interface ReadingCard {
 }
 
 export interface Reading {
+  isPreview?: boolean
   id: string
   spreadType: SpreadType
   spreadName: string
@@ -51,6 +52,32 @@ export interface RegisterResponse {
   userId: string
   email: string
   verificationRequired: boolean
+}
+
+export interface RegistrationDocumentVersions {
+  offer: string
+  privacy: string
+  personalDataConsent: string
+  marketingConsent: string
+  cookies: string
+}
+
+export interface RegistrationOptionalConsents {
+  personalization: boolean
+  marketing: boolean
+  analytics: boolean
+}
+
+export interface RegisterPayload {
+  email: string
+  password: string
+  offerAccepted: true
+  privacyAcknowledged: true
+  personalDataConsentAccepted: true
+  ageConfirmed18: true
+  documentVersions: RegistrationDocumentVersions
+  optionalConsents: RegistrationOptionalConsents
+  collectionSource: 'registration'
 }
 
 export interface TarotCardInfo {
@@ -143,7 +170,7 @@ export interface FeedbackInfo {
 }
 
 export interface LeaderboardEntry {
-  userId: string
+  entryId: string
   displayName: string
   totalScore: number
   feedbackScore: number
@@ -174,14 +201,7 @@ export interface AchievementInfo {
   unlockedAt: string | null
 }
 
-export interface TelegramStatus {
-  isLinked: boolean
-}
 
-export interface TelegramLinkResponse {
-  deepLinkUrl: string
-  isLinked: boolean
-}
 
 export interface AnnouncementInfo {
   id: string
@@ -201,13 +221,13 @@ export interface UserMemoryRule {
 export interface Personalization {
   firstName: string | null
   lastName: string | null
-  birthDate: string | null
+  birthYear: number | null
   isComplete: boolean
   memoryRules: UserMemoryRule[]
 }
 
 export interface UpdatePersonalizationPayload {
-  firstName: string
-  lastName: string
-  birthDate: string
+  firstName: string | null
+  lastName: string | null
+  birthYear: number | null
 }

@@ -44,12 +44,11 @@ public sealed class AuthServiceTests
             && !x.IsEmailVerified
             && x.EmailVerificationToken != null
             && x.EmailVerificationSentAt != null), It.IsAny<CancellationToken>()), Times.Once);
-        email.Verify(e => e.SendAsync("test@example.com", It.IsAny<string>(),
-            AuthEmailTemplate.Verification("http://link"), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("test@example.com", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task Register_creates_verified_user_without_email_when_email_is_not_configured()
+    public async Task Register_does_not_create_or_verify_user_when_email_is_not_configured()
     {
         var (sut, users, hasher, _, email, _) = CreateSut(emailConfigured: false);
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -58,29 +57,24 @@ public sealed class AuthServiceTests
             .ReturnsAsync((User u, CancellationToken _) => u);
         hasher.Setup(h => h.Hash(It.IsAny<string>())).Returns("hashed");
 
-        var result = await sut.RegisterAsync(new RegisterRequest { Email = "Test@Example.com", Password = "password123" });
+        var act = () => sut.RegisterAsync(new RegisterRequest { Email = "Test@Example.com", Password = "password123" });
 
-        result.Email.Should().Be("test@example.com");
-        result.VerificationRequired.Should().BeFalse();
-        users.Verify(u => u.AddAsync(It.Is<User>(x =>
-            x.Email == "test@example.com"
-            && x.PasswordHash == "hashed"
-            && x.IsEmailVerified
-            && x.EmailVerificationToken == null
-            && x.EmailVerificationSentAt == null), It.IsAny<CancellationToken>()), Times.Once);
+        (await act.Should().ThrowAsync<FeatureDisabledException>()).Which.FeatureCode.Should().Be("email_verification");
+        users.Verify(u => u.AddAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
         email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task Register_throws_conflict_when_email_taken()
+    public async Task Register_returns_generic_response_when_email_taken()
     {
         var (sut, users, _, _, _, _) = CreateSut();
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new User { Email = "a@b.c", PasswordHash = "x" });
 
-        var act = () => sut.RegisterAsync(new RegisterRequest { Email = "a@b.c", Password = "password123" });
+        var result = await sut.RegisterAsync(new RegisterRequest { Email = "a@b.c", Password = "password123" });
 
-        await act.Should().ThrowAsync<ConflictException>();
+        result.UserId.Should().BeEmpty();
+        result.Email.Should().Be("a@b.c");
     }
 
     [Fact]
@@ -94,7 +88,9 @@ public sealed class AuthServiceTests
             EmailVerificationToken = "tok",
             EmailVerificationSentAt = DateTime.UtcNow
         };
-        users.Setup(u => u.GetByEmailVerificationTokenAsync("tok", It.IsAny<CancellationToken>()))
+        users.Setup(u => u.GetByEmailVerificationTokenAsync(
+                It.Is<string>(x => x.Length == 64 && x != "tok"),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
         jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>()))
             .Returns(("jwt", DateTime.UtcNow.AddHours(1)));
@@ -119,7 +115,9 @@ public sealed class AuthServiceTests
             EmailVerificationToken = "tok",
             EmailVerificationSentAt = DateTime.UtcNow.AddDays(-2)
         };
-        users.Setup(u => u.GetByEmailVerificationTokenAsync("tok", It.IsAny<CancellationToken>()))
+        users.Setup(u => u.GetByEmailVerificationTokenAsync(
+                It.Is<string>(x => x.Length == 64 && x != "tok"),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         var act = () => sut.VerifyEmailAsync("tok");
@@ -153,9 +151,9 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task Login_succeeds_when_verified()
+    public async Task Login_succeeds_when_verified_even_when_email_delivery_is_unavailable()
     {
-        var (sut, users, hasher, jwt, _, _) = CreateSut();
+        var (sut, users, hasher, jwt, _, _) = CreateSut(emailConfigured: false);
         users.Setup(u => u.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new User { Email = "admin@b.c", PasswordHash = "hash", IsAdmin = true, IsEmailVerified = true });
         hasher.Setup(h => h.Verify("pw", "hash")).Returns(true);
@@ -168,7 +166,7 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
-    public async Task Login_marks_existing_unverified_user_verified_when_email_is_not_configured()
+    public async Task Login_does_not_bypass_email_verification_when_email_is_not_configured()
     {
         var (sut, users, hasher, jwt, _, _) = CreateSut(emailConfigured: false);
         var user = new User
@@ -184,13 +182,14 @@ public sealed class AuthServiceTests
         hasher.Setup(h => h.Verify("pw", "hash")).Returns(true);
         jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>())).Returns(("tok", DateTime.UtcNow.AddHours(1)));
 
-        var result = await sut.LoginAsync(new LoginRequest { Email = "a@b.c", Password = "pw" });
+        var act = () => sut.LoginAsync(new LoginRequest { Email = "a@b.c", Password = "pw" });
 
-        result.AccessToken.Should().Be("tok");
-        user.IsEmailVerified.Should().BeTrue();
-        user.EmailVerificationToken.Should().BeNull();
-        user.EmailVerificationSentAt.Should().BeNull();
-        users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+        await act.Should().ThrowAsync<EmailNotVerifiedException>();
+        user.IsEmailVerified.Should().BeFalse();
+        user.EmailVerificationToken.Should().Be("old");
+        user.EmailVerificationSentAt.Should().NotBeNull();
+        users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Never);
+        jwt.Verify(x => x.CreateAccessToken(It.IsAny<User>()), Times.Never);
     }
 
     [Fact]
@@ -216,6 +215,23 @@ public sealed class AuthServiceTests
         await sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "missing@x.com" });
 
         email.Verify(e => e.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Unavailable_email_does_not_rotate_verification_or_reset_tokens(bool passwordReset)
+    {
+        var (sut, users, _, _, email, _) = CreateSut(emailConfigured: false);
+        var act = passwordReset
+            ? () => sut.ForgotPasswordAsync(new ForgotPasswordRequest { Email = "a@b.c" })
+            : (Func<Task>)(() => sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" }));
+
+        await act.Should().ThrowAsync<FeatureDisabledException>();
+        users.Verify(x => x.GetByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never,
+            "an unavailable integration must behave identically for known and unknown accounts");
+        users.Verify(x => x.UpdateAsync(It.IsAny<User>(), It.IsAny<CancellationToken>()), Times.Never);
+        email.Verify(x => x.SendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -255,8 +271,7 @@ public sealed class AuthServiceTests
 
         await sut.ResendVerificationAsync(new ResendVerificationRequest { Email = "a@b.c" });
 
-        email.Verify(e => e.SendAsync("a@b.c", It.IsAny<string>(),
-            AuthEmailTemplate.Verification("http://link"), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("a@b.c", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -285,8 +300,7 @@ public sealed class AuthServiceTests
         user.PasswordResetTokenExpiresAt.Should().NotBeNull();
         user.PasswordResetTokenExpiresAt!.Value.Should().BeAfter(DateTime.UtcNow);
         users.Verify(u => u.UpdateAsync(user, It.IsAny<CancellationToken>()), Times.Once);
-        email.Verify(e => e.SendAsync("a@b.c", It.Is<string>(s => s.Contains("пароля")),
-            AuthEmailTemplate.PasswordReset("http://reset-link"), It.IsAny<CancellationToken>()), Times.Once);
+        email.Verify(e => e.SendAsync("a@b.c", It.Is<string>(s => s.Contains("пароля")), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -301,7 +315,9 @@ public sealed class AuthServiceTests
             PasswordResetToken = "tok",
             PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(30)
         };
-        users.Setup(u => u.GetByPasswordResetTokenAsync("tok", It.IsAny<CancellationToken>()))
+        users.Setup(u => u.GetByPasswordResetTokenAsync(
+                It.Is<string>(x => x.Length == 64 && x != "tok"),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
         hasher.Setup(h => h.Hash("new-password")).Returns("new-hash");
         jwt.Setup(j => j.CreateAccessToken(It.IsAny<User>())).Returns(("jwt", DateTime.UtcNow.AddHours(1)));
@@ -326,7 +342,9 @@ public sealed class AuthServiceTests
             PasswordResetToken = "tok",
             PasswordResetTokenExpiresAt = DateTime.UtcNow.AddMinutes(-1)
         };
-        users.Setup(u => u.GetByPasswordResetTokenAsync("tok", It.IsAny<CancellationToken>()))
+        users.Setup(u => u.GetByPasswordResetTokenAsync(
+                It.Is<string>(x => x.Length == 64 && x != "tok"),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         var act = () => sut.ResetPasswordAsync(new ResetPasswordRequest { Token = "tok", NewPassword = "new-password" });

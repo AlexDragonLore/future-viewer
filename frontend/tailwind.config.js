@@ -15,8 +15,8 @@ export default {
         },
       },
       fontFamily: {
-        display: ['"Cinzel"', 'serif'],
-        body: ['"Inter"', 'system-ui', 'sans-serif'],
+        display: ['Georgia', '"Times New Roman"', 'serif'],
+        body: ['system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
       },
       boxShadow: {
         glow: '0 0 40px rgba(245, 194, 107, 0.25)',

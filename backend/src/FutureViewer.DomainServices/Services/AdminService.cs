@@ -16,8 +16,8 @@ public sealed class AdminService
     private readonly IUserRepository _users;
     private readonly IAchievementRepository _achievementsRepo;
     private readonly AchievementService _achievements;
-    private readonly TelegramLinkService _telegram;
     private readonly ILogger<AdminService> _logger;
+    private readonly IPrivacyRepository? _privacy;
 
     public AdminService(
         IFeedbackRepository feedbacks,
@@ -25,16 +25,16 @@ public sealed class AdminService
         IUserRepository users,
         IAchievementRepository achievementsRepo,
         AchievementService achievements,
-        TelegramLinkService telegram,
-        ILogger<AdminService> logger)
+        ILogger<AdminService> logger,
+        IPrivacyRepository? privacy = null)
     {
         _feedbacks = feedbacks;
         _readings = readings;
         _users = users;
         _achievementsRepo = achievementsRepo;
         _achievements = achievements;
-        _telegram = telegram;
         _logger = logger;
+        _privacy = privacy;
     }
 
     public async Task<AdminFeedbackListResult> SearchFeedbacksAsync(
@@ -97,9 +97,12 @@ public sealed class AdminService
 
         var saved = await _feedbacks.AddAsync(feedback, ct);
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) created feedback {FeedbackId} for reading {ReadingId} (bypassDelay={Bypass}, replace={Replace})",
-            actorEmail, actorId, saved.Id, readingId, bypassDelay, replace);
+        await WriteAuditAsync(
+            actorId,
+            "admin.feedback_scheduled",
+            "feedback",
+            saved.Id,
+            ct);
 
         return MapAdmin(saved, reading, await _users.GetByIdAsync(reading.UserId.Value, ct));
     }
@@ -145,9 +148,12 @@ public sealed class AdminService
 
         var saved = await _feedbacks.AddAsync(feedback, ct);
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) created synthetic feedback {FeedbackId} for reading {ReadingId} score={Score}",
-            actorEmail, actorId, saved.Id, readingId, aiScore);
+        await WriteAuditAsync(
+            actorId,
+            "admin.feedback_synthetic_created",
+            "feedback",
+            saved.Id,
+            ct);
 
         await _achievements.CheckAndGrantAsync(saved.UserId, ct);
 
@@ -180,9 +186,12 @@ public sealed class AdminService
 
         await _feedbacks.UpdateAsync(feedback, ct);
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) updated feedback {FeedbackId}: score={Score} status={Status}",
-            actorEmail, actorId, feedbackId, feedback.AiScore, feedback.Status);
+        await WriteAuditAsync(
+            actorId,
+            "admin.feedback_updated",
+            "feedback",
+            feedbackId,
+            ct);
 
         await _achievements.CheckAndGrantAsync(feedback.UserId, ct);
 
@@ -200,9 +209,12 @@ public sealed class AdminService
         if (!existed)
             throw new NotFoundException("Feedback not found");
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) deleted feedback {FeedbackId}",
-            actorEmail, actorId, feedbackId);
+        await WriteAuditAsync(
+            actorId,
+            "admin.feedback_deleted",
+            "feedback",
+            feedbackId,
+            ct);
     }
 
     public async Task<AdminUserListResult> SearchUsersAsync(
@@ -256,8 +268,6 @@ public sealed class AdminService
             SubscriptionStatus = user.SubscriptionStatus,
             SubscriptionExpiresAt = user.SubscriptionExpiresAt,
             YukassaSubscriptionId = user.YukassaSubscriptionId,
-            TelegramChatId = user.TelegramChatId,
-            HasTelegramLinkToken = !string.IsNullOrEmpty(user.TelegramLinkToken),
             TotalReadings = totalReadings,
             TotalFeedbacks = allFeedbacksCount,
             TotalScore = totalScore,
@@ -300,9 +310,13 @@ public sealed class AdminService
         {
             user.IsAdmin = isAdmin;
             await _users.UpdateAsync(user, ct);
-            _logger.LogInformation(
-                "Admin {ActorEmail} ({ActorId}) set IsAdmin={IsAdmin} on user {UserId}",
-                actorEmail, actorId, isAdmin, userId);
+            await WriteAuditAsync(
+                actorId,
+                "admin.user_role_changed",
+                "user",
+                user.PrivacySubjectId,
+                ct,
+                isAdmin ? "admin_enabled" : "admin_disabled");
         }
 
         return await BuildListItemAsync(user, ct);
@@ -317,13 +331,20 @@ public sealed class AdminService
         if (actorId == userId)
             throw new ConflictException("Admin cannot delete themselves");
 
+        var target = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
+        var targetReference = target.PrivacySubjectId;
+
         var deleted = await _users.DeleteAsync(userId, ct);
         if (!deleted)
             throw new NotFoundException("User not found");
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) deleted user {UserId}",
-            actorEmail, actorId, userId);
+        await WriteAuditAsync(
+            actorId,
+            "admin.user_deleted",
+            "user",
+            targetReference,
+            ct);
     }
 
     public async Task<AdminUserDetailDto> SetSubscriptionAsync(
@@ -349,9 +370,13 @@ public sealed class AdminService
 
         await _users.UpdateAsync(user, ct);
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) set subscription on {UserId}: status={Status} expiresAt={ExpiresAt}",
-            actorEmail, actorId, userId, status, user.SubscriptionExpiresAt);
+        await WriteAuditAsync(
+            actorId,
+            "admin.subscription_changed",
+            "user",
+            user.PrivacySubjectId,
+            ct,
+            status.ToString().ToLowerInvariant());
 
         return await GetUserDetailAsync(userId, ct);
     }
@@ -383,9 +408,12 @@ public sealed class AdminService
         if (granted is null)
             throw new ConflictException($"User already has achievement '{code}'");
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) granted achievement {Code} to user {UserId}",
-            actorEmail, actorId, code, userId);
+        await WriteAuditAsync(
+            actorId,
+            "admin.achievement_granted",
+            "user",
+            user.PrivacySubjectId,
+            ct);
 
         return new AchievementDto
         {
@@ -409,6 +437,8 @@ public sealed class AdminService
         if (string.IsNullOrWhiteSpace(code))
             throw new DomainException("Achievement code is required");
 
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new NotFoundException("User not found");
         var achievement = await _achievementsRepo.GetByCodeAsync(code, ct)
             ?? throw new NotFoundException($"Achievement '{code}' not found");
 
@@ -416,9 +446,12 @@ public sealed class AdminService
         if (!removed)
             throw new NotFoundException($"User does not have achievement '{code}'");
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) revoked achievement {Code} from user {UserId}",
-            actorEmail, actorId, code, userId);
+        await WriteAuditAsync(
+            actorId,
+            "admin.achievement_revoked",
+            "user",
+            user.PrivacySubjectId,
+            ct);
     }
 
     public async Task<IReadOnlyList<AchievementDto>> RecheckAchievementsAsync(
@@ -432,27 +465,15 @@ public sealed class AdminService
 
         var granted = await _achievements.CheckAndGrantAsync(user.Id, ct);
 
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) rechecked achievements for user {UserId}: granted={Count}",
-            actorEmail, actorId, userId, granted.Count);
+        await WriteAuditAsync(
+            actorId,
+            "admin.achievements_rechecked",
+            "user",
+            user.PrivacySubjectId,
+            ct,
+            granted.Count > 0 ? "changes_applied" : "no_changes");
 
         return granted;
-    }
-
-    public async Task UnlinkTelegramAsync(
-        Guid actorId,
-        string actorEmail,
-        Guid userId,
-        CancellationToken ct = default)
-    {
-        _ = await _users.GetByIdAsync(userId, ct)
-            ?? throw new NotFoundException("User not found");
-
-        await _telegram.UnlinkAsync(userId, ct);
-
-        _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) unlinked Telegram for user {UserId}",
-            actorEmail, actorId, userId);
     }
 
     public async Task<AdminStatsDto> GetStatsAsync(CancellationToken ct = default)
@@ -467,7 +488,6 @@ public sealed class AdminService
         var activeSubs = await _users.CountActiveSubscriptionsAsync(now, ct);
         var readingsToday = await _readings.CountSinceAsync(todayUtc, ct);
         var readingsThisWeek = await _readings.CountSinceAsync(weekAgoUtc, ct);
-        var pendingToNotify = await _feedbacks.CountPendingToNotifyAsync(now, ct);
         var scoredThisMonth = await _feedbacks.CountScoredSinceAsync(monthAgoUtc, ct);
 
         return new AdminStatsDto
@@ -477,56 +497,45 @@ public sealed class AdminService
             ActiveSubscriptions = activeSubs,
             ReadingsToday = readingsToday,
             ReadingsThisWeek = readingsThisWeek,
-            PendingFeedbacksToNotify = pendingToNotify,
             ScoredFeedbacksThisMonth = scoredThisMonth
         };
     }
 
-    public async Task<AdminTelegramLinkResult> SetTelegramChatIdAsync(
+    private async Task WriteAuditAsync(
         Guid actorId,
-        string actorEmail,
-        Guid userId,
-        long chatId,
-        CancellationToken ct = default)
+        string eventType,
+        string targetType,
+        Guid? targetReference,
+        CancellationToken ct,
+        string? reasonCode = null)
     {
-        var user = await _users.GetByIdAsync(userId, ct)
-            ?? throw new NotFoundException("User not found");
-
-        var existing = await _users.GetByTelegramChatIdAsync(chatId, ct);
-        if (existing is not null && existing.Id != userId)
-            throw new ConflictException($"Telegram chatId {chatId} is already linked to another user");
-
-        user.TelegramChatId = chatId;
-        user.TelegramLinkToken = null;
-
-        try
+        if (_privacy is null)
         {
-            await _users.UpdateAsync(user, ct);
-        }
-        catch (Exception ex) when (IsUniqueViolation(ex))
-        {
-            throw new ConflictException($"Telegram chatId {chatId} is already linked to another user");
+            // Compatibility path for isolated unit tests that construct the legacy
+            // service directly. Production DI always provides IPrivacyRepository.
+            _logger.LogWarning(
+                "Persistent administrative audit is unavailable; eventType={EventType}",
+                eventType);
+            return;
         }
 
+        var actor = await _users.GetByIdAsync(actorId, ct);
+        var auditEvent = new AuditEvent
+        {
+            OccurredAt = DateTime.UtcNow,
+            EventType = eventType,
+            CorrelationId = Guid.NewGuid().ToString("N"),
+            ActorSubjectReference = actor?.PrivacySubjectId,
+            TargetType = targetType,
+            TargetReference = targetReference,
+            Outcome = "success",
+            ReasonCode = reasonCode
+        };
+        await _privacy.AddAuditEventAsync(auditEvent, ct);
         _logger.LogInformation(
-            "Admin {ActorEmail} ({ActorId}) set Telegram chatId={ChatId} for user {UserId}",
-            actorEmail, actorId, chatId, userId);
-
-        return new AdminTelegramLinkResult { ChatId = chatId };
-    }
-
-    private static bool IsUniqueViolation(Exception ex)
-    {
-        for (var e = ex; e is not null; e = e.InnerException)
-        {
-            var name = e.GetType().Name;
-            if (name.Contains("UniqueConstraint", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (e.Message.Contains("duplicate key", StringComparison.OrdinalIgnoreCase) ||
-                e.Message.Contains("unique constraint", StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-        return false;
+            "Administrative mutation audited; eventType={EventType}; auditEventId={AuditEventId}",
+            eventType,
+            auditEvent.Id);
     }
 
     private async Task<AdminUserListItem> BuildListItemAsync(User user, CancellationToken ct)
@@ -544,7 +553,6 @@ public sealed class AdminService
             IsAdmin = user.IsAdmin,
             SubscriptionStatus = user.SubscriptionStatus,
             SubscriptionExpiresAt = user.SubscriptionExpiresAt,
-            TelegramChatId = user.TelegramChatId,
             TotalReadings = totalReadings,
             TotalFeedbacks = totalFeedbacks,
             TotalScore = totalScore
@@ -606,9 +614,4 @@ public sealed class AdminUserListResult
 {
     public required IReadOnlyList<AdminUserListItem> Items { get; init; }
     public required int Total { get; init; }
-}
-
-public sealed class AdminTelegramLinkResult
-{
-    public required long ChatId { get; init; }
 }

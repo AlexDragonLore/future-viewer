@@ -3,37 +3,36 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useDeckStore } from '@/stores/useDeckStore'
-import { useProfileStore } from '@/stores/useProfileStore'
+import { useReadingStore } from '@/stores/useReadingStore'
+import { usePrivacyStore } from '@/stores/usePrivacyStore'
 import { SpreadType } from '@/types'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
-import { paidProduct } from '@/content/legal'
+import AiDisclaimer from '@/components/AiDisclaimer.vue'
+import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 import { findDeckMeta } from '@/data/decks'
 import { SPREADS_META, findSpreadMeta } from '@/data/spreads'
 import { extractApiError } from '@/api/httpClient'
 import { readingApi } from '@/api/readingApi'
 import { unlockAudio } from '@/composables/useAudio'
 import type { AxiosError } from 'axios'
-import type { QuestionValidationResponse } from '@/api/readingApi'
-
-const subscriberWarningMessage = 'По такому запросу обычно не гадают. Вы уверены, что хотите продолжить?'
-const subscriptionRequiredMessage = 'На такие запросы можно ответить только с подпиской.'
+import { assessQuestionLocally } from '@/utils/questionSafety'
+import { getGuestContinuation } from '@/utils/guestReading'
 
 const router = useRouter()
 const auth = useAuthStore()
 const deck = useDeckStore()
-const profile = useProfileStore()
+const readingStore = useReadingStore()
+const privacyStore = usePrivacyStore()
+const publicConfig = usePublicConfigStore()
+const paidProduct = computed(() => publicConfig.paidProduct)
 
 const question = ref('')
-const firstName = ref('')
-const lastName = ref('')
-const birthDate = ref('')
-const introError = ref<string | null>(null)
 const validationMessage = ref<string | null>(null)
 const validationSuggestion = ref<string | null>(null)
-const validationRequiresSubscription = ref(false)
-const questionWarning = ref<QuestionValidationResponse | null>(null)
 const validatingQuestion = ref(false)
-const spreadType = ref<SpreadType>(SpreadType.ThreeCard)
+const spreadType = ref<SpreadType>(SpreadType.SingleCard)
+const saveToHistory = ref(false)
+const hasGuestReading = ref(Boolean(getGuestContinuation()))
 
 const currentDeckMeta = computed(() => findDeckMeta(deck.current))
 const currentSpreadMeta = computed(() => findSpreadMeta(spreadType.value))
@@ -49,65 +48,29 @@ function ensureSuggestion(suggestedQuestion: string | null | undefined, source =
   return suggestedQuestion?.trim() || buildFallbackSuggestion(source)
 }
 
-function readPendingPayload() {
-  const pending = sessionStorage.getItem('fv_pending')
-  if (!pending) return null
-  try {
-    return JSON.parse(pending) as { question?: string; spreadType?: SpreadType }
-  } catch {
-    return null
-  }
-}
-
-function restorePendingPayload(payload: { question?: string; spreadType?: SpreadType } | null) {
+function restorePendingPayload(payload: { question?: string; spreadType?: SpreadType; saveToHistory?: boolean } | null) {
   if (!payload) return
   question.value = payload.question ?? ''
   if (payload.spreadType) spreadType.value = payload.spreadType
+  saveToHistory.value = payload.saveToHistory === true
 }
 
 onMounted(async () => {
-  const pendingPayload = readPendingPayload()
-  const readingError = sessionStorage.getItem('fv_reading_error')
-  if (readingError) {
-    sessionStorage.removeItem('fv_reading_error')
-    sessionStorage.removeItem('fv_pending')
-    restorePendingPayload(pendingPayload)
-    try {
-      const parsed = JSON.parse(readingError) as { message?: string; suggestedQuestion?: string | null }
-      validationMessage.value = parsed.message ?? null
-      validationSuggestion.value = ensureSuggestion(parsed.suggestedQuestion, pendingPayload?.question ?? question.value)
-    } catch {
-      validationMessage.value = null
-      validationSuggestion.value = ensureSuggestion(null, pendingPayload?.question ?? question.value)
-    }
-  }
+  const pendingPayload = readingStore.takePending()
+  const hadPendingDraft = Boolean(pendingPayload && !pendingPayload.validated)
+  if (pendingPayload && !pendingPayload.validated) restorePendingPayload(pendingPayload)
 
-  const validation = sessionStorage.getItem('fv_question_validation')
-  if (validation) {
-    sessionStorage.removeItem('fv_question_validation')
-    sessionStorage.removeItem('fv_pending')
-    restorePendingPayload(pendingPayload)
-    try {
-      const parsed = JSON.parse(validation) as { message?: string; suggestedQuestion?: string | null }
-      validationMessage.value = parsed.message ?? null
-      validationSuggestion.value = ensureSuggestion(parsed.suggestedQuestion, pendingPayload?.question ?? question.value)
-    } catch {
-      validationMessage.value = null
-      validationSuggestion.value = ensureSuggestion(null, pendingPayload?.question ?? question.value)
-    }
+  const workflowIssue = readingStore.takeWorkflowIssue()
+  if (workflowIssue) {
+    validationMessage.value = workflowIssue.message
+    validationSuggestion.value = ensureSuggestion(workflowIssue.suggestedQuestion)
   }
 
   if (auth.isAuthenticated) {
-    await Promise.all([auth.refreshSubscription(), profile.loadPersonalization()])
-    if (profile.personalization) {
-      firstName.value = profile.personalization.firstName ?? ''
-      lastName.value = profile.personalization.lastName ?? ''
-      birthDate.value = profile.personalization.birthDate ?? ''
-    }
+    await Promise.allSettled([auth.refreshSubscription(), privacyStore.loadSettings()])
+    if (!hadPendingDraft) saveToHistory.value = privacyStore.settings.historyEnabled
   }
 })
-
-const needsIntro = computed(() => auth.isAuthenticated && !(profile.personalization?.isComplete ?? false))
 
 const requiresSubscription = computed(() => {
   if (!auth.isAuthenticated) return false
@@ -135,8 +98,7 @@ const blockMessage = computed(() => {
 const canBegin = computed(() => {
   if (validatingQuestion.value) return false
   if (auth.isAuthenticated && auth.subscriptionLoading) return false
-  if (!question.value.trim()) return false
-  if (needsIntro.value && (!firstName.value.trim() || !lastName.value.trim() || !birthDate.value)) return false
+  if (auth.isAuthenticated && !question.value.trim()) return false
   if (!auth.isAuthenticated) return true
   return !blocked.value
 })
@@ -151,91 +113,52 @@ const badgeText = computed(() => {
   return `Бесплатно сегодня: ${left}/${s.freeReadingsDailyLimit}`
 })
 
-const warningSuggestion = computed(() =>
-  questionWarning.value
-    ? ensureSuggestion(questionWarning.value.suggestedQuestion, question.value)
-    : null,
-)
-
 function applySuggestion() {
-  const suggestion = validationSuggestion.value ?? warningSuggestion.value
+  const suggestion = validationSuggestion.value
   if (suggestion) {
     question.value = suggestion
     validationMessage.value = null
     validationSuggestion.value = null
-    validationRequiresSubscription.value = false
-    questionWarning.value = null
-    sessionStorage.removeItem('fv_pending')
   }
-}
-
-function continueWithWarning() {
-  const pending = {
-    spreadType: spreadType.value,
-    question: question.value.trim(),
-    questionWarningAcknowledged: true,
-  }
-  sessionStorage.setItem('fv_pending', JSON.stringify(pending))
-  questionWarning.value = null
-  router.push({ name: 'reading' })
-}
-
-function closeWarning() {
-  questionWarning.value = null
-  sessionStorage.removeItem('fv_pending')
 }
 
 async function begin() {
   if (!canBegin.value) return
   unlockAudio()
-  introError.value = null
-  validationMessage.value = null
-  validationSuggestion.value = null
-  validationRequiresSubscription.value = false
-  questionWarning.value = null
-  const pending = {
-    spreadType: spreadType.value,
-    question: question.value.trim(),
-    questionWarningAcknowledged: false,
-  }
-  sessionStorage.setItem('fv_pending', JSON.stringify(pending))
-  if (!auth.isAuthenticated) {
-    router.push({ name: 'auth', query: { redirect: '/reading' } })
+  if (!auth.isAuthenticated && getGuestContinuation()) {
+    router.push({ name: 'result' })
     return
   }
-  if (needsIntro.value) {
-    try {
-      await profile.savePersonalization({
-        firstName: firstName.value,
-        lastName: lastName.value,
-        birthDate: birthDate.value,
-      })
-    } catch (e) {
-      introError.value = extractApiError(e, 'Не удалось сохранить знакомство')
-      return
-    }
+  hasGuestReading.value = false
+  validationMessage.value = null
+  validationSuggestion.value = null
+  const pending = {
+    spreadType: auth.isAuthenticated ? spreadType.value : SpreadType.SingleCard,
+    question: question.value.trim() || 'На что мне сейчас стоит обратить внимание?',
+    questionWarningAcknowledged: false,
+    saveToHistory: saveToHistory.value,
+    validated: false,
+  }
+
+  const localSafety = assessQuestionLocally(pending.question)
+  if (localSafety.blocked) {
+    validationMessage.value = localSafety.message ?? 'Вопрос нужно обезличить.'
+    validationSuggestion.value = localSafety.suggestedQuestion ?? null
+    return
+  }
+
+  if (!auth.isAuthenticated) {
+    readingStore.setPending({ ...pending, saveToHistory: false, validated: true })
+    router.push({ name: 'reading' })
+    return
   }
 
   validatingQuestion.value = true
   try {
     const validation = await readingApi.validateQuestion(spreadType.value, pending.question, deck.current)
-    if (validation.status !== 'accepted') {
-      const suggestion = ensureSuggestion(validation.suggestedQuestion, pending.question)
-      if (validation.requiresSubscription || !auth.isSubscribed) {
-        validationMessage.value = subscriptionRequiredMessage
-        validationSuggestion.value = suggestion
-        validationRequiresSubscription.value = true
-        sessionStorage.removeItem('fv_pending')
-        return
-      }
-
-      questionWarning.value = {
-        ...validation,
-        message: validation.message || subscriberWarningMessage,
-        canContinue: true,
-        requiresSubscription: false,
-        suggestedQuestion: suggestion,
-      }
+    if (validation.status !== 'accepted' || !validation.canContinue) {
+      validationMessage.value = validation.message || 'Вопрос нужно обезличить или переформулировать.'
+      validationSuggestion.value = ensureSuggestion(validation.suggestedQuestion, pending.question)
       return
     }
   } catch (e) {
@@ -244,18 +167,16 @@ async function begin() {
     if (code === 'question_needs_rewrite' || code === 'question_rejected' || code === 'question_requires_subscription') {
       validationMessage.value = extractApiError(e, 'Вопрос нужно уточнить')
       validationSuggestion.value = ensureSuggestion(err.response?.data?.suggestedQuestion, pending.question)
-      validationRequiresSubscription.value = code === 'question_requires_subscription'
-      sessionStorage.removeItem('fv_pending')
       return
     }
     validationMessage.value = extractApiError(e, 'Не удалось проверить вопрос')
     validationSuggestion.value = ensureSuggestion(null, pending.question)
-    sessionStorage.removeItem('fv_pending')
     return
   } finally {
     validatingQuestion.value = false
   }
 
+  readingStore.setPending({ ...pending, validated: true })
   router.push({ name: 'reading' })
 }
 </script>
@@ -264,9 +185,11 @@ async function begin() {
   <main class="home-page min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16">
     <header class="text-center mb-10">
       <div class="home-kicker text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ВУАЛЬ ГРЯДУЩЕГО ✦</div>
-      <h1 class="home-title font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">Загляни за Вуаль</h1>
+      <h1 class="home-title font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">{{ auth.isAuthenticated ? 'Загляни за Вуаль' : 'Открой свою карту' }}</h1>
       <p class="text-mystic-silver/70 max-w-xl mx-auto">
-        Задай вопрос Вселенной. Карты Таро раскроют тайные нити судьбы и покажут путь сквозь туман грядущего.
+        {{ auth.isAuthenticated
+          ? 'Задай обезличенный вопрос и получи символическую интерпретацию карт как один из возможных взглядов на ситуацию.'
+          : 'Одна карта и начало толкования — бесплатно, без регистрации. Продолжение откроется после создания аккаунта.' }}
       </p>
     </header>
 
@@ -278,7 +201,7 @@ async function begin() {
         </RouterLink>
       </div>
 
-      <div v-if="currentDeckMeta" class="deck-blurb" data-testid="home-deck-blurb">
+      <div v-if="auth.isAuthenticated && currentDeckMeta" class="deck-blurb" data-testid="home-deck-blurb">
         <div class="deck-blurb-head">
           <span class="deck-blurb-label">Колода:</span>
           <strong>{{ currentDeckMeta.label }}</strong>
@@ -289,7 +212,7 @@ async function begin() {
         </RouterLink>
       </div>
 
-      <div>
+      <div v-if="auth.isAuthenticated">
         <label class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">Расклад</label>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <button
@@ -314,15 +237,22 @@ async function begin() {
         </div>
       </div>
 
-      <div>
-        <label class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">Вопрос</label>
+      <p v-if="!auth.isAuthenticated && hasGuestReading" class="text-center text-mystic-silver/80">
+        Твоя карта уже открыта. Вернись к ней и продолжи с того же места.
+      </p>
+      <div v-if="auth.isAuthenticated || !hasGuestReading">
+        <label for="reading-question" class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">{{ auth.isAuthenticated ? 'Вопрос' : 'Твой вопрос · необязательно' }}</label>
         <textarea
+          id="reading-question"
           v-model="question"
           rows="3"
-          placeholder="Что меня ждёт впереди?"
+          placeholder="На что мне сейчас стоит обратить внимание?"
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 text-mystic-silver placeholder:text-mystic-silver/30 focus:outline-none focus:border-mystic-accent transition"
           maxlength="500"
         />
+        <p v-if="!auth.isAuthenticated" class="text-xs text-mystic-silver/60 mt-2">
+          Можно просто открыть карту дня. Если пишешь свой вопрос, не указывай имена и личные данные.
+        </p>
       </div>
 
       <div v-if="validationMessage" class="validation-warning" data-testid="question-validation">
@@ -338,83 +268,36 @@ async function begin() {
         </button>
       </div>
 
-      <div
-        v-if="questionWarning"
-        class="validation-warning question-warning-panel"
-        role="dialog"
-        aria-labelledby="question-warning-title"
-        data-testid="question-warning-modal"
-      >
-        <div id="question-warning-title" class="warning-title">Такой вопрос не подходит для гадания</div>
-        <p class="warning-text">{{ questionWarning.message }}</p>
-        <p class="warning-reason">{{ questionWarning.reason }}</p>
-        <button
-          v-if="warningSuggestion"
-          type="button"
-          class="suggestion-button"
-          @click="applySuggestion"
-          data-testid="warning-apply-suggested-question"
-        >
-          {{ warningSuggestion }}
-        </button>
-        <div class="warning-actions">
-          <button type="button" class="warning-secondary" @click="closeWarning">
-            Отмена
-          </button>
-          <button type="button" class="glow-button warning-primary" @click="continueWithWarning" data-testid="continue-with-warning">
-            Продолжить с этим вопросом
-          </button>
-        </div>
-      </div>
-
       <div v-if="validatingQuestion" class="validation-pending" data-testid="question-validating">
         <span class="validation-spinner" aria-hidden="true"></span>
         <span>Сверяю вопрос с Вуалью…</span>
       </div>
 
-      <section v-if="needsIntro" class="intro-block" data-testid="personalization-intro">
-        <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Знакомство</div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <input
-            v-model="firstName"
-            type="text"
-            placeholder="Имя"
-            maxlength="80"
-            class="intro-input"
-            data-testid="first-name-input"
-          />
-          <input
-            v-model="lastName"
-            type="text"
-            placeholder="Фамилия"
-            maxlength="80"
-            class="intro-input"
-            data-testid="last-name-input"
-          />
-          <input
-            v-model="birthDate"
-            type="date"
-            class="intro-input sm:col-span-2"
-            data-testid="birth-date-input"
-          />
-        </div>
-        <p v-if="introError" class="text-red-300 text-xs mt-2">{{ introError }}</p>
-      </section>
+      <label v-if="auth.isAuthenticated" class="history-choice" data-testid="history-save-choice">
+        <input v-model="saveToHistory" type="checkbox" data-testid="save-to-history" />
+        <span>
+          Сохранить вопрос, карты и интерпретацию в истории. По умолчанию выключено; настройку можно изменить в
+          разделе «Данные и конфиденциальность».
+        </span>
+      </label>
 
       <div v-if="blocked" class="block-warning" data-testid="block-warning">
         {{ blockMessage }}
       </div>
 
       <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
-        {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : 'Войти и начать' }}
+        {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : hasGuestReading ? 'Продолжить мой расклад' : 'Открыть карту бесплатно' }}
       </button>
 
+      <AiDisclaimer />
+
       <SubscriptionBanner
-        v-if="auth.isAuthenticated && !auth.isSubscribed && (blocked || validationRequiresSubscription)"
-        :message="validationRequiresSubscription ? 'Этот вопрос доступен только с подпиской' : requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
+        v-if="auth.isAuthenticated && !auth.isSubscribed && blocked"
+        :message="requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
+        :price-label="`${paidProduct.price} / ${paidProduct.period}`"
       />
 
-      <div class="payment-info">
+      <div v-if="auth.isAuthenticated && publicConfig.paymentsEnabled" class="payment-info">
         <div>
           <div class="payment-title">{{ paidProduct.title }}</div>
           <p>
@@ -422,13 +305,13 @@ async function begin() {
             активируется после успешной онлайн-оплаты. Автосписаний нет — для продления нужно оплатить доступ заново.
           </p>
         </div>
-        <RouterLink to="/legal" class="payment-link">Условия оплаты</RouterLink>
+        <RouterLink to="/legal/offer" class="payment-link">Условия оплаты</RouterLink>
       </div>
 
       <div class="home-links flex flex-wrap items-center gap-3 justify-between text-xs text-mystic-silver/50">
         <RouterLink v-if="!auth.isAuthenticated" to="/auth" class="hover:text-mystic-accent transition">Войти / Регистрация</RouterLink>
         <RouterLink v-else to="/history" class="hover:text-mystic-accent transition">История раскладов</RouterLink>
-        <RouterLink to="/faq" class="hover:text-mystic-accent transition">FAQ</RouterLink>
+        <RouterLink to="/faq" class="hover:text-mystic-accent transition">Вопросы и ответы</RouterLink>
         <span v-if="auth.email">{{ auth.email }}</span>
       </div>
     </section>
@@ -612,6 +495,30 @@ async function begin() {
   color: #fca5a5;
   font-size: 0.8rem;
   line-height: 1.4;
+}
+.history-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  border: 1px solid rgba(245, 194, 107, 0.2);
+  border-radius: 0.75rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.8rem 0.9rem;
+  color: rgba(224, 212, 186, 0.76);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.history-choice input {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+  accent-color: #f5c26b;
+}
+.legal-payment-block {
+  border-left: 2px solid rgba(252, 165, 165, 0.7);
+  padding: 0.65rem 0.8rem;
+  color: rgba(252, 165, 165, 0.9);
+  font-size: 0.75rem;
+  line-height: 1.5;
 }
 .glow-button:disabled {
   opacity: 0.5;

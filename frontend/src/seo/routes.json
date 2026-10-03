@@ -5,14 +5,14 @@
   "googleSiteVerification": "wIruS4kUKqmhYfO04Yq8VUay-fwhwo1iGnYvyL_LQMg",
   "yandexVerification": "3e5ca7086b4b140e",
   "defaultImage": "/og/veil-of-future-og.png",
-  "defaultTitle": "Вуаль Грядущего — онлайн Таро с AI-интерпретацией",
-  "defaultDescription": "Онлайн-расклады Таро с AI-интерпретацией: карта дня, три карты и Кельтский крест. Задайте вопрос и получите понятный разбор.",
+  "defaultTitle": "Карта Таро онлайн бесплатно без регистрации | Вуаль Грядущего",
+  "defaultDescription": "Откройте одну карту Таро бесплатно без регистрации: половина толкования ИИ доступна сразу. Чтобы дочитать расклад, зарегистрируйтесь и подтвердите email.",
   "indexableRoutes": [
     {
       "name": "home",
       "path": "/",
-      "title": "Вуаль Грядущего — онлайн Таро с AI-интерпретацией",
-      "description": "Онлайн-расклады Таро с AI-интерпретацией: карта дня, три карты и Кельтский крест. Задайте вопрос и получите понятный разбор.",
+      "title": "Карта Таро онлайн бесплатно без регистрации | Вуаль Грядущего",
+      "description": "Откройте одну карту Таро бесплатно без регистрации: половина толкования ИИ доступна сразу. Чтобы дочитать расклад, зарегистрируйтесь и подтвердите email.",
       "priority": 1,
       "changefreq": "weekly",
       "type": "website"
@@ -30,26 +30,8 @@
       "name": "about",
       "path": "/about",
       "title": "О сервисе | Вуаль Грядущего",
-      "description": "Вуаль Грядущего — онлайн-сервис Таро с AI-интерпретациями, личным кабинетом, историей раскладов и прозрачными правилами работы.",
+      "description": "Вуаль Грядущего — онлайн-сервис Таро с интерпретациями ИИ, личным кабинетом, историей раскладов и прозрачными правилами работы.",
       "priority": 0.7,
-      "changefreq": "monthly",
-      "type": "article"
-    },
-    {
-      "name": "privacy",
-      "path": "/privacy",
-      "title": "Политика конфиденциальности | Вуаль Грядущего",
-      "description": "Как Вуаль Грядущего обрабатывает email, данные профиля, вопросы к раскладам, обратную связь, Telegram-связку и платежные данные.",
-      "priority": 0.5,
-      "changefreq": "monthly",
-      "type": "article"
-    },
-    {
-      "name": "legal",
-      "path": "/legal",
-      "title": "Оплата и оферта | Вуаль Грядущего",
-      "description": "Условия оплаты цифрового доступа Future Viewer Pro, порядок предоставления услуги, контакты исполнителя и публичная оферта.",
-      "priority": 0.5,
       "changefreq": "monthly",
       "type": "article"
     }
@@ -69,6 +51,14 @@
     { "name": "feedback", "path": "/feedback/:token", "title": "Обратная связь | Вуаль Грядущего" },
     { "name": "achievements", "path": "/achievements", "title": "Достижения | Вуаль Грядущего" },
     { "name": "profile", "path": "/profile", "title": "Профиль | Вуаль Грядущего" },
+    { "name": "legal-privacy", "path": "/legal/privacy", "title": "Политика обработки персональных данных | Вуаль Грядущего" },
+    { "name": "legal-personal-data-consent", "path": "/legal/personal-data-consent", "title": "Согласие на обработку персональных данных | Вуаль Грядущего" },
+    { "name": "legal-cookies", "path": "/legal/cookies", "title": "Политика cookies и хранилища браузера | Вуаль Грядущего" },
+    { "name": "legal-offer", "path": "/legal/offer", "title": "Публичная оферта | Вуаль Грядущего" },
+    { "name": "legal-marketing-consent", "path": "/legal/marketing-consent", "title": "Согласие на рекламные сообщения | Вуаль Грядущего" },
+    { "name": "legal-ai-disclaimer", "path": "/legal/ai-disclaimer", "title": "Уведомление об ИИ и Таро | Вуаль Грядущего" },
+    { "name": "legal-data-request", "path": "/legal/data-request", "title": "Права пользователя и обращения о данных | Вуаль Грядущего" },
+    { "name": "legal-processors", "path": "/legal/processors", "title": "Реестр обработчиков | Вуаль Грядущего" },
     { "name": "admin", "path": "/admin", "title": "Админ-панель | Вуаль Грядущего" },
     { "name": "admin-users", "path": "/admin/users", "title": "Пользователи | Вуаль Грядущего" },
     { "name": "admin-user-detail", "path": "/admin/users/:id", "title": "Пользователь | Вуаль Грядущего" },

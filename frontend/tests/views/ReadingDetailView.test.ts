@@ -82,4 +82,14 @@ describe('ReadingDetailView', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Not found')
   })
+
+  it('sanitizes stored AI Markdown and renders the disclaimer', async () => {
+    getMock.mockResolvedValue({ ...sample, interpretation: '<script>alert(1)</script> [bad](javascript:alert(1))' })
+    const { wrapper } = await mountDetail('abc-123')
+    await flushPromises()
+    const rendered = wrapper.get('.prose-mystic').html()
+    expect(rendered).not.toContain('<script')
+    expect(rendered).not.toContain('javascript:')
+    expect(wrapper.find('[data-testid="ai-disclaimer"]').exists()).toBe(true)
+  })
 })

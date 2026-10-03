@@ -48,7 +48,7 @@ public sealed class ReadingServiceTests
                 PasswordHash = "x",
                 FirstName = "Ada",
                 LastName = "Lovelace",
-                BirthDate = new DateOnly(1815, 12, 10),
+                BirthYear = 1815,
                 SubscriptionStatus = SubscriptionStatus.Active,
                 SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
             });
@@ -61,7 +61,7 @@ public sealed class ReadingServiceTests
         var questionValidator = AcceptedQuestionValidator();
         var memoryExtractor = EmptyMemoryExtractor();
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, personalization, questionValidator.Object, memoryExtractor.Object, NullLogger<ReadingService>.Instance);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, personalization, questionValidator.Object, memoryExtractor.Object, users.Object, NullLogger<ReadingService>.Instance);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "Что меня ждёт?" },
@@ -110,7 +110,7 @@ public sealed class ReadingServiceTests
                 PasswordHash = "x",
                 FirstName = "Ada",
                 LastName = "Lovelace",
-                BirthDate = new DateOnly(1815, 12, 10),
+                BirthYear = 1815,
                 SubscriptionStatus = SubscriptionStatus.Active,
                 SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
             });
@@ -123,14 +123,15 @@ public sealed class ReadingServiceTests
         var questionValidator = AcceptedQuestionValidator();
         var memoryExtractor = EmptyMemoryExtractor();
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, personalization, questionValidator.Object, memoryExtractor.Object, NullLogger<ReadingService>.Instance);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, personalization, questionValidator.Object, memoryExtractor.Object, users.Object, NullLogger<ReadingService>.Instance);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest
             {
                 SpreadType = SpreadType.SingleCard,
                 Question = "q",
-                DeckType = DeckType.Thoth
+                DeckType = DeckType.Thoth,
+                SaveToHistory = true
             },
             userId: Guid.NewGuid());
 
@@ -138,6 +139,9 @@ public sealed class ReadingServiceTests
         capturedNotes.Should().NotBeNull();
         capturedNotes!.Values.Should().OnlyContain(v => v.Contains("Thoth"));
         saved!.DeckType.Should().Be(DeckType.Thoth);
+        saved.SavedToHistory.Should().BeFalse("the account-level history switch is off by default");
+        saved.Question.Should().BeEmpty();
+        result.Question.Should().Be("q", "the current response may show the question without persisting it");
         result.DeckType.Should().Be(DeckType.Thoth);
     }
 
@@ -170,6 +174,7 @@ public sealed class ReadingServiceTests
             personalization,
             questionValidator.Object,
             EmptyMemoryExtractor().Object,
+            users.Object,
             NullLogger<ReadingService>.Instance);
 
         var act = () => sut.CreateAsync(
@@ -204,9 +209,10 @@ public sealed class ReadingServiceTests
                 It.IsAny<UserPromptContext>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InterpretationResult { Text = "ok", Model = "stub", GeneratedAt = DateTime.UtcNow });
-        var subscription = new SubscriptionService(CompleteUserRepo().Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var users = CompleteUserRepo();
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
         var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
-        var personalization = new PersonalizationService(CompleteUserRepo().Object, EmptyMemoryRepo().Object);
+        var personalization = new PersonalizationService(users.Object, EmptyMemoryRepo().Object);
         var questionValidator = new Mock<IAIQuestionValidator>();
         questionValidator.Setup(v => v.ValidateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new QuestionValidationResult
@@ -225,6 +231,7 @@ public sealed class ReadingServiceTests
             personalization,
             questionValidator.Object,
             EmptyMemoryExtractor().Object,
+            users.Object,
             NullLogger<ReadingService>.Instance);
 
         var result = await sut.CreateAsync(
@@ -251,7 +258,7 @@ public sealed class ReadingServiceTests
                 PasswordHash = "x",
                 FirstName = "Ada",
                 LastName = "Lovelace",
-                BirthDate = new DateOnly(1815, 12, 10),
+                BirthYear = 1815,
                 SubscriptionStatus = SubscriptionStatus.Active,
                 SubscriptionExpiresAt = DateTime.UtcNow.AddDays(5)
             });

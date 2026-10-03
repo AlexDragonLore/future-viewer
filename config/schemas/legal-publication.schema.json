@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://alex-taro.ru/schemas/legal-publication.schema.json",
+  "title": "Future Viewer approved legal publication facts",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "reviewed_at", "manual_approved", "service", "documents"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema_version": { "const": 1 },
+    "reviewed_at": { "type": ["string", "null"], "format": "date" },
+    "manual_approved": { "type": "boolean" },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service_name", "paid_product_title", "price_label", "access_period", "description", "auto_renewal", "npd_receipt_process_verified", "npd_receipt_procedure", "support_response_term", "refund_method", "claim_review_procedure", "manual_approved"],
+      "properties": {
+        "service_name": { "type": ["string", "null"] },
+        "paid_product_title": { "type": ["string", "null"] },
+        "price_label": { "type": ["string", "null"] },
+        "access_period": { "type": ["string", "null"] },
+        "description": { "type": ["string", "null"] },
+        "auto_renewal": { "type": "boolean" },
+        "npd_receipt_process_verified": { "type": "boolean" },
+        "npd_receipt_procedure": { "type": ["string", "null"] },
+        "support_response_term": { "type": ["string", "null"] },
+        "refund_method": { "type": ["string", "null"] },
+        "claim_review_procedure": { "type": ["string", "null"] },
+        "manual_approved": { "type": "boolean" }
+      }
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["document_type", "version", "content_hash", "published_at", "effective_at", "is_active", "manual_approved"],
+        "properties": {
+          "document_type": { "enum": ["offer", "privacy", "personal-data-consent", "marketing-consent", "cookies", "ai-disclaimer", "data-request", "processors"] },
+          "version": { "type": ["string", "null"] },
+          "content_hash": { "type": ["string", "null"] },
+          "published_at": { "type": ["string", "null"], "format": "date-time" },
+          "effective_at": { "type": ["string", "null"], "format": "date" },
+          "is_active": { "type": "boolean" },
+          "manual_approved": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

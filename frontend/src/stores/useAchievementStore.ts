@@ -1,3 +1,4 @@
+import { resetOnAccountChange } from '@/utils/accountSession'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { achievementApi } from '@/api/achievementApi'
@@ -8,6 +9,8 @@ export const useAchievementStore = defineStore('achievement', () => {
   const items = ref<AchievementInfo[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+
+  resetOnAccountChange({ items, loading, error })
 
   async function loadCatalog() {
     loading.value = true

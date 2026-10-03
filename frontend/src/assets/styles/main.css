@@ -20,7 +20,7 @@ html {
 body {
   background: #0b0618;
   color: #e8d5f2;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
@@ -37,7 +37,7 @@ video {
 }
 
 h1, h2, h3, .font-display {
-  font-family: 'Cinzel', serif;
+  font-family: Georgia, 'Times New Roman', serif;
   letter-spacing: 0.08em;
 }
 
@@ -63,7 +63,7 @@ h1, h2, h3, .font-display {
   border: 1px solid rgba(245, 194, 107, 0.6);
   border-radius: 999px;
   background: rgba(245, 194, 107, 0.08);
-  font-family: 'Cinzel', serif;
+  font-family: Georgia, 'Times New Roman', serif;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   font-size: 0.875rem;

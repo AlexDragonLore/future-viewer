@@ -4,6 +4,7 @@ using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.Domain.ValueObjects;
 using FutureViewer.DomainServices.DTOs;
+using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
 using OpenAI.Chat;
 
@@ -13,19 +14,28 @@ public sealed class OpenAIInterpreter : IAIInterpreter
 {
     private readonly AIChatClientFactory _chatClientFactory;
     private readonly ChatClient _chat;
+    private readonly IAiPrivacyGateway _privacyGateway;
 
-    public OpenAIInterpreter(AIChatClientFactory chatClientFactory)
+    public OpenAIInterpreter(
+        AIChatClientFactory chatClientFactory,
+        IAiPrivacyGateway privacyGateway)
     {
         _chatClientFactory = chatClientFactory;
         _chat = chatClientFactory.CreateChatClient();
+        _privacyGateway = privacyGateway;
     }
 
     public string Model => _chatClientFactory.Model;
 
     private const string SystemPrompt =
-        "Ты — опытный таролог. Отвечай на русском языке, стиль мистический, но не перегруженный. " +
+        "Ты создаёшь развлекательную и информационную интерпретацию карт Таро на русском языке. " +
+        "Описывай только возможный взгляд, темы для размышления и варианты — не выдавай интерпретацию за факт, диагноз или достоверное предсказание. " +
+        "Не давай медицинских, психологических, юридических или финансовых указаний; не рекомендуй лекарства, инвестиции, кредиты или юридически значимые действия. " +
+        "Не обещай точный, гарантированный результат и не утверждай, что AI знает будущее. " +
+        "Если контекст выглядит срочным или опасным, предложи обратиться к профильному специалисту или экстренной службе, не развивая гадание. " +
+        "Стиль может быть мягко мистическим, но не перегруженным. " +
         "Форматируй ответ в Markdown: используй ## для заголовков позиций расклада, **жирный** для названий карт, " +
-        "маркированные списки для ключевых тем. Завершай разделом ## Общий вывод (3–5 предложений).";
+        "маркированные списки для ключевых тем. Завершай разделом ## Возможный взгляд (3–5 предложений) и кратким напоминанием, что важные решения нельзя основывать только на этом результате.";
 
     public async Task<InterpretationResult> InterpretAsync(
         Spread spread,
@@ -36,7 +46,15 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         UserPromptContext promptContext,
         CancellationToken ct = default)
     {
-        var messages = BuildMessages(spread, question, cards, deckType, variantNotes, promptContext);
+        _ = promptContext; // Identity/profile/timezone/memory must not leave the service.
+        var privacy = Prepare(question);
+        var messages = BuildMessages(
+            spread,
+            privacy.SafeText,
+            cards,
+            deckType,
+            variantNotes,
+            privacy.RequestId);
         var response = await _chat.CompleteChatAsync(messages, cancellationToken: ct);
         var text = response.Value.Content[0].Text;
 
@@ -57,7 +75,15 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         UserPromptContext promptContext,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var messages = BuildMessages(spread, question, cards, deckType, variantNotes, promptContext);
+        _ = promptContext; // Identity/profile/timezone/memory must not leave the service.
+        var privacy = Prepare(question);
+        var messages = BuildMessages(
+            spread,
+            privacy.SafeText,
+            cards,
+            deckType,
+            variantNotes,
+            privacy.RequestId);
         var stream = _chat.CompleteChatStreamingAsync(messages, cancellationToken: ct);
 
         await foreach (var update in stream.WithCancellation(ct))
@@ -77,16 +103,16 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         IReadOnlyList<ReadingCard> cards,
         DeckType deckType,
         IReadOnlyDictionary<int, string> variantNotes,
-        UserPromptContext promptContext)
+        Guid requestId)
     {
         return new List<ChatMessage>
         {
-            new SystemChatMessage(BuildSystemPrompt(deckType, promptContext)),
-            new UserChatMessage(BuildPrompt(spread, question, cards, deckType, variantNotes))
+            new SystemChatMessage(BuildSystemPrompt(deckType)),
+            new UserChatMessage(BuildPrompt(spread, question, cards, deckType, variantNotes, requestId))
         };
     }
 
-    private static string BuildSystemPrompt(DeckType deckType, UserPromptContext promptContext)
+    private static string BuildSystemPrompt(DeckType deckType)
     {
         var deckTone = deckType switch
         {
@@ -106,27 +132,7 @@ public sealed class OpenAIInterpreter : IAIInterpreter
 
         var sb = new StringBuilder();
         sb.Append(SystemPrompt).Append(' ').AppendLine(deckTone);
-        sb.Append("Сегодняшний день: ").Append(promptContext.Today.ToString("yyyy-MM-dd"));
-        if (!string.IsNullOrWhiteSpace(promptContext.ClientTimeZone))
-            sb.Append(" (часовой пояс пользователя: ").Append(promptContext.ClientTimeZone).Append(')');
-        sb.AppendLine(".");
-        sb.Append("Профиль пользователя: ")
-            .Append(promptContext.FirstName).Append(' ')
-            .Append(promptContext.LastName)
-            .Append(", дата рождения: ")
-            .Append(promptContext.BirthDate.ToString("yyyy-MM-dd"))
-            .AppendLine(".");
-
-        if (promptContext.MemoryRules.Count > 0)
-        {
-            sb.AppendLine("Сохранённая память о пользователе, которую можно учитывать только когда она релевантна вопросу:");
-            foreach (var rule in promptContext.MemoryRules.Take(20))
-            {
-                sb.Append("- ").AppendLine(rule);
-            }
-        }
-
-        sb.AppendLine("Не упоминай память явно и не делай выводы о пользователе как факты, если это не помогает ответу.");
+        sb.AppendLine("У тебя нет профиля или идентификатора пользователя. Не пытайся установить личность и не запрашивай персональные данные.");
         return sb.ToString();
     }
 
@@ -135,9 +141,11 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         string question,
         IReadOnlyList<ReadingCard> cards,
         DeckType deckType,
-        IReadOnlyDictionary<int, string> variantNotes)
+        IReadOnlyDictionary<int, string> variantNotes,
+        Guid requestId)
     {
         var sb = new StringBuilder();
+        sb.Append("Технический request ID: ").AppendLine(requestId.ToString("N"));
         sb.Append("Колода: ").AppendLine(deckType.ToString());
         sb.Append("Расклад: ").AppendLine(spread.Name);
         if (!string.IsNullOrWhiteSpace(question))
@@ -164,5 +172,16 @@ public sealed class OpenAIInterpreter : IAIInterpreter
         sb.AppendLine();
         sb.AppendLine("Дай развёрнутую интерпретацию расклада применительно к вопросу.");
         return sb.ToString();
+    }
+
+    private AiPrivacyDecision Prepare(string question)
+    {
+        var decision = _privacyGateway.Prepare(question, AiPrivacyOperation.TarotInterpretation);
+        if (!decision.CanSendExternally)
+            throw new AiPrivacyBlockedException(
+                decision.ReasonCode,
+                decision.UserMessage,
+                decision.SafeResponse);
+        return decision;
     }
 }

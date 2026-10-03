@@ -20,6 +20,11 @@ public sealed class UnauthorizedException : DomainException
     public UnauthorizedException(string message) : base(message) { }
 }
 
+public sealed class ReauthenticationFailedException : DomainException
+{
+    public ReauthenticationFailedException() : base("Неверный пароль. Проверьте пароль и повторите действие.") { }
+}
+
 public sealed class QuotaExceededException : DomainException
 {
     public QuotaExceededException(string message) : base(message) { }
@@ -84,4 +89,27 @@ public sealed class QuestionValidationException : DomainException
 
     public string ErrorCode { get; }
     public string? SuggestedQuestion { get; }
+}
+
+public sealed class AiPrivacyBlockedException : DomainException
+{
+    public AiPrivacyBlockedException(string reasonCode, string message, string? safeResponse = null)
+        : base(message)
+    {
+        ReasonCode = reasonCode;
+        SafeResponse = safeResponse;
+    }
+
+    public string ReasonCode { get; }
+    public string? SafeResponse { get; }
+}
+
+public sealed class FeatureDisabledException : DomainException
+{
+    public FeatureDisabledException(string featureCode, string message) : base(message)
+    {
+        FeatureCode = featureCode;
+    }
+
+    public string FeatureCode { get; }
 }

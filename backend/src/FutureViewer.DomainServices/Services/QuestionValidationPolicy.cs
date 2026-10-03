@@ -25,7 +25,24 @@ public static class QuestionValidationPolicy
                 SuggestedQuestion = null,
                 Message = validation.Reason,
                 CanContinue = true,
-                RequiresSubscription = false
+                RequiresSubscription = false,
+                BlockCode = null,
+                SafeResponse = null
+            };
+        }
+
+        if (validation.Status == QuestionValidationStatus.Rejected)
+        {
+            return new QuestionValidationCheckDto
+            {
+                Status = status,
+                Reason = validation.Reason,
+                SuggestedQuestion = validation.SuggestedQuestion,
+                Message = validation.SafeResponse ?? validation.Reason,
+                CanContinue = false,
+                RequiresSubscription = false,
+                BlockCode = validation.BlockCode ?? "rejected",
+                SafeResponse = validation.SafeResponse
             };
         }
 
@@ -39,7 +56,9 @@ public static class QuestionValidationPolicy
             SuggestedQuestion = suggestedQuestion,
             Message = hasActiveSubscription ? SubscriberWarningMessage : SubscriptionRequiredMessage,
             CanContinue = hasActiveSubscription,
-            RequiresSubscription = !hasActiveSubscription
+            RequiresSubscription = !hasActiveSubscription,
+            BlockCode = null,
+            SafeResponse = null
         };
     }
 

@@ -19,7 +19,7 @@ vi.mock('@/api/subscriptionApi', () => ({
 
 import ResetPasswordView from '@/views/ResetPasswordView.vue'
 
-async function mountView(url = '/reset-password?token=abc123'): Promise<{ wrapper: ReturnType<typeof mount>; router: Router }> {
+async function mountView(url = '/reset-password#token=abc123'): Promise<{ wrapper: ReturnType<typeof mount>; router: Router }> {
   setActivePinia(createPinia())
   const router = createRouter({
     history: createMemoryHistory(),

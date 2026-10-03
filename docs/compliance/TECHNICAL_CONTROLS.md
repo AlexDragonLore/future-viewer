@@ -1,0 +1,23 @@
+# Реализованные технические compliance-контроли
+
+Дата: 1 августа 2026 года. Эти контролы уменьшают риск и блокируют опасную конфигурацию; они не являются заявлением о соответствии 152-ФЗ, 149-ФЗ, 1119, приказу ФСТЭК № 21 или иным нормам.
+
+| Контрол | Реализация | Fail-closed условие | Остаточное ручное действие |
+|---|---|---|---|
+| Реестр обработчиков | `config/processors.json`, schema, `scripts/check-compliance.mjs` | Enabled provider без entity/country/exact encrypted endpoint/categories/retention/training/cross-border/contract/manual approval блокирует release; web/API — HTTPS, email — SMTPS/mandatory STARTTLS | Подтвердить все поля и основания; неизвестные записи оставить выключенными |
+| AI transport | Runtime registry guard + static exact allowlist factory/interpreter | AI default off; unknown/unapproved endpoint и новый transport блокируются | Проверить договор, страну, retention, training и трансграничное уведомление |
+| Operator/legal facts | `operator.json`, `legal-publication.json`, `retention.json`, export script | Legal build не получает реквизиты/версии/сроки/НПД procedure до approval | Проверить ФИО, ИНН, адрес, НПД, тексты, hashes и даты |
+| Registration consent boundary | Отдельные versioned records: offer acceptance, privacy-policy acknowledgement, mandatory `PersonalDataProcessingConsent` linked to `/legal/personal-data-consent`, 18+; personalization/marketing/analytics отдельно; один выключенный checkbox для ПД; оферта/политика/18+ явно подтверждаются нажатием «Создать»; optional consent выключены и не запрашиваются при регистрации | Нет любого mandatory flag, точной активной версии документа либо legal publication approval — account не создаётся; offer/privacy/age не могут неявно создать personal-data consent; optional flag не выводится из регистрации | Утвердить содержание и версии документов, правовые основания по каждой цели и последствия отзыва обязательного consent; повторить unit/E2E/browser QA |
+| IP/assets | `assets.json`, release/frontend gate | Shipped asset group без заявленных evidence/hash/license/commercial-use approval блокирует release | Получить лицензии/договоры либо заменить asset; добавить фактическую per-file manifest/hash verification |
+| Emergency switches | `AI_ENABLED`, `PAYMENT_ENABLED`, `PAYMENT_WEBHOOK_ENABLED` default false; `PRIVACY_EXPORT_ENABLED` can be set false during incident | Независимо запрещают external AI, payment create/webhook и privacy export | Утвердить provider; регистрировать и быстро снимать временный запрет export после containment |
+| Shared-host isolation | Loopback-only app proxy, split networks, project naming, isolation script | Public 80/443, wrong host, shared Docker resource/credential или env path блокирует check/deploy | Проверить фактический shared edge и janetka resources/ACL |
+| Edge protection | CSP, HSTS, nosniff, referrer/permissions/frame/COOP, 1 MiB API limit | Release check требует CSP/HSTS и exact Nginx hostname | Проверить headers/browser и все subdomains до HSTS expansion/preload |
+| Logs | Docker `local` rotation; privacy Nginx log excludes URI/IP/UA; sensitive SPA routes access-log off | Project images have bounded log files | Проверить/очистить historical host/provider logs; утвердить TTL/storage |
+| Containers | Backend non-root; backend/frontend read-only; tmpfs; cap drop/no-new-privileges where compatible | Compose config is checked in CI | Проверить runtime compatibility, AppArmor/SELinux, host patching, Docker access |
+| Supply chain | CodeQL, npm/NuGet audit, Gitleaks, Trivy, Dependabot | Production `needs` all security/build/compliance workflows | Настроить required checks/reviewer/SLA; pin actions/images by immutable digest |
+| Deployment | Exact SHA, pinned SSH known_hosts, one non-root deploy key, no global prune, pre-change Git revision/image/env state, rollback | Missing secrets/gates/config/isolation/health blocks job; rollback запускается после любого сбоя, последовавшего за успешным capture | Ограничить deploy account, ротировать старые keys, выполнить browser smoke и migration rehearsal |
+| Backup | Streaming `pg_dump` → age, explicit project path/TTL, isolated restore test | Script refuses unknown recipient/TTL/path | Подтвердить РФ storage, key custody, schedule, first restore drill/RPO/RTO |
+
+## Текущий ожидаемый release status
+
+Release gate должен завершаться ошибкой, пока реестры имеют `manual_approved=false`, неизвестны operator/provider/retention facts или assets не подтверждены. Удалять этот блок либо подставлять фиктивные значения запрещено. Одобрение означает наличие проверяемого evidence reference и ручную ответственность владельца, а не только смену boolean.

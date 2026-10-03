@@ -17,7 +17,7 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -145,6 +145,176 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.ToTable("announcement_reads", (string)null);
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.AuditEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorSubjectReference")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_subject_reference");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<string>("DocumentVersion")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("document_version");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("event_type");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("outcome");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("reason_code");
+
+                    b.Property<Guid?>("TargetReference")
+                        .HasColumnType("uuid")
+                        .HasColumnName("target_reference");
+
+                    b.Property<string>("TargetType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("target_type");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorSubjectReference");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.HasIndex("EventType", "OccurredAt");
+
+                    b.ToTable("audit_events", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.DataDeletionJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_at");
+
+                    b.Property<DateTime>("ScheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_at");
+
+                    b.Property<DateTime?>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectReference")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_reference");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectReference");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Status", "ScheduledAt");
+
+                    b.ToTable("data_deletion_jobs", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.DataSubjectRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("DueAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("due_at");
+
+                    b.Property<DateTime?>("IdentityVerifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("identity_verified_at");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("received_at");
+
+                    b.Property<int>("RequestType")
+                        .HasColumnType("integer")
+                        .HasColumnName("request_type");
+
+                    b.Property<string>("ResultReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("result_reference");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectReference")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_reference");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SubjectReference");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Status", "DueAt");
+
+                    b.ToTable("data_subject_requests", (string)null);
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.DeckVariant", b =>
                 {
                     b.Property<int>("Id")
@@ -176,6 +346,159 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.ToTable("deck_variants", (string)null);
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.LegalDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("integer")
+                        .HasColumnName("document_type");
+
+                    b.Property<DateTime>("EffectiveAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("effective_at");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentType")
+                        .IsUnique()
+                        .HasFilter("is_active");
+
+                    b.HasIndex("DocumentType", "Version")
+                        .IsUnique();
+
+                    b.ToTable("legal_documents", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.PaymentOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AccessDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("access_days");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("provider");
+
+                    b.Property<string>("ProviderPaymentId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("provider_payment_id");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("public_id");
+
+                    b.Property<DateTime?>("ReceiptIssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("receipt_issued_at");
+
+                    b.Property<string>("ReceiptReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("receipt_reference");
+
+                    b.Property<string>("ReceiptStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("receipt_status");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("SubjectReference")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_reference");
+
+                    b.Property<string>("TariffCode")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("tariff_code");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderPaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("SubjectReference");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("Provider", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("payment_orders", (string)null);
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.ProcessedPayment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -193,14 +516,16 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("processed_at");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<Guid>("SubjectReference")
                         .HasColumnType("uuid")
-                        .HasColumnName("user_id");
+                        .HasColumnName("subject_reference");
 
                     b.HasKey("Id");
 
                     b.HasIndex("PaymentId")
                         .IsUnique();
+
+                    b.HasIndex("SubjectReference");
 
                     b.ToTable("processed_payments", (string)null);
                 });
@@ -240,6 +565,12 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("question");
+
+                    b.Property<bool>("SavedToHistory")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("saved_to_history");
 
                     b.Property<int>("SpreadType")
                         .HasColumnType("integer")
@@ -460,13 +791,23 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<DateTime?>("AccountDeletionRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("account_deletion_requested_at");
+
+                    b.Property<int>("AccountStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("account_status");
+
+                    b.Property<int?>("BirthYear")
+                        .HasColumnType("integer")
+                        .HasColumnName("birth_year");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<DateOnly?>("BirthDate")
-                        .HasColumnType("date")
-                        .HasColumnName("birth_date");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -488,11 +829,23 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("first_name");
 
+                    b.Property<bool>("HistoryEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("history_enabled");
+
                     b.Property<bool>("IsAdmin")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false)
                         .HasColumnName("is_admin");
+
+                    b.Property<bool>("IsAdultConfirmed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_adult_confirmed");
 
                     b.Property<bool>("IsEmailVerified")
                         .ValueGeneratedOnAdd()
@@ -519,6 +872,16 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("password_reset_token_expires_at");
 
+                    b.Property<Guid>("PrivacySubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("privacy_subject_id");
+
+                    b.Property<int>("SecurityVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("security_version");
+
                     b.Property<DateTime?>("SubscriptionExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("subscription_expires_at");
@@ -526,15 +889,6 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Property<int>("SubscriptionStatus")
                         .HasColumnType("integer")
                         .HasColumnName("subscription_status");
-
-                    b.Property<long?>("TelegramChatId")
-                        .HasColumnType("bigint")
-                        .HasColumnName("telegram_chat_id");
-
-                    b.Property<string>("TelegramLinkToken")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("telegram_link_token");
 
                     b.Property<string>("YukassaSubscriptionId")
                         .HasMaxLength(128)
@@ -550,10 +904,111 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PasswordResetToken");
 
-                    b.HasIndex("TelegramChatId")
+                    b.HasIndex("PrivacySubjectId")
                         .IsUnique();
 
                     b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.UserAchievement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AchievementId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("achievement_id");
+
+                    b.Property<DateTime>("UnlockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("unlocked_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AchievementId");
+
+                    b.HasIndex("UserId", "AchievementId")
+                        .IsUnique();
+
+                    b.ToTable("user_achievements", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.UserConsent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("accepted_at");
+
+                    b.Property<string>("CollectionSource")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("collection_source");
+
+                    b.Property<int>("ConsentType")
+                        .HasColumnType("integer")
+                        .HasColumnName("consent_type");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<string>("DocumentVersion")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("document_version");
+
+                    b.Property<string>("IpHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("ip_hash");
+
+                    b.Property<Guid>("LegalDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("legal_document_id");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<Guid>("SubjectReference")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_reference");
+
+                    b.Property<string>("UserAgentHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("user_agent_hash");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegalDocumentId");
+
+                    b.HasIndex("SubjectReference");
+
+                    b.HasIndex("UserId", "ConsentType")
+                        .IsUnique()
+                        .HasFilter("revoked_at IS NULL AND user_id IS NOT NULL AND consent_type <> 1");
+
+                    b.ToTable("user_consents", (string)null);
                 });
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.UserMemoryRule", b =>
@@ -588,46 +1043,6 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.ToTable("user_memory_rules", (string)null);
                 });
 
-            modelBuilder.Entity("FutureViewer.Domain.Entities.UserAchievement", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("AchievementId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("achievement_id");
-
-                    b.Property<DateTime>("UnlockedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("unlocked_at");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AchievementId");
-
-                    b.HasIndex("UserId", "AchievementId")
-                        .IsUnique();
-
-                    b.ToTable("user_achievements", (string)null);
-                });
-
-            modelBuilder.Entity("FutureViewer.Domain.Entities.DeckVariant", b =>
-                {
-                    b.HasOne("FutureViewer.Domain.Entities.TarotCard", "Card")
-                        .WithMany("DeckVariants")
-                        .HasForeignKey("CardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Card");
-                });
-
             modelBuilder.Entity("FutureViewer.Domain.Entities.AnnouncementRead", b =>
                 {
                     b.HasOne("FutureViewer.Domain.Entities.Announcement", "Announcement")
@@ -643,6 +1058,43 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Announcement");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.DataDeletionJob", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.DataSubjectRequest", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.DeckVariant", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.TarotCard", "Card")
+                        .WithMany("DeckVariants")
+                        .HasForeignKey("CardId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Card");
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.PaymentOrder", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
                 });
@@ -714,6 +1166,24 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.UserConsent", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.LegalDocument", "LegalDocument")
+                        .WithMany("Consents")
+                        .HasForeignKey("LegalDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FutureViewer.Domain.Entities.User", "User")
+                        .WithMany("Consents")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("LegalDocument");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.UserMemoryRule", b =>
                 {
                     b.HasOne("FutureViewer.Domain.Entities.User", "User")
@@ -735,6 +1205,11 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("Reads");
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.LegalDocument", b =>
+                {
+                    b.Navigation("Consents");
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.Reading", b =>
                 {
                     b.Navigation("Cards");
@@ -749,9 +1224,11 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.User", b =>
                 {
+                    b.Navigation("Achievements");
+
                     b.Navigation("AnnouncementReads");
 
-                    b.Navigation("Achievements");
+                    b.Navigation("Consents");
 
                     b.Navigation("Feedbacks");
 

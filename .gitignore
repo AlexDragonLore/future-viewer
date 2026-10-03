@@ -80,6 +80,8 @@ nunit-*.xml
 coverage*.json
 coverage*.xml
 coverage*.info
+playwright-report/
+test-results/
 *.coverage
 *.coveragexml
 *.gcda
@@ -430,3 +432,6 @@ $RECYCLE.BIN/
 # Testcontainers
 # ============================================================
 **/.testcontainers/
+
+# Local dependency symlinks in isolated release worktrees
+frontend/node_modules

@@ -23,6 +23,6 @@ public sealed class CapturingEmailSender : IEmailSender
 
 public sealed class FakeEmailLinkBuilder : IEmailLinkBuilder
 {
-    public string BuildVerificationLink(string token) => $"http://test/verify-email?token={token}";
-    public string BuildPasswordResetLink(string token) => $"http://test/reset-password?token={token}";
+    public string BuildVerificationLink(string token) => $"http://test/verify-email#token={token}";
+    public string BuildPasswordResetLink(string token) => $"http://test/reset-password#token={token}";
 }

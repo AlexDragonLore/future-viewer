@@ -9,12 +9,11 @@ namespace FutureViewer.DomainServices.Tests;
 
 public sealed class AchievementServiceTests
 {
-    private static User NewUser(long? telegramChatId = null) => new()
+    private static User NewUser() => new()
     {
         Id = Guid.NewGuid(),
         Email = "a@b.c",
         PasswordHash = "x",
-        TelegramChatId = telegramChatId
     };
 
     private static Achievement A(string code, int sort = 0) => new()
@@ -31,7 +30,6 @@ public sealed class AchievementServiceTests
     {
         A(AchievementService.Codes.FirstReading),
         A(AchievementService.Codes.FirstFeedback),
-        A(AchievementService.Codes.TelegramLinked),
         A(AchievementService.Codes.Streak3),
         A(AchievementService.Codes.Streak7),
         A(AchievementService.Codes.Streak30),
@@ -113,18 +111,6 @@ public sealed class AchievementServiceTests
         codes.Should().Contain(AchievementService.Codes.Total10);
         codes.Should().Contain(AchievementService.Codes.Total50);
         codes.Should().NotContain(AchievementService.Codes.Total100);
-    }
-
-    [Fact]
-    public async Task CheckAndGrantAsync_grants_telegram_linked_when_chat_id_set()
-    {
-        var harness = new Harness();
-        var user = NewUser(telegramChatId: 1234);
-        var sut = harness.Build(user, readingCount: 0, scoredFeedbacks: Array.Empty<ReadingFeedback>());
-
-        var granted = await sut.CheckAndGrantAsync(user.Id);
-
-        granted.Select(g => g.Code).Should().Contain(AchievementService.Codes.TelegramLinked);
     }
 
     [Fact]
@@ -248,7 +234,7 @@ public sealed class AchievementServiceTests
 
         var result = await sut.GetAllWithUserStatusAsync(user.Id);
 
-        result.Should().HaveCount(12);
+        result.Should().HaveCount(11);
         result.First(r => r.Code == AchievementService.Codes.FirstReading).UnlockedAt.Should().Be(unlockedAt);
         result.First(r => r.Code == AchievementService.Codes.Total10).UnlockedAt.Should().BeNull();
     }

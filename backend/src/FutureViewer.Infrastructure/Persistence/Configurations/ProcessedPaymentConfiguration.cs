@@ -12,8 +12,9 @@ public sealed class ProcessedPaymentConfiguration : IEntityTypeConfiguration<Pro
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
         b.Property(x => x.PaymentId).HasColumnName("payment_id").IsRequired().HasMaxLength(128);
-        b.Property(x => x.UserId).HasColumnName("user_id");
+        b.Property(x => x.SubjectReference).HasColumnName("subject_reference").IsRequired();
         b.Property(x => x.ProcessedAt).HasColumnName("processed_at");
         b.HasIndex(x => x.PaymentId).IsUnique();
+        b.HasIndex(x => x.SubjectReference);
     }
 }

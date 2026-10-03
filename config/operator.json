@@ -1,0 +1,16 @@
+{
+  "$schema": "./schemas/operator.schema.json",
+  "schema_version": 1,
+  "operator": {
+    "full_name": null,
+    "tax_status": null,
+    "taxpayer_id": null,
+    "postal_address": null,
+    "contact_email": null,
+    "support_email": null,
+    "evidence_reference": null,
+    "reviewed_at": null,
+    "manual_approved": false,
+    "publication_allowed": false
+  }
+}

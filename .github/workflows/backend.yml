@@ -1,16 +1,24 @@
 name: backend
 
 on:
+  workflow_call:
   push:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'config/**'
+      - 'scripts/**'
       - '.github/workflows/backend.yml'
   pull_request:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'config/**'
+      - 'scripts/**'
       - '.github/workflows/backend.yml'
+
+permissions:
+  contents: read
 
 jobs:
   build-test:
@@ -21,6 +29,17 @@ jobs:
       ASPNETCORE_ENVIRONMENT: Testing
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test compliance evidence validation
+        run: node --test scripts/tests/*.test.mjs
+
+      - name: Compliance boundary checks
+        run: node scripts/check-compliance.mjs --scope=backend
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4

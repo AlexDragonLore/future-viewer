@@ -55,9 +55,6 @@ export interface FeedbackSearchFilters {
   pageSize?: number
 }
 
-export interface RunNotificationsResult {
-  processed: number
-}
 
 export interface AdminUserListItem {
   id: string
@@ -66,7 +63,6 @@ export interface AdminUserListItem {
   isAdmin: boolean
   subscriptionStatus: SubscriptionStatusValue
   subscriptionExpiresAt: string | null
-  telegramChatId: number | null
   totalReadings: number
   totalFeedbacks: number
   totalScore: number
@@ -100,8 +96,6 @@ export interface AdminUserDetail {
   subscriptionStatus: SubscriptionStatusValue
   subscriptionExpiresAt: string | null
   yukassaSubscriptionId: string | null
-  telegramChatId: number | null
-  hasTelegramLinkToken: boolean
   totalReadings: number
   totalFeedbacks: number
   totalScore: number
@@ -131,10 +125,6 @@ export interface AdminGrantedAchievement {
   unlockedAt: string | null
 }
 
-export interface AdminTelegramLinkResult {
-  linked: boolean
-  chatId: number
-}
 
 export interface AdminStats {
   totalUsers: number
@@ -142,6 +132,5 @@ export interface AdminStats {
   activeSubscriptions: number
   readingsToday: number
   readingsThisWeek: number
-  pendingFeedbacksToNotify: number
   scoredFeedbacksThisMonth: number
 }

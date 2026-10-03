@@ -14,9 +14,17 @@ public sealed class AIChatClientFactory
         IOptions<OpenAIOptions> openAIOptions,
         IOptions<DeepSeekOptions> deepSeekOptions)
     {
+        if (!aiOptions.Value.Enabled)
+            throw new InvalidOperationException(
+                "AI integration is disabled by AI:Enabled.");
+
         var settings = ResolveSettings(aiOptions.Value, openAIOptions.Value, deepSeekOptions.Value);
+        var endpoint = NormalizeAndValidateEndpoint(settings.BaseUrl);
+        ValidateOfficialEndpoint(settings.Provider, endpoint);
+
         Provider = settings.Provider;
         Model = settings.Model;
+        Endpoint = endpoint;
 
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
             throw new InvalidOperationException($"{settings.ConfigurationSection}:ApiKey is not configured");
@@ -24,15 +32,14 @@ public sealed class AIChatClientFactory
         if (string.IsNullOrWhiteSpace(settings.Model))
             throw new InvalidOperationException($"{settings.ConfigurationSection}:Model is not configured");
 
-        var clientOptions = new OpenAIClientOptions();
-        if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
-            clientOptions.Endpoint = new Uri(settings.BaseUrl, UriKind.Absolute);
+        var clientOptions = new OpenAIClientOptions { Endpoint = endpoint };
 
         _client = new OpenAIClient(new ApiKeyCredential(settings.ApiKey), clientOptions);
     }
 
     public string Provider { get; }
     public string Model { get; }
+    public Uri Endpoint { get; }
 
     public ChatClient CreateChatClient() => _client.GetChatClient(Model);
 
@@ -54,7 +61,9 @@ public sealed class AIChatClientFactory
                 ConfigurationSection: OpenAIOptions.SectionName,
                 ApiKey: openAIOptions.ApiKey,
                 Model: openAIOptions.Model,
-                BaseUrl: openAIOptions.BaseUrl);
+                BaseUrl: string.IsNullOrWhiteSpace(openAIOptions.BaseUrl)
+                    ? "https://api.openai.com/v1"
+                    : openAIOptions.BaseUrl);
         }
 
         if (provider.Equals("DeepSeek", StringComparison.OrdinalIgnoreCase))
@@ -71,10 +80,38 @@ public sealed class AIChatClientFactory
             $"AI:Provider '{provider}' is not supported. Use 'OpenAI' or 'DeepSeek'.");
     }
 
+    private static Uri NormalizeAndValidateEndpoint(string baseUrl)
+    {
+        if (!Uri.TryCreate(baseUrl, UriKind.Absolute, out var endpoint) ||
+            !string.Equals(endpoint.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ||
+            string.IsNullOrWhiteSpace(endpoint.Host) ||
+            !string.IsNullOrEmpty(endpoint.UserInfo) ||
+            !string.IsNullOrEmpty(endpoint.Query) ||
+            !string.IsNullOrEmpty(endpoint.Fragment))
+        {
+            throw new InvalidOperationException("AI endpoint must be an exact HTTPS base URL without credentials, query or fragment.");
+        }
+
+        return new Uri(endpoint.AbsoluteUri.TrimEnd('/'), UriKind.Absolute);
+    }
+
+    private static void ValidateOfficialEndpoint(string provider, Uri endpoint)
+    {
+        var expected = provider switch
+        {
+            "OpenAI" => "https://api.openai.com/v1",
+            "DeepSeek" => "https://api.deepseek.com",
+            _ => throw new InvalidOperationException("Unsupported AI provider endpoint mapping.")
+        };
+        if (!string.Equals(endpoint.AbsoluteUri.TrimEnd('/'), expected, StringComparison.Ordinal))
+            throw new InvalidOperationException("AI endpoint must be the selected provider's official HTTPS endpoint.");
+    }
+
     private sealed record AIClientSettings(
         string Provider,
         string ConfigurationSection,
         string ApiKey,
         string Model,
         string BaseUrl);
+
 }
