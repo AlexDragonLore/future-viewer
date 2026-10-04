@@ -164,8 +164,17 @@ function cancelAutoScroll() {
 }
 
 watch(
-  targetText,
-  (text) => {
+  [targetText, locked],
+  ([text, isPreview]) => {
+    // Guest previews arrive as complete responses, so no simulated stream is needed.
+    if (isPreview) {
+      cancelTick()
+      cancelMarkdownRender()
+      displayed.value = text
+      lastTick = 0
+      renderMarkdown()
+      return
+    }
     if (text.length < displayed.value.length) {
       displayed.value = ''
       lastTick = 0

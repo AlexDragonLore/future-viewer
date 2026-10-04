@@ -202,6 +202,22 @@ describe('ResultView', () => {
     expect(wrapper.text()).not.toContain('begin')
   })
 
+  it('shows the whole completed guest preview and registration CTA before animation frames run', async () => {
+    const interpretation = 'Готовое гостевое толкование. '.repeat(40) + 'Последняя строка доступной половины…'
+    const { wrapper } = await mountResult({ ...sample, isPreview: true, interpretation }, () => {
+      const store = useReadingStore()
+      store.cardsReady = true
+      store.streamingDone = true
+      store.streamingText = interpretation
+    })
+
+    expect(wrapper.get('.prose-mystic').text()).toBe(interpretation)
+    expect(wrapper.find('.caret').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="guest-unlock"]').isVisible()).toBe(true)
+    expect(wrapper.get('a.guest-register').attributes('href')).toBe('/auth?mode=register&redirect=/result')
+    expect(wrapper.find('[data-testid="result-paid-offer"]').exists()).toBe(false)
+  })
+
   it('offers the current server product only after the full text is visible and uses the existing consent-aware checkout', async () => {
     const { wrapper } = await mountResult(sample, enableFreeAccountCheckout)
     expect(wrapper.find('[data-testid="result-paid-offer"]').exists()).toBe(false)
