@@ -139,7 +139,7 @@ export const useReadingStore = defineStore('reading', () => {
     }
   }
 
-  async function create(spreadType: SpreadType, question: string, questionWarningAcknowledged = false, saveToHistory = false) {
+  async function create(spreadType: SpreadType, question: string, questionWarningAcknowledged = false, saveToHistory = true) {
     loading.value = true
     error.value = null
     try {
@@ -164,7 +164,7 @@ export const useReadingStore = defineStore('reading', () => {
     question: string,
     signal?: AbortSignal,
     questionWarningAcknowledged = false,
-    saveToHistory = false,
+    saveToHistory = true,
   ) {
     loading.value = true
     error.value = null

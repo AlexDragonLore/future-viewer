@@ -29,7 +29,7 @@ flowchart LR
     GW -->|minimized text + random request ID| REG
     REG -->|approved only| AI
     AI -->|interpretation only| API
-    API -->|current response; persist only with two-level history opt-in| U
+    API -->|current response; persist only with account and per-reading history settings (default on)| U
     API -->|safe question/answer only if history enabled + per-reading choice| DB
 
     API -->|email + one-time link; registry required| REG
@@ -92,7 +92,7 @@ sequenceDiagram
     participant D as PostgreSQL
     participant R as Processor registry
     participant X as Approved AI
-    B->>A: question + saveToHistory=false by default
+    B->>A: question + saveToHistory=true by default (signed-in users)
     A->>G: raw input in-process
     alt PII / third party / special category / high-stakes request
         G-->>B: local block or safe emergency response

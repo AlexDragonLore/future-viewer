@@ -38,7 +38,7 @@ public sealed class PrivacyEndpointTests : IClassFixture<IntegrationTestFixture>
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var user = await db.Users.SingleAsync(x => x.Email == email);
         user.IsAdultConfirmed.Should().BeTrue();
-        user.HistoryEnabled.Should().BeFalse();
+        user.HistoryEnabled.Should().BeTrue();
         var consents = await db.UserConsents.Where(x => x.UserId == user.Id).ToListAsync();
         consents.Select(x => x.ConsentType).Should().BeEquivalentTo(new[]
         {
@@ -119,7 +119,7 @@ public sealed class PrivacyEndpointTests : IClassFixture<IntegrationTestFixture>
         var settingsResponse = await client.GetAsync("/api/privacy/settings");
         settingsResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var settings = await settingsResponse.Content.ReadFromJsonAsync<PrivacySettingsDto>();
-        settings!.HistoryEnabled.Should().BeFalse();
+        settings!.HistoryEnabled.Should().BeTrue();
         settings.MarketingEnabled.Should().BeFalse();
 
         var unauthorized = await client.PostAsJsonAsync(

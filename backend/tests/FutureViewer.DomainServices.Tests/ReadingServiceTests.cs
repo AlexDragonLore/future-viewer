@@ -72,6 +72,9 @@ public sealed class ReadingServiceTests
         result.SpreadName.Should().Be("Прошлое — Настоящее — Будущее");
         result.DeckType.Should().Be(DeckType.RWS);
         repo.Verify(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.UpdateAsync(It.Is<Reading>(reading => reading.SavedToHistory
+            && reading.Question == "Что меня ждёт?"
+            && reading.AiInterpretation == "mystical text"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -139,9 +142,10 @@ public sealed class ReadingServiceTests
         capturedNotes.Should().NotBeNull();
         capturedNotes!.Values.Should().OnlyContain(v => v.Contains("Thoth"));
         saved!.DeckType.Should().Be(DeckType.Thoth);
-        saved.SavedToHistory.Should().BeFalse("the account-level history switch is off by default");
-        saved.Question.Should().BeEmpty();
-        result.Question.Should().Be("q", "the current response may show the question without persisting it");
+        saved.SavedToHistory.Should().BeTrue();
+        saved.Question.Should().Be("q");
+        saved.AiInterpretation.Should().Be("ok");
+        result.Question.Should().Be("q");
         result.DeckType.Should().Be(DeckType.Thoth);
     }
 

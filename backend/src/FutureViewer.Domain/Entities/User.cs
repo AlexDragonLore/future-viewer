@@ -16,7 +16,7 @@ public sealed class User
     public string? LastName { get; set; }
     public int? BirthYear { get; set; }
     public bool IsAdultConfirmed { get; set; }
-    public bool HistoryEnabled { get; set; }
+    public bool HistoryEnabled { get; set; } = true;
     public UserAccountStatus AccountStatus { get; set; } = UserAccountStatus.Active;
     public int SecurityVersion { get; set; } = 1;
     public DateTime? AccountDeletionRequestedAt { get; set; }

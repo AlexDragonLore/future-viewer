@@ -57,7 +57,7 @@ export const readingApi = {
     question: string,
     deckType: DeckType,
     questionWarningAcknowledged = false,
-    saveToHistory = false,
+    saveToHistory = true,
   ): Promise<Reading> {
     const { data } = await httpClient.post<Reading>('/api/readings', {
       spreadType,
@@ -93,7 +93,7 @@ export const readingApi = {
     handlers: ReadingStreamHandlers,
     signal?: AbortSignal,
     questionWarningAcknowledged = false,
-    saveToHistory = false,
+    saveToHistory = true,
   ): Promise<void> {
     const baseURL = (httpClient.defaults.baseURL ?? '').replace(/\/$/, '')
     const token = localStorage.getItem('fv_token')

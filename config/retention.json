@@ -18,7 +18,7 @@
     {
       "policy_id": "reading-history",
       "data_categories": ["question", "cards", "ai_interpretation"],
-      "trigger": "history_opt_in_until_user_deletion",
+      "trigger": "history_enabled_until_user_deletion",
       "retention_period": null,
       "legal_basis_reference": null,
       "deletion_mechanism": "reading_or_history_deletion",

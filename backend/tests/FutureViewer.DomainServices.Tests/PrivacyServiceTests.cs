@@ -36,7 +36,7 @@ public sealed class PrivacyServiceTests
             CancellationToken.None);
 
         fixture.User.IsAdultConfirmed.Should().BeTrue();
-        fixture.User.HistoryEnabled.Should().BeFalse();
+        fixture.User.HistoryEnabled.Should().BeTrue();
         captured.Select(x => x.ConsentType).Should().BeEquivalentTo(new[]
         {
             ConsentType.OfferAcceptance,

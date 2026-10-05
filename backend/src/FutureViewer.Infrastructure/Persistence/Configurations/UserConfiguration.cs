@@ -27,7 +27,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.HistoryEnabled)
             .HasColumnName("history_enabled")
             .IsRequired()
-            .HasDefaultValue(false);
+            .HasDefaultValue(true);
         b.Property(x => x.AccountStatus)
             .HasColumnName("account_status")
             .HasConversion<int>()

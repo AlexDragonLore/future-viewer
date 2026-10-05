@@ -34,6 +34,7 @@ const validationSuggestion = ref<string | null>(null)
 const validatingQuestion = ref(false)
 const spreadType = ref<SpreadType>(SpreadType.SingleCard)
 const saveToHistory = ref(false)
+const historySettingsLoading = ref(auth.isAuthenticated)
 const hasGuestReading = ref(Boolean(getGuestContinuation()))
 
 const currentDeckMeta = computed(() => findDeckMeta(deck.current))
@@ -69,8 +70,14 @@ onMounted(async () => {
   }
 
   if (auth.isAuthenticated) {
-    await Promise.allSettled([auth.refreshSubscription(), privacyStore.loadSettings()])
-    if (!hadPendingDraft) saveToHistory.value = privacyStore.settings.historyEnabled
+    await Promise.allSettled([
+      auth.refreshSubscription(),
+      privacyStore.loadSettings().then(() => {
+        if (!hadPendingDraft) saveToHistory.value = privacyStore.settings.historyEnabled
+      }).finally(() => {
+        historySettingsLoading.value = false
+      }),
+    ])
   }
 })
 
@@ -99,6 +106,7 @@ const blockMessage = computed(() => {
 
 const canBegin = computed(() => {
   if (validatingQuestion.value) return false
+  if (auth.isAuthenticated && historySettingsLoading.value) return false
   if (auth.isAuthenticated && auth.subscriptionLoading) return false
   if (auth.isAuthenticated && !question.value.trim()) return false
   if (!auth.isAuthenticated) return true
@@ -276,10 +284,11 @@ async function begin() {
       </div>
 
       <label v-if="auth.isAuthenticated" class="history-choice" data-testid="history-save-choice">
-        <input v-model="saveToHistory" type="checkbox" data-testid="save-to-history" />
-        <span>
-          Сохранить вопрос, карты и интерпретацию в истории. По умолчанию выключено; настройку можно изменить в
-          разделе «Данные и конфиденциальность».
+        <input v-model="saveToHistory" :disabled="historySettingsLoading" type="checkbox" data-testid="save-to-history" />
+        <span v-if="historySettingsLoading">Загружаю настройку сохранения истории…</span>
+        <span v-else>
+          Сохранить вопрос, карты и интерпретацию в истории. По умолчанию включено. Можно отключить для этого
+          расклада или в разделе «Данные и конфиденциальность».
         </span>
       </label>
 

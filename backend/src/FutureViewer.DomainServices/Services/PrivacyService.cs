@@ -52,7 +52,7 @@ public sealed class PrivacyService
             throw new DomainException("Mandatory registration acknowledgements are missing.");
 
         user.IsAdultConfirmed = true;
-        user.HistoryEnabled = false;
+        user.HistoryEnabled = true;
         await _users.UpdateAsync(user, ct);
 
         var evidence = new RegistrationEvidence(
