@@ -200,6 +200,7 @@ public sealed class ReadingServiceTests
     [Fact]
     public async Task CreateAsync_continues_when_subscriber_acknowledges_question_warning()
     {
+        const string safeSuggestion = "На что мне обратить внимание?";
         var repo = new Mock<IReadingRepository>();
         repo.Setup(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync((Reading r, CancellationToken _) => r);
@@ -223,7 +224,7 @@ public sealed class ReadingServiceTests
             {
                 Status = QuestionValidationStatus.NeedsRewrite,
                 Reason = "Лучше уточнить.",
-                SuggestedQuestion = "На что мне обратить внимание?"
+                SuggestedQuestion = safeSuggestion
             });
 
         var sut = new ReadingService(
@@ -249,6 +250,14 @@ public sealed class ReadingServiceTests
 
         result.Interpretation.Should().Be("ok");
         repo.Verify(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()), Times.Once);
+        ai.Verify(a => a.InterpretAsync(
+            It.IsAny<Spread>(),
+            safeSuggestion,
+            It.IsAny<IReadOnlyList<ReadingCard>>(),
+            It.IsAny<DeckType>(),
+            It.IsAny<IReadOnlyDictionary<int, string>>(),
+            It.IsAny<UserPromptContext>(),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static Mock<IUserRepository> CompleteUserRepo()

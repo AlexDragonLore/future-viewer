@@ -353,12 +353,9 @@ public sealed class ReadingService
         var suggestedQuestion = validation.SuggestedQuestion
             ?? QuestionValidationHeuristics.BuildFallbackSuggestion(question);
 
-        var sb = new StringBuilder();
         // Never append the original rejected/rewritten text. Only the locally-created,
         // non-identifying suggestion may cross the external boundary.
-        sb.Append("Безопасная формулировка: ").AppendLine(suggestedQuestion);
-        sb.AppendLine("Дай только возможный взгляд для личной рефлексии; не давай медицинских, юридических или финансовых указаний и не утверждай будущие события как факты.");
-        return sb.ToString();
+        return suggestedQuestion;
     }
 
     private static void EnsureAllowed(AiPrivacyDecision decision)

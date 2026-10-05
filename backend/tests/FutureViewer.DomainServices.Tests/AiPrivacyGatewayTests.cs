@@ -82,6 +82,20 @@ public sealed class AiPrivacyGatewayTests
     }
 
     [Theory]
+    [InlineData("Что он чувствует ко мне?")]
+    [InlineData("Как будут развиваться наши отношения?")]
+    [InlineData("Мне грустно после расставания. Что поможет двигаться дальше?")]
+    public void Prepare_allows_ordinary_relationship_questions_without_identifying_or_sensitive_details(string question)
+    {
+        var result = _sut.Prepare(question, AiPrivacyOperation.TarotInterpretation);
+
+        result.CanSendExternally.Should().BeTrue();
+        result.Disposition.Should().Be(AiPrivacyDisposition.Allowed);
+        result.SafeText.Should().Be(question);
+        result.SafeResponse.Should().BeNull();
+    }
+
+    [Theory]
     [InlineData("Как укрепить характер и раскрыть таланты?")]
     [InlineData("Как разнообразить повседневную практику?")]
     [InlineData("Как найти вдохновение для творчества?")]
