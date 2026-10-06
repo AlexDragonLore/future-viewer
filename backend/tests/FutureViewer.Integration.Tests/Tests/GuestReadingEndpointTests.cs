@@ -77,9 +77,13 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
         // Idempotent resume saves the same full reading without consuming another draw.
         (await owner.PostAsJsonAsync("/api/readings/guest/unlock", request)).EnsureSuccessStatusCode();
         var history = (await (await owner.GetAsync("/api/readings/history")).Content.ReadFromJsonAsync<ReadingResult[]>())!;
-        history.Should().ContainSingle().Which.Should().BeEquivalentTo(full);
+        var historyReading = history.Should().ContainSingle().Which;
+        historyReading.Should().BeEquivalentTo(full, options => options.Excluding(reading => reading.CreatedAt));
+        historyReading.CreatedAt.Should().BeCloseTo(full.CreatedAt, TimeSpan.FromMicroseconds(1),
+            "PostgreSQL timestamps have microsecond precision");
         var detail = await (await owner.GetAsync($"/api/readings/{full.Id}")).Content.ReadFromJsonAsync<ReadingResult>();
-        detail.Should().BeEquivalentTo(full);
+        detail.Should().BeEquivalentTo(full, options => options.Excluding(reading => reading.CreatedAt));
+        detail!.CreatedAt.Should().Be(historyReading.CreatedAt);
         using var scope = fixture.Services.CreateScope();
         var readings = scope.ServiceProvider.GetRequiredService<IReadingRepository>();
         var stored = (await readings.GetByIdAsync(full.Id))!;
