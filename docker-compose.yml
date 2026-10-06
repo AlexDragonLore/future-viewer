@@ -43,6 +43,7 @@ services:
       Jwt__Secret: ${JWT_SECRET:-dev-secret-please-change-me-in-prod-32chars-minimum}
       Jwt__Issuer: future-viewer
       Jwt__Audience: future-viewer
+      Jwt__ExpiresMinutes: ${JWT_EXPIRES_MINUTES:-259200}
       Privacy__ExportEnabled: ${PRIVACY_EXPORT_ENABLED:-true}
       AI__Provider: ${AI_PROVIDER:-OpenAI}
       AI__Enabled: ${AI_ENABLED:-true}

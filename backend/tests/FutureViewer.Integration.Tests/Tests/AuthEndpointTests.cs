@@ -1,4 +1,6 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using FutureViewer.DomainServices.DTOs;
@@ -96,10 +98,12 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         verifyResponse.StatusCode.Should().Be(HttpStatusCode.OK);
         var auth = await verifyResponse.Content.ReadFromJsonAsync<AuthResponse>();
         auth!.AccessToken.Should().NotBeNullOrWhiteSpace();
+        AssertSessionLifetime(auth);
 
         var loginResponse = await client.PostAsJsonAsync("/api/auth/login",
             new LoginRequest { Email = email, Password = "password123" });
         loginResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        AssertSessionLifetime((await loginResponse.Content.ReadFromJsonAsync<AuthResponse>())!);
     }
 
     [Fact]
@@ -170,7 +174,7 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
     {
         var client = _fixture.CreateClient();
         var email = $"reset-{Guid.NewGuid():N}@example.com";
-        await _fixture.RegisterAndLoginAsync(client, email, "oldpassword1");
+        var previousAuth = await _fixture.RegisterAndLoginAsync(client, email, "oldpassword1");
 
         var forgot = await client.PostAsJsonAsync("/api/auth/forgot-password",
             new ForgotPasswordRequest { Email = email });
@@ -186,6 +190,14 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
         reset.StatusCode.Should().Be(HttpStatusCode.OK);
         var auth = await reset.Content.ReadFromJsonAsync<AuthResponse>();
         auth!.AccessToken.Should().NotBeNullOrWhiteSpace();
+        AssertSessionLifetime(auth);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", previousAuth.AccessToken);
+        (await client.GetAsync("/api/subscription/status")).StatusCode.Should().Be(HttpStatusCode.Unauthorized,
+            "resetting the password must revoke an existing 180-day session immediately");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        (await client.GetAsync("/api/subscription/status")).StatusCode.Should().Be(HttpStatusCode.OK);
+        client.DefaultRequestHeaders.Authorization = null;
 
         var loginOld = await client.PostAsJsonAsync("/api/auth/login",
             new LoginRequest { Email = email, Password = "oldpassword1" });
@@ -240,6 +252,14 @@ public sealed class AuthEndpointTests : IClassFixture<IntegrationTestFixture>
             new ResetPasswordRequest { Token = token, NewPassword = "newpassword1" });
 
         reset.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    private static void AssertSessionLifetime(AuthResponse auth)
+    {
+        var token = new JwtSecurityTokenHandler().ReadJwtToken(auth.AccessToken);
+        (token.ValidTo - token.ValidFrom).Should().Be(TimeSpan.FromDays(180));
+        auth.ExpiresAt.Should().BeCloseTo(token.ValidTo, TimeSpan.FromSeconds(1));
+        auth.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddDays(180), TimeSpan.FromSeconds(10));
     }
 
     private static string ExtractToken(CapturedEmail email)

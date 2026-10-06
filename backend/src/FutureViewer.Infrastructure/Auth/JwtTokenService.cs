@@ -21,7 +21,8 @@ public sealed class JwtTokenService : IJwtTokenService
 
     public (string Token, DateTime ExpiresAt) CreateAccessToken(User user)
     {
-        var expires = DateTime.UtcNow.AddMinutes(_options.ExpiresMinutes);
+        var issuedAt = DateTime.UtcNow;
+        var expires = issuedAt.AddMinutes(_options.ExpiresMinutes);
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -39,7 +40,7 @@ public sealed class JwtTokenService : IJwtTokenService
             issuer: _options.Issuer,
             audience: _options.Audience,
             claims: claims,
-            notBefore: DateTime.UtcNow,
+            notBefore: issuedAt,
             expires: expires,
             signingCredentials: creds);
 
