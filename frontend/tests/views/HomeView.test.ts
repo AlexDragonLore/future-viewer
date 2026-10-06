@@ -54,6 +54,12 @@ function authenticate() {
   localStorage.setItem('fv_email', 'u@x.test')
 }
 
+function enablePayments() {
+  const config = usePublicConfigStore()
+  config.paymentsEnabled = true
+  config.paymentProduct = { amount: 300, currency: 'RUB', accessDays: 30 }
+}
+
 async function selectSingleCardAndType(wrapper: ReturnType<typeof mount>, question: string) {
   await wrapper.findAll('.spread-option')[0].trigger('click')
   await wrapper.find('textarea').setValue(question)
@@ -243,12 +249,91 @@ describe('HomeView privacy and question safety', () => {
     expect(sessionStorage.length).toBe(0)
   })
 
-  it('still enforces the free product quota independently from question safety', async () => {
+  it('offers one payment banner for an unavailable spread and restores Start for the free spread', async () => {
+    authenticate()
+    const { wrapper, store } = await mountHome(enablePayments)
+    await wrapper.findAll('.spread-option')[1].trigger('click')
+    await wrapper.find('textarea').setValue('Какой аспект задачи рассмотреть?')
+    expect(wrapper.find('[data-testid="block-warning"]').exists()).toBe(false)
+    expect(wrapper.find('.payment-info').exists()).toBe(false)
+    expect(wrapper.findAll('button').some(button => button.text() === 'Начать расклад')).toBe(false)
+    expect(wrapper.findAll('.subscription-banner')).toHaveLength(1)
+    expect(wrapper.get('.subscription-banner').text()).toContain('Расклад требует платного доступа')
+    expect(wrapper.get('.subscription-banner').text()).toContain('300')
+    expect(wrapper.get('.subscription-banner button').attributes('disabled')).toBeDefined()
+    expect(validateQuestionMock).not.toHaveBeenCalled()
+    expect(store.pending).toBeNull()
+
+    await wrapper.findAll('.spread-option')[0].trigger('click')
+    expect(wrapper.find('.subscription-banner').exists()).toBe(false)
+    expect(wrapper.get('button.glow-button').text()).toBe('Начать расклад')
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeUndefined()
+  })
+
+  it('offers only payment when the free daily quota is exhausted', async () => {
+    authenticate()
+    statusMock.mockResolvedValue({
+      status: SubscriptionStatusValue.None, expiresAt: null, isActive: false,
+      freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1, canCreateFreeReading: false,
+    })
+    const { wrapper, store } = await mountHome(enablePayments)
+    await wrapper.find('textarea').setValue('Какой аспект задачи рассмотреть?')
+    expect(wrapper.find('[data-testid="block-warning"]').exists()).toBe(false)
+    expect(wrapper.find('.payment-info').exists()).toBe(false)
+    expect(wrapper.findAll('button').some(button => button.text() === 'Начать расклад')).toBe(false)
+    expect(wrapper.findAll('.subscription-banner')).toHaveLength(1)
+    expect(wrapper.get('.subscription-banner').text()).toContain('Лимит бесплатных раскладов исчерпан')
+    expect(validateQuestionMock).not.toHaveBeenCalled()
+    expect(store.pending).toBeNull()
+  })
+
+  it('keeps Start available to subscribers without a duplicate payment explanation', async () => {
+    authenticate()
+    statusMock.mockResolvedValue({
+      status: SubscriptionStatusValue.Active, expiresAt: '2030-01-01T00:00:00Z', isActive: true,
+      freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1, canCreateFreeReading: false,
+    })
+    const { wrapper } = await mountHome(enablePayments)
+    await wrapper.findAll('.spread-option')[2].trigger('click')
+    await wrapper.find('textarea').setValue('Какой аспект задачи рассмотреть?')
+    expect(wrapper.find('.subscription-banner').exists()).toBe(false)
+    expect(wrapper.find('.payment-info').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="block-warning"]').exists()).toBe(false)
+    expect(wrapper.get('button.glow-button').text()).toBe('Начать расклад')
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeUndefined()
+  })
+
+  it('waits for the access status before offering payment or Start', async () => {
+    authenticate()
+    let resolveStatus!: (value: unknown) => void
+    statusMock.mockImplementation(() => new Promise(resolve => { resolveStatus = resolve }))
+    const { wrapper } = await mountHome(enablePayments)
+    await wrapper.findAll('.spread-option')[1].trigger('click')
+    await wrapper.find('textarea').setValue('Какой аспект задачи рассмотреть?')
+    expect(wrapper.get('[role="status"]').text()).toBe('Проверяю доступ…')
+    expect(wrapper.find('.subscription-banner').exists()).toBe(false)
+    expect(wrapper.findAll('button').some(button => button.text() === 'Начать расклад')).toBe(false)
+
+    resolveStatus({
+      status: SubscriptionStatusValue.Active, expiresAt: '2030-01-01T00:00:00Z', isActive: true,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1, canCreateFreeReading: true,
+    })
+    await flushPromises()
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+    expect(wrapper.find('.subscription-banner').exists()).toBe(false)
+    expect(wrapper.get('button.glow-button').text()).toBe('Начать расклад')
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeUndefined()
+  })
+
+  it('keeps an unavailable paid spread blocked when payments are disabled', async () => {
     authenticate()
     const { wrapper } = await mountHome()
     await wrapper.findAll('.spread-option')[1].trigger('click')
     await wrapper.find('textarea').setValue('Какой аспект задачи рассмотреть?')
-    expect(wrapper.find('[data-testid="block-warning"]').exists()).toBe(true)
-    expect((wrapper.get('button.glow-button').element as HTMLButtonElement).disabled).toBe(true)
+    expect(wrapper.get('[data-testid="payments-unavailable"]').text()).toBe('Оплата временно недоступна.')
+    expect(wrapper.findAll('button').some(button => button.text() === 'Начать расклад')).toBe(false)
+    expect(wrapper.find('[data-testid="block-warning"]').exists()).toBe(false)
+    expect(wrapper.find('.payment-info').exists()).toBe(false)
+    expect(validateQuestionMock).not.toHaveBeenCalled()
   })
 })

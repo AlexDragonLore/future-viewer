@@ -82,14 +82,6 @@ const freeQuotaExhausted = computed(() => {
 
 const blocked = computed(() => requiresSubscription.value || freeQuotaExhausted.value)
 
-const blockMessage = computed(() => {
-  if (requiresSubscription.value)
-    return 'Бесплатный доступ открыт только к раскладу «Карта дня». Оплати доступ, чтобы продолжить.'
-  if (freeQuotaExhausted.value)
-    return 'Ты использовал бесплатный расклад на сегодня. Возвращайся завтра или оплати доступ.'
-  return ''
-})
-
 const canBegin = computed(() => {
   if (validatingQuestion.value) return false
   if (auth.isAuthenticated && auth.subscriptionLoading) return false
@@ -267,34 +259,21 @@ async function begin() {
         <span>Сверяю вопрос с Вуалью…</span>
       </div>
 
-      <div v-if="blocked" class="block-warning" data-testid="block-warning">
-        {{ blockMessage }}
-      </div>
-
-      <div>
+      <p v-if="auth.isAuthenticated && auth.subscriptionLoading" class="text-sm text-mystic-silver/60" role="status">
+        Проверяю доступ…
+      </p>
+      <SubscriptionBanner
+        v-else-if="blocked"
+        :message="requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
+        :price-label="`${paidProduct.price} / ${paidProduct.period}`"
+      />
+      <div v-else>
         <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
           {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : hasGuestReading ? 'Продолжить мой расклад' : 'Открыть карту бесплатно' }}
         </button>
         <p v-if="showGuestPaidOffer" class="guest-paid-offer" data-testid="guest-paid-offer">
           Все 3 расклада безлимитно — {{ paidProduct.price }} за {{ paidProduct.period }}. Без автосписаний.
         </p>
-      </div>
-
-      <SubscriptionBanner
-        v-if="auth.isAuthenticated && !auth.isSubscribed && blocked"
-        :message="requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
-        :price-label="`${paidProduct.price} / ${paidProduct.period}`"
-      />
-
-      <div v-if="auth.isAuthenticated && publicConfig.paymentsEnabled" class="payment-info">
-        <div>
-          <div class="payment-title">{{ paidProduct.title }}</div>
-          <p>
-            {{ paidProduct.price }} за {{ paidProduct.period }}. Цифровой доступ к безлимитным раскладам
-            активируется после успешной онлайн-оплаты. Автосписаний нет — для продления нужно оплатить доступ заново.
-          </p>
-        </div>
-        <RouterLink to="/legal/offer" class="payment-link">Условия оплаты</RouterLink>
       </div>
 
       <div class="home-links flex flex-wrap items-center gap-3 justify-between text-xs text-mystic-silver/50">
@@ -483,15 +462,6 @@ async function begin() {
   background: rgba(245, 194, 107, 0.12);
   color: #f5c26b;
 }
-.block-warning {
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.08);
-  color: #fca5a5;
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
 .legal-payment-block {
   border-left: 2px solid rgba(252, 165, 165, 0.7);
   padding: 0.65rem 0.8rem;
@@ -502,35 +472,6 @@ async function begin() {
 .glow-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.payment-info {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 0;
-  border-top: 1px solid rgba(245, 194, 107, 0.18);
-  border-bottom: 1px solid rgba(245, 194, 107, 0.12);
-}
-.payment-info p {
-  margin: 0.2rem 0 0;
-  color: rgba(224, 212, 186, 0.62);
-  font-size: 0.75rem;
-  line-height: 1.45;
-}
-.payment-title {
-  color: rgba(245, 194, 107, 0.9);
-  font-family: 'Cinzel', serif;
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-}
-.payment-link {
-  flex: 0 0 auto;
-  color: #f5c26b;
-  font-size: 0.75rem;
-  text-decoration: none;
-}
-.payment-link:hover {
-  text-decoration: underline;
 }
 @media (max-width: 620px) {
   .home-page {
@@ -555,11 +496,6 @@ async function begin() {
     justify-content: center;
     overflow-wrap: anywhere;
     text-align: center;
-  }
-  .payment-info {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.5rem;
   }
   .warning-actions {
     align-items: stretch;
