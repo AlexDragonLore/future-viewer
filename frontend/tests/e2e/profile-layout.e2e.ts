@@ -15,7 +15,11 @@ async function openProfile(page: Page, email: string, active: boolean) {
   const responses: Record<string, unknown> = {
     '/api/public/config': {
       supportEmail: '', paymentsEnabled: true,
-      paymentProduct: { amount: 300, currency: 'RUB', accessDays: 30 },
+      paymentProduct: { tariffCode: 'pro-30d', amount: 299, currency: 'RUB', accessDays: 30 },
+      paymentProducts: [
+        { tariffCode: 'pro-7d', amount: 99, currency: 'RUB', accessDays: 7 },
+        { tariffCode: 'pro-30d', amount: 299, currency: 'RUB', accessDays: 30 },
+      ],
     },
     '/api/public/legal-documents': legalDocumentsResponse,
     '/api/subscription/status': {
@@ -98,6 +102,9 @@ for (const width of [320, 393, 640, 768, 1280]) {
       }
 
       const acceptance = page.getByTestId('payment-offer-acceptance')
+      await expect(page.getByTestId('tariff-pro-7d')).toBeChecked()
+      await expect(page.locator('.tariff-option').filter({ hasText: '7 дней' })).toContainText(/99\s*₽/)
+      await expect(page.locator('.tariff-option').filter({ hasText: '30 дней' })).toContainText(/299\s*₽/)
       const paymentButton = page.getByRole('button', { name: scenario.active ? 'Продлить доступ' : 'Оплатить доступ', exact: true })
       await expect(paymentButton).toBeDisabled()
       await acceptance.check()

@@ -9,6 +9,7 @@ export interface PaymentCreation {
 export interface PaymentOfferAcceptance {
   offerAccepted: boolean
   offerVersion: string
+  tariffCode: string
 }
 
 export interface PaymentStatus {

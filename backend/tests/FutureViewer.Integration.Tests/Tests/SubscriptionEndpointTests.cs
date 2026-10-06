@@ -111,6 +111,9 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var order = await db.PaymentOrders.SingleAsync(x => x.PublicId == Guid.Parse(payment!.PaymentId));
+        order.TariffCode.Should().Be("pro-30d", "clients omitting the tariff retain the monthly checkout");
+        order.Amount.Should().Be(299m);
+        order.AccessDays.Should().Be(30);
         var consent = await db.UserConsents.SingleAsync(x =>
             x.UserId == auth.UserId && x.CollectionSource == $"checkout:{order.PublicId:N}");
         consent.ConsentType.Should().Be(ConsentType.OfferAcceptance);
@@ -150,6 +153,81 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         status.FreeReadingsUsedToday.Should().Be(0);
         status.FreeReadingsDailyLimit.Should().BeGreaterThan(0);
         status.CanCreateFreeReading.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData("pro-7d", 99, 7)]
+    [InlineData("pro-30d", 299, 30)]
+    public async Task Checkout_persists_and_charges_the_selected_server_tariff(
+        string tariffCode, decimal amount, int accessDays)
+    {
+        var provider = new CheckoutProvider();
+        using var factory = _fixture.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.PostConfigure<PaymentOptions>(options =>
+            {
+                options.Enabled = true;
+                options.WebhookEnabled = true;
+            });
+            services.AddSingleton<IPaymentProvider>(provider);
+        }));
+        using var client = factory.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client,
+            $"checkout-tariff-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var response = await client.PostAsJsonAsync("/api/payments/subscribe", new CreatePaymentRequest
+        {
+            TariffCode = tariffCode,
+            OfferAccepted = true,
+            OfferVersion = AuthTestExtensions.LegalDocumentVersion
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var payment = await response.Content.ReadFromJsonAsync<PaymentCreationDto>();
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var order = await db.PaymentOrders.SingleAsync(x => x.PublicId == Guid.Parse(payment!.PaymentId));
+        order.TariffCode.Should().Be(tariffCode);
+        order.Amount.Should().Be(amount);
+        order.Currency.Should().Be("RUB");
+        order.AccessDays.Should().Be(accessDays);
+        provider.LastProduct.Should().BeEquivalentTo(new PaymentProductDescriptor
+        {
+            TariffCode = tariffCode, Amount = amount, Currency = "RUB", AccessDays = accessDays
+        });
+    }
+
+    [Fact]
+    public async Task Checkout_rejects_unknown_tariff_without_creating_a_payment()
+    {
+        var provider = new CheckoutProvider();
+        using var factory = _fixture.WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.PostConfigure<PaymentOptions>(options =>
+            {
+                options.Enabled = true;
+                options.WebhookEnabled = true;
+            });
+            services.AddSingleton<IPaymentProvider>(provider);
+        }));
+        using var client = factory.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client,
+            $"checkout-unknown-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        var response = await client.PostAsJsonAsync("/api/payments/subscribe", new CreatePaymentRequest
+        {
+            TariffCode = "pro-1d", OfferAccepted = true, OfferVersion = AuthTestExtensions.LegalDocumentVersion
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        provider.Calls.Should().Be(0);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.PaymentOrders.CountAsync(x => x.UserId == auth.UserId)).Should().Be(0);
+        (await db.UserConsents.CountAsync(x => x.UserId == auth.UserId
+            && x.CollectionSource.StartsWith("checkout:"))).Should().Be(0);
     }
 
     [Fact]
@@ -215,16 +293,23 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
     private sealed class CheckoutProvider : IPaymentProvider
     {
         public int Calls { get; private set; }
+        public PaymentProductDescriptor? LastProduct { get; private set; }
         public string ProviderName => "checkout-test";
         public PaymentProductDescriptor Product => new()
         {
-            TariffCode = "pro-30d", Amount = 300m, Currency = "RUB", AccessDays = 30
+            TariffCode = "pro-30d", Amount = 299m, Currency = "RUB", AccessDays = 30
         };
+        public IReadOnlyList<PaymentProductDescriptor> Products =>
+        [
+            new() { TariffCode = "pro-7d", Amount = 99m, Currency = "RUB", AccessDays = 7 },
+            Product
+        ];
 
         public Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
-            Guid publicOrderId, string idempotencyKey, CancellationToken ct = default)
+            Guid publicOrderId, string idempotencyKey, PaymentProductDescriptor product, CancellationToken ct = default)
         {
             Calls++;
+            LastProduct = product;
             return Task.FromResult(new PaymentCreationResult
             {
                 PaymentId = $"checkout-test-{publicOrderId:N}",

@@ -29,6 +29,7 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.Receiver)
         && !string.IsNullOrWhiteSpace(_options.NotificationSecret)
         && PaymentEndpointSafety.IsYooMoneyCheckout(_options.QuickpayUrl)
+        && _options.WeeklyPriceAmount > 0 && decimal.Round(_options.WeeklyPriceAmount, 2) == _options.WeeklyPriceAmount
         && _options.MonthlyPriceAmount > 0 && decimal.Round(_options.MonthlyPriceAmount, 2) == _options.MonthlyPriceAmount
         && _options.CurrencyCode == "643";
 
@@ -40,9 +41,22 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         AccessDays = 30
     };
 
+    public IReadOnlyList<PaymentProductDescriptor> Products =>
+    [
+        new()
+        {
+            TariffCode = "pro-7d",
+            Amount = _options.WeeklyPriceAmount,
+            Currency = "RUB",
+            AccessDays = 7
+        },
+        Product
+    ];
+
     public Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
         Guid publicOrderId,
         string idempotencyKey,
+        PaymentProductDescriptor product,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(_options.Receiver))
@@ -51,7 +65,7 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
 
         _ = idempotencyKey; // YooMoney quickpay has no request idempotency header.
         var label = CreateLabel(publicOrderId);
-        var url = BuildQuickpayUrl(label);
+        var url = BuildQuickpayUrl(label, product.Amount);
 
         return Task.FromResult(new PaymentCreationResult
         {
@@ -136,14 +150,14 @@ public sealed class YooMoneyRedirectPaymentProvider : IPaymentProvider
         return Task.FromResult<PaymentVerification?>(verification);
     }
 
-    private string BuildQuickpayUrl(string label)
+    private string BuildQuickpayUrl(string label, decimal amount)
     {
         var fields = new Dictionary<string, string>
         {
             ["receiver"] = _options.Receiver,
             ["quickpay-form"] = _options.QuickpayForm,
             ["paymentType"] = _options.PaymentType,
-            ["sum"] = _options.MonthlyPriceAmount.ToString("F2", CultureInfo.InvariantCulture),
+            ["sum"] = amount.ToString("F2", CultureInfo.InvariantCulture),
             ["label"] = label,
             ["targets"] = _options.Targets,
             ["successURL"] = _options.ReturnUrl

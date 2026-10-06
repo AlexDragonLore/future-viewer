@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using FluentAssertions;
 using FutureViewer.Infrastructure.Payment;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,8 +9,11 @@ namespace FutureViewer.Integration.Tests.Tests;
 
 public sealed class YukassaClientTests
 {
-    [Fact]
-    public async Task CreateSubscriptionPaymentAsync_accepts_confirmation_url_without_return_url()
+    [Theory]
+    [InlineData("pro-7d", "99.00", 7)]
+    [InlineData("pro-30d", "299.00", 30)]
+    public async Task CreateSubscriptionPaymentAsync_uses_selected_tariff_and_accepts_confirmation_url_without_return_url(
+        string tariffCode, string amount, int accessDays)
     {
         var handler = new StubHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -30,7 +34,8 @@ public sealed class YukassaClientTests
 
         var result = await client.CreateSubscriptionPaymentAsync(
             publicOrderId,
-            "6dc06929b7c64121955396daed93c358");
+            "6dc06929b7c64121955396daed93c358",
+            client.Products.Single(product => product.TariffCode == tariffCode));
 
         result.PaymentId.Should().Be("pay-prod-1");
         result.Status.Should().Be("pending");
@@ -38,6 +43,10 @@ public sealed class YukassaClientTests
         handler.RequestBody.Should().Contain($"\"order_id\":\"{publicOrderId:N}\"");
         handler.RequestBody!.Contains("email", StringComparison.OrdinalIgnoreCase).Should().BeFalse();
         handler.IdempotenceKey.Should().Be("6dc06929b7c64121955396daed93c358");
+        using var request = JsonDocument.Parse(handler.RequestBody!);
+        request.RootElement.GetProperty("amount").GetProperty("value").GetString().Should().Be(amount);
+        request.RootElement.GetProperty("amount").GetProperty("currency").GetString().Should().Be("RUB");
+        request.RootElement.GetProperty("description").GetString().Should().Contain($"на {accessDays} дней");
     }
 
     [Theory]
@@ -101,8 +110,7 @@ public sealed class YukassaClientTests
         {
             ShopId = "516089",
             SecretKey = "test-secret",
-            ReturnUrl = "https://alex-taro.ru/payment/success",
-            MonthlyPriceAmount = 300m
+            ReturnUrl = "https://alex-taro.ru/payment/success"
         });
 
         return new YukassaClient(

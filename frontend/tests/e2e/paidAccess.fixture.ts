@@ -42,7 +42,11 @@ export async function installPaidAccessFixture(context: BrowserContext, options:
         body = {
           supportEmail: '',
           paymentsEnabled: options.paymentsEnabled ?? true,
-          paymentProduct: { amount: options.amount ?? 300, currency: 'RUB', accessDays: options.accessDays ?? 30 },
+          paymentProduct: { tariffCode: 'pro-30d', amount: options.amount ?? 299, currency: 'RUB', accessDays: options.accessDays ?? 30 },
+          paymentProducts: [
+            { tariffCode: 'pro-7d', amount: 99, currency: 'RUB', accessDays: 7 },
+            { tariffCode: 'pro-30d', amount: options.amount ?? 299, currency: 'RUB', accessDays: options.accessDays ?? 30 },
+          ],
         }
         break
       case '/api/public/legal-documents': body = legalDocumentsResponse; break

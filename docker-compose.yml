@@ -70,7 +70,8 @@ services:
       Yukassa__SecretKey: ${YUKASSA_SECRET_KEY:-}
       Yukassa__ReturnUrl: ${YUKASSA_RETURN_URL:-http://localhost:5173/payment/success}
       Yukassa__Currency: ${YUKASSA_CURRENCY:-RUB}
-      Yukassa__MonthlyPriceAmount: ${YUKASSA_MONTHLY_PRICE_AMOUNT:-300}
+      Yukassa__WeeklyPriceAmount: ${YUKASSA_WEEKLY_PRICE_AMOUNT:-99}
+      Yukassa__MonthlyPriceAmount: ${YUKASSA_MONTHLY_PRICE_AMOUNT:-299}
       Yukassa__ApiBaseUrl: ${YUKASSA_API_BASE_URL:-https://api.yookassa.ru/v3/}
       YooMoney__Receiver: ${YOOMONEY_RECEIVER:-}
       YooMoney__NotificationSecret: ${YOOMONEY_NOTIFICATION_SECRET:-}
@@ -79,7 +80,8 @@ services:
       YooMoney__QuickpayForm: ${YOOMONEY_QUICKPAY_FORM:-button}
       YooMoney__PaymentType: ${YOOMONEY_PAYMENT_TYPE:-AC}
       YooMoney__CurrencyCode: ${YOOMONEY_CURRENCY_CODE:-643}
-      YooMoney__MonthlyPriceAmount: ${YOOMONEY_MONTHLY_PRICE_AMOUNT:-300}
+      YooMoney__WeeklyPriceAmount: ${YOOMONEY_WEEKLY_PRICE_AMOUNT:-99}
+      YooMoney__MonthlyPriceAmount: ${YOOMONEY_MONTHLY_PRICE_AMOUNT:-299}
       YooMoney__Targets: ${YOOMONEY_TARGETS:-Доступ Future Viewer Pro}
     ports:
       - "5050:8080"

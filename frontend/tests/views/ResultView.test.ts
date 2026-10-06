@@ -73,7 +73,7 @@ function enableFreeAccountCheckout() {
   }
   const config = usePublicConfigStore()
   config.paymentsEnabled = true
-  config.paymentProduct = { amount: 640, currency: 'RUB', accessDays: 45 }
+  config.paymentProducts = [{ tariffCode: 'pro-45d', amount: 640, currency: 'RUB', accessDays: 45 }]
 }
 
 async function finishTyping() {
@@ -232,7 +232,7 @@ describe('ResultView', () => {
     await offer.get('button').trigger('click')
     await flushPromises()
     expect(createPayment).toHaveBeenCalledOnce()
-    expect(createPayment).toHaveBeenCalledWith({ offerAccepted: true, offerVersion: 'offer-current' })
+    expect(createPayment).toHaveBeenCalledWith({ offerAccepted: true, offerVersion: 'offer-current', tariffCode: 'pro-45d' })
   })
 
   it.each(['guest', 'preview', 'subscriber', 'disabled', 'missing-product', 'unknown-subscription', 'refreshing-subscription', 'loading'])
@@ -244,7 +244,7 @@ describe('ResultView', () => {
       if (reason === 'guest') auth.token = null
       if (reason === 'subscriber') auth.subscription!.isActive = true
       if (reason === 'disabled') config.paymentsEnabled = false
-      if (reason === 'missing-product') config.paymentProduct = null
+      if (reason === 'missing-product') config.paymentProducts = []
       if (reason === 'unknown-subscription') auth.subscription = null
       if (reason === 'refreshing-subscription') auth.subscriptionLoading = true
       if (reason === 'loading') useReadingStore().loading = true

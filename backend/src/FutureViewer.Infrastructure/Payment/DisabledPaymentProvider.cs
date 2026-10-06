@@ -6,6 +6,7 @@ public sealed class DisabledPaymentProvider : IPaymentProvider
 {
     public string ProviderName => "disabled";
     public bool IsConfigured => false;
+    public IReadOnlyList<PaymentProductDescriptor> Products => [];
 
     public PaymentProductDescriptor Product => new()
     {
@@ -18,6 +19,7 @@ public sealed class DisabledPaymentProvider : IPaymentProvider
     public Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
         Guid publicOrderId,
         string idempotencyKey,
+        PaymentProductDescriptor product,
         CancellationToken ct = default) =>
         throw new InvalidOperationException(
             "Payment integration is disabled in the service configuration.");

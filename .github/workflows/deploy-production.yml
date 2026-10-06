@@ -90,7 +90,8 @@ jobs:
       YUKASSA_SHOP_ID: ${{ secrets.YUKASSA_SHOP_ID }}
       YUKASSA_SECRET_KEY: ${{ secrets.YUKASSA_SECRET_KEY }}
       YUKASSA_CURRENCY: ${{ vars.YUKASSA_CURRENCY || 'RUB' }}
-      YUKASSA_MONTHLY_PRICE_AMOUNT: ${{ vars.YUKASSA_MONTHLY_PRICE_AMOUNT || '300' }}
+      YUKASSA_WEEKLY_PRICE_AMOUNT: ${{ vars.YUKASSA_WEEKLY_PRICE_AMOUNT || '99' }}
+      YUKASSA_MONTHLY_PRICE_AMOUNT: ${{ vars.YUKASSA_MONTHLY_PRICE_AMOUNT || '299' }}
       YUKASSA_API_BASE_URL: ${{ vars.YUKASSA_API_BASE_URL || 'https://api.yookassa.ru/v3/' }}
       YOOMONEY_RECEIVER: ${{ secrets.YOOMONEY_RECEIVER }}
       YOOMONEY_NOTIFICATION_SECRET: ${{ secrets.YOOMONEY_NOTIFICATION_SECRET }}
@@ -98,7 +99,8 @@ jobs:
       YOOMONEY_QUICKPAY_FORM: ${{ vars.YOOMONEY_QUICKPAY_FORM || 'button' }}
       YOOMONEY_PAYMENT_TYPE: ${{ vars.YOOMONEY_PAYMENT_TYPE || 'AC' }}
       YOOMONEY_CURRENCY_CODE: ${{ vars.YOOMONEY_CURRENCY_CODE || '643' }}
-      YOOMONEY_MONTHLY_PRICE_AMOUNT: ${{ vars.YOOMONEY_MONTHLY_PRICE_AMOUNT || '300' }}
+      YOOMONEY_WEEKLY_PRICE_AMOUNT: ${{ vars.YOOMONEY_WEEKLY_PRICE_AMOUNT || '99' }}
+      YOOMONEY_MONTHLY_PRICE_AMOUNT: ${{ vars.YOOMONEY_MONTHLY_PRICE_AMOUNT || '299' }}
       YOOMONEY_TARGETS: ${{ vars.YOOMONEY_TARGETS || 'Доступ Future Viewer Pro' }}
     steps:
       - uses: actions/checkout@v4
@@ -338,6 +340,7 @@ jobs:
             write_overlay_line YUKASSA_SHOP_ID "$YUKASSA_SHOP_ID"
             write_overlay_line YUKASSA_SECRET_KEY "$YUKASSA_SECRET_KEY"
             write_overlay_line YUKASSA_CURRENCY "$YUKASSA_CURRENCY"
+            write_overlay_line YUKASSA_WEEKLY_PRICE_AMOUNT "$YUKASSA_WEEKLY_PRICE_AMOUNT"
             write_overlay_line YUKASSA_MONTHLY_PRICE_AMOUNT "$YUKASSA_MONTHLY_PRICE_AMOUNT"
             write_overlay_line YUKASSA_API_BASE_URL "$YUKASSA_API_BASE_URL"
             write_overlay_line YOOMONEY_RECEIVER "$YOOMONEY_RECEIVER"
@@ -346,6 +349,7 @@ jobs:
             write_overlay_line YOOMONEY_QUICKPAY_FORM "$YOOMONEY_QUICKPAY_FORM"
             write_overlay_line YOOMONEY_PAYMENT_TYPE "$YOOMONEY_PAYMENT_TYPE"
             write_overlay_line YOOMONEY_CURRENCY_CODE "$YOOMONEY_CURRENCY_CODE"
+            write_overlay_line YOOMONEY_WEEKLY_PRICE_AMOUNT "$YOOMONEY_WEEKLY_PRICE_AMOUNT"
             write_overlay_line YOOMONEY_MONTHLY_PRICE_AMOUNT "$YOOMONEY_MONTHLY_PRICE_AMOUNT"
             write_overlay_line YOOMONEY_TARGETS "$YOOMONEY_TARGETS"
             write_overlay_line VITE_MERCHANT_SERVICE_NAME "${VITE_MERCHANT_SERVICE_NAME:-}"

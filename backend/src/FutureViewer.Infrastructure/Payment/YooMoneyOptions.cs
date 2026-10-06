@@ -11,6 +11,7 @@ public sealed class YooMoneyOptions
     public string QuickpayForm { get; set; } = "button";
     public string PaymentType { get; set; } = "AC";
     public string CurrencyCode { get; set; } = "643";
-    public decimal MonthlyPriceAmount { get; set; } = 300m;
+    public decimal WeeklyPriceAmount { get; set; } = 99m;
+    public decimal MonthlyPriceAmount { get; set; } = 299m;
     public string Targets { get; set; } = "Доступ Future Viewer Pro";
 }

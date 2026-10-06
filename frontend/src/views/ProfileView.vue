@@ -6,15 +6,12 @@ import ScoreBadge from '@/components/ScoreBadge.vue'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
 import PrivacyCenter from '@/components/PrivacyCenter.vue'
 import { extractApiError } from '@/api/httpClient'
-import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 import { usePrivacyStore } from '@/stores/usePrivacyStore'
 import { FeedbackStatus, type FeedbackInfo } from '@/types'
 
 const store = useProfileStore()
 const auth = useAuthStore()
 const privacy = usePrivacyStore()
-const publicConfig = usePublicConfigStore()
-const paidProduct = computed(() => publicConfig.paidProduct)
 
 const recentFeedbacks = computed(() => store.feedbacks.slice(0, 5))
 const firstName = ref('')
@@ -28,7 +25,7 @@ const accessExpiresLabel = computed(() => {
   return new Date(expiresAt).toLocaleDateString()
 })
 const accessMessage = computed(() =>
-  auth.isSubscribed ? 'Продлить доступ ещё на месяц' : 'Оплатить доступ к полным раскладам',
+  auth.isSubscribed ? 'Продлить доступ' : 'Полный доступ',
 )
 const accessButtonLabel = computed(() =>
   auth.isSubscribed ? 'Продлить доступ' : 'Оплатить доступ',
@@ -122,7 +119,7 @@ async function clearMemory() {
     </div>
 
     <template v-else>
-      <section class="mystic-card p-6 mb-6" data-testid="profile-access">
+      <section class="mystic-card p-4 sm:p-6 mb-6" data-testid="profile-access">
         <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Доступ</div>
         <p class="text-sm text-mystic-silver/80 mb-4">
           <template v-if="auth.isSubscribed">
@@ -136,7 +133,6 @@ async function clearMemory() {
         <SubscriptionBanner
           :message="accessMessage"
           :button-label="accessButtonLabel"
-          :price-label="`${paidProduct.price} / ${paidProduct.period}`"
         />
       </section>
 

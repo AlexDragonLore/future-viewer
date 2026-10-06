@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Integration.Tests.Fixtures;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Hosting;
@@ -47,11 +48,34 @@ public sealed class PublicEndpointTests : IClassFixture<IntegrationTestFixture>
                     ["Payment:Provider"] = "Yukassa",
                     ["Yukassa:ShopId"] = configured ? "qa-shop" : "",
                     ["Yukassa:SecretKey"] = configured ? "qa-key" : "",
+                    ["Yukassa:WeeklyPriceAmount"] = "99",
+                    ["Yukassa:MonthlyPriceAmount"] = "299",
                 })));
         using var client = factory.CreateClient();
         var payload = await client.GetFromJsonAsync<PublicConfigPayload>("/api/public/config");
         payload!.PaymentsEnabled.Should().Be(expected);
+        if (configured)
+        {
+            payload.PaymentProduct.Should().BeEquivalentTo(new PaymentProductDescriptor
+            {
+                TariffCode = "pro-30d", Amount = 299m, Currency = "RUB", AccessDays = 30
+            });
+            payload.PaymentProducts.Should().BeEquivalentTo(new PaymentProductDescriptor[]
+            {
+                new() { TariffCode = "pro-7d", Amount = 99m, Currency = "RUB", AccessDays = 7 },
+                new() { TariffCode = "pro-30d", Amount = 299m, Currency = "RUB", AccessDays = 30 }
+            });
+        }
+        else
+        {
+            payload.PaymentProduct.Should().BeNull();
+            payload.PaymentProducts.Should().BeEmpty();
+        }
     }
 
-    private sealed record PublicConfigPayload(string SupportEmail, bool PaymentsEnabled);
+    private sealed record PublicConfigPayload(
+        string SupportEmail,
+        bool PaymentsEnabled,
+        PaymentProductDescriptor? PaymentProduct,
+        PaymentProductDescriptor[] PaymentProducts);
 }

@@ -57,7 +57,7 @@ function authenticate() {
 function enablePayments() {
   const config = usePublicConfigStore()
   config.paymentsEnabled = true
-  config.paymentProduct = { amount: 300, currency: 'RUB', accessDays: 30 }
+  config.paymentProducts = [{ tariffCode: 'pro-7d', amount: 99, currency: 'RUB', accessDays: 7 }, { tariffCode: 'pro-30d', amount: 299, currency: 'RUB', accessDays: 30 }]
 }
 
 async function selectSingleCardAndType(wrapper: ReturnType<typeof mount>, question: string) {
@@ -149,7 +149,7 @@ describe('HomeView privacy and question safety', () => {
     const { wrapper, router, store } = await mountHome(() => {
       const config = usePublicConfigStore()
       config.paymentsEnabled = true
-      config.paymentProduct = { amount: 640, currency: 'RUB', accessDays: 45 }
+      config.paymentProducts = [{ tariffCode: 'pro-45d', amount: 640, currency: 'RUB', accessDays: 45 }]
     })
     const offer = wrapper.get('[data-testid="guest-paid-offer"]')
     expect(offer.text()).toContain('640')
@@ -169,7 +169,7 @@ describe('HomeView privacy and question safety', () => {
     const { wrapper } = await mountHome(() => {
       const config = usePublicConfigStore()
       config.paymentsEnabled = reason !== 'disabled'
-      config.paymentProduct = reason === 'missing-product' ? null : { amount: 300, currency: 'RUB', accessDays: 30 }
+      config.paymentProducts = reason === 'missing-product' ? [] : [{ tariffCode: 'pro-30d', amount: 299, currency: 'RUB', accessDays: 30 }]
     })
     expect(wrapper.find('[data-testid="guest-paid-offer"]').exists()).toBe(false)
   })
@@ -258,8 +258,9 @@ describe('HomeView privacy and question safety', () => {
     expect(wrapper.find('.payment-info').exists()).toBe(false)
     expect(wrapper.findAll('button').some(button => button.text() === 'Начать расклад')).toBe(false)
     expect(wrapper.findAll('.subscription-banner')).toHaveLength(1)
-    expect(wrapper.get('.subscription-banner').text()).toContain('Расклад требует платного доступа')
-    expect(wrapper.get('.subscription-banner').text()).toContain('300')
+    expect(wrapper.get('.subscription-banner').text()).toContain('Открой все расклады')
+    expect(wrapper.get('.subscription-banner').text()).toContain('99')
+    expect(wrapper.get('.subscription-banner').text()).toContain('299')
     expect(wrapper.get('.subscription-banner button').attributes('disabled')).toBeDefined()
     expect(validateQuestionMock).not.toHaveBeenCalled()
     expect(store.pending).toBeNull()
@@ -282,7 +283,7 @@ describe('HomeView privacy and question safety', () => {
     expect(wrapper.find('.payment-info').exists()).toBe(false)
     expect(wrapper.findAll('button').some(button => button.text() === 'Начать расклад')).toBe(false)
     expect(wrapper.findAll('.subscription-banner')).toHaveLength(1)
-    expect(wrapper.get('.subscription-banner').text()).toContain('Лимит бесплатных раскладов исчерпан')
+    expect(wrapper.get('.subscription-banner').text()).toContain('Расклады без ограничений')
     expect(validateQuestionMock).not.toHaveBeenCalled()
     expect(store.pending).toBeNull()
   })

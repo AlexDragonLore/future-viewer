@@ -105,7 +105,7 @@ public sealed class PaymentConcurrencyTests(IntegrationTestFixture fixture) : IC
         };
 
         public Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
-            Guid publicOrderId, string idempotencyKey, CancellationToken ct = default) =>
+            Guid publicOrderId, string idempotencyKey, PaymentProductDescriptor product, CancellationToken ct = default) =>
             throw new NotSupportedException();
 
         public PaymentWebhookEvent ParseWebhook(string body) => new()

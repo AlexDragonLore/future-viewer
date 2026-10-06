@@ -15,7 +15,6 @@ const router = useRouter()
 const store = useReadingStore()
 const auth = useAuthStore()
 const publicConfig = usePublicConfigStore()
-const paidProduct = computed(() => publicConfig.paidProduct)
 const restoring = ref(false)
 const locked = computed(() => reading.value?.isPreview === true)
 
@@ -194,7 +193,7 @@ watch(
 const streaming = computed(() => (hasActiveStream.value && !store.streamingDone) || displayed.value.length < targetText.value.length)
 const showPaidOffer = computed(() => auth.isAuthenticated && auth.subscription !== null
   && !auth.subscriptionLoading && !auth.isSubscribed
-  && publicConfig.paymentsEnabled && publicConfig.paymentProduct !== null
+  && publicConfig.paymentsEnabled && publicConfig.paidProducts.length > 0
   && !locked.value && !streaming.value && !store.loading && !restoring.value
   && Boolean(targetText.value.trim()))
 
@@ -290,7 +289,6 @@ function again() {
       data-testid="result-paid-offer"
       message="Все 3 расклада без лимита"
       button-label="Оплатить доступ"
-      :price-label="`${paidProduct.price} за ${paidProduct.period}`"
     />
 
     <AiDisclaimer class="max-w-2xl w-full mb-8" />

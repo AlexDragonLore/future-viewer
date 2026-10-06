@@ -104,7 +104,9 @@ public sealed class SubscriptionService
             LegalDocumentType.PublicOffer, request.OfferVersion, ct)
             ?? throw new ConflictException("Оферта обновилась. Обновите страницу и ознакомьтесь с действующей редакцией.");
 
-        var product = _payments.Product;
+        var product = _payments.Products.FirstOrDefault(product =>
+            string.Equals(product.TariffCode, request.TariffCode, StringComparison.Ordinal))
+            ?? throw new DomainException("Выбранный тариф недоступен. Обновите страницу и выберите действующий тариф.");
         if (product.Amount <= 0 || decimal.Round(product.Amount, 2) != product.Amount || product.AccessDays <= 0
             || string.IsNullOrWhiteSpace(product.TariffCode)
             || !string.Equals(product.Currency, "RUB", StringComparison.OrdinalIgnoreCase))
@@ -144,6 +146,7 @@ public sealed class SubscriptionService
             result = await _payments.CreateSubscriptionPaymentAsync(
                 order.PublicId,
                 order.IdempotencyKey,
+                product,
                 ct);
             order.ProviderPaymentId = result.PaymentId;
             order.Status = PaymentOrderStatus.ProviderCreated;

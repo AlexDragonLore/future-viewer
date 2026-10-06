@@ -8,7 +8,11 @@ async function openHome(page: Page, options: { authenticated?: boolean; active?:
   const responses: Record<string, unknown> = {
     '/api/public/config': {
       supportEmail: '', paymentsEnabled: true,
-      paymentProduct: { amount: 300, currency: 'RUB', accessDays: 30 },
+      paymentProduct: { tariffCode: 'pro-30d', amount: 299, currency: 'RUB', accessDays: 30 },
+      paymentProducts: [
+        { tariffCode: 'pro-7d', amount: 99, currency: 'RUB', accessDays: 7 },
+        { tariffCode: 'pro-30d', amount: 299, currency: 'RUB', accessDays: 30 },
+      ],
     },
     '/api/public/legal-documents': legalDocumentsResponse,
     '/api/announcements/unread': [],
@@ -50,7 +54,8 @@ async function openHome(page: Page, options: { authenticated?: boolean; active?:
 async function expectSinglePaymentAction(page: Page, message: string) {
   await expect(page.locator('.subscription-banner')).toHaveCount(1)
   await expect(page.locator('.subscription-banner')).toContainText(message)
-  await expect(page.locator('.subscription-banner')).toContainText('300')
+  await expect(page.locator('.subscription-banner .tariff-option').filter({ hasText: '7 дней' })).toContainText(/99\s*₽/)
+  await expect(page.locator('.subscription-banner .tariff-option').filter({ hasText: '30 дней' })).toContainText(/299\s*₽/)
   await expect(page.getByRole('button', { name: 'Начать расклад', exact: true })).toHaveCount(0)
   await expect(page.getByTestId('block-warning')).toHaveCount(0)
   await expect(page.locator('.payment-info')).toHaveCount(0)
@@ -66,7 +71,7 @@ async function expectSinglePaymentAction(page: Page, message: string) {
 test('mobile paid spread shows one payment action and changing back restores Start', async ({ page }, testInfo) => {
   const mutations = await openHome(page, { authenticated: true })
   await page.locator('.spread-option').nth(1).click()
-  await expectSinglePaymentAction(page, 'Расклад требует платного доступа')
+  await expectSinglePaymentAction(page, 'Открой все расклады')
   await page.locator('.subscription-banner').scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('paid-spread-mobile.png') })
   await page.getByTestId('payment-offer-acceptance').check()
@@ -80,7 +85,7 @@ test('mobile paid spread shows one payment action and changing back restores Sta
 
 test('mobile exhausted daily quota shows only its payment banner', async ({ page }, testInfo) => {
   const mutations = await openHome(page, { authenticated: true, exhausted: true })
-  await expectSinglePaymentAction(page, 'Лимит бесплатных раскладов исчерпан')
+  await expectSinglePaymentAction(page, 'Расклады без ограничений')
   await page.locator('.subscription-banner').scrollIntoViewIfNeeded()
   await page.screenshot({ path: testInfo.outputPath('exhausted-quota-mobile.png') })
   expect(mutations).toEqual([])
@@ -101,7 +106,9 @@ test('guest still sees the compact paid option under the free card button', asyn
   const mutations = await openHome(page)
   await expect(page.getByRole('button', { name: 'Открыть карту бесплатно', exact: true })).toBeEnabled()
   await expect(page.getByTestId('guest-paid-offer')).toContainText('Все 3 расклада безлимитно')
-  await expect(page.getByTestId('guest-paid-offer')).toContainText('300')
+  await expect(page.getByTestId('guest-paid-offer')).toContainText(/99\s*₽/)
+  await expect(page.getByTestId('guest-paid-offer')).toContainText('7 дней')
+  await expect(page.getByTestId('guest-paid-offer')).toContainText(/299\s*₽/)
   await expect(page.getByTestId('guest-paid-offer')).toContainText('30 дней')
   await expect(page.locator('.subscription-banner, .payment-info')).toHaveCount(0)
   await expect(page.getByTestId('payment-offer-acceptance')).toHaveCount(0)

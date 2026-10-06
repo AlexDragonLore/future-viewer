@@ -53,9 +53,43 @@ describe('payments capability', () => {
 
   it('accepts explicit payment enablement from the backend', async () => {
     setActivePinia(createPinia())
-    getConfig.mockResolvedValueOnce({ supportEmail: '', paymentsEnabled: true })
+    getConfig.mockResolvedValueOnce({ supportEmail: '', paymentsEnabled: true,
+      paymentProducts: [
+        { tariffCode: 'pro-30d', amount: 299, currency: 'RUB', accessDays: 30 },
+        { tariffCode: 'pro-7d', amount: 99, currency: 'RUB', accessDays: 7 },
+      ],
+    })
     const store = usePublicConfigStore()
     await store.load()
     expect(store.paymentsEnabled).toBe(true)
+    expect(store.paidProducts.map(product => product.tariffCode)).toEqual(['pro-7d', 'pro-30d'])
+    expect(store.paidProducts[0].price).toContain('99')
+    expect(store.paidProducts[1].price).toContain('299')
+  })
+
+  it('supports the legacy single-product response during an API update', async () => {
+    setActivePinia(createPinia())
+    getConfig.mockResolvedValueOnce({ paymentsEnabled: true,
+      paymentProduct: { amount: 300, currency: 'RUB', accessDays: 30 },
+    })
+    const store = usePublicConfigStore()
+    await store.load()
+    expect(store.paymentProducts).toEqual([{ tariffCode: 'pro-30d', amount: 300, currency: 'RUB', accessDays: 30 }])
+    expect(store.paymentsEnabled).toBe(true)
+  })
+
+  it('disables checkout when tariff data is missing or invalid', async () => {
+    setActivePinia(createPinia())
+    getConfig.mockResolvedValueOnce({ paymentsEnabled: true,
+      paymentProducts: [
+        { tariffCode: 'pro-7d', amount: -99, currency: 'RUB', accessDays: 7 },
+        { tariffCode: '', amount: 299, currency: 'RUB', accessDays: 30 },
+        { tariffCode: 'pro-30d', amount: 299, currency: 'USD', accessDays: 30 },
+      ],
+    })
+    const store = usePublicConfigStore()
+    await store.load()
+    expect(store.paymentProducts).toEqual([])
+    expect(store.paymentsEnabled).toBe(false)
   })
 })

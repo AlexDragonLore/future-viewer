@@ -4,11 +4,13 @@ public interface IPaymentProvider
 {
     string ProviderName { get; }
     PaymentProductDescriptor Product { get; }
+    IReadOnlyList<PaymentProductDescriptor> Products => [Product];
     bool IsConfigured => true;
 
     Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
         Guid publicOrderId,
         string idempotencyKey,
+        PaymentProductDescriptor product,
         CancellationToken ct = default);
 
     PaymentWebhookEvent? ParseWebhook(string body);

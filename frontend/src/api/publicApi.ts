@@ -1,9 +1,17 @@
 import { httpClient } from './httpClient'
 
+export interface PaymentProduct {
+  tariffCode: string
+  amount: number
+  currency: string
+  accessDays: number
+}
+
 export interface PublicConfig {
   supportEmail: string
   paymentsEnabled: boolean
-  paymentProduct?: { amount: number; currency: string; accessDays: number } | null
+  paymentProduct?: Omit<PaymentProduct, 'tariffCode'> & { tariffCode?: string } | null
+  paymentProducts?: PaymentProduct[]
 }
 
 export const publicApi = {

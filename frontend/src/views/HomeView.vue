@@ -21,9 +21,9 @@ const auth = useAuthStore()
 const deck = useDeckStore()
 const readingStore = useReadingStore()
 const publicConfig = usePublicConfigStore()
-const paidProduct = computed(() => publicConfig.paidProduct)
+const tariffSummary = computed(() => publicConfig.paidProducts.map(product => `${product.price} за ${product.period}`).join(' или '))
 const showGuestPaidOffer = computed(() => !auth.isAuthenticated
-  && publicConfig.paymentsEnabled && publicConfig.paymentProduct !== null)
+  && publicConfig.paymentsEnabled && publicConfig.paidProducts.length > 0)
 
 const question = ref('')
 const validationMessage = ref<string | null>(null)
@@ -264,15 +264,14 @@ async function begin() {
       </p>
       <SubscriptionBanner
         v-else-if="blocked"
-        :message="requiresSubscription ? 'Расклад требует платного доступа' : 'Лимит бесплатных раскладов исчерпан'"
-        :price-label="`${paidProduct.price} / ${paidProduct.period}`"
+        :message="requiresSubscription ? 'Открой все расклады' : 'Расклады без ограничений'"
       />
       <div v-else>
         <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
           {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : hasGuestReading ? 'Продолжить мой расклад' : 'Открыть карту бесплатно' }}
         </button>
         <p v-if="showGuestPaidOffer" class="guest-paid-offer" data-testid="guest-paid-offer">
-          Все 3 расклада безлимитно — {{ paidProduct.price }} за {{ paidProduct.period }}. Без автосписаний.
+          Все 3 расклада безлимитно — {{ tariffSummary }}. Без автосписаний.
         </p>
       </div>
 

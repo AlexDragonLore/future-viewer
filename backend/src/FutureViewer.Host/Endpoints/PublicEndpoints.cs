@@ -16,6 +16,7 @@ public static class PublicEndpoints
                 supportEmail = support.Value.Email,
                 paymentsEnabled = payment.Value.Enabled && payment.Value.WebhookEnabled && provider.IsConfigured,
                 paymentProduct = provider.IsConfigured ? provider.Product : null,
+                paymentProducts = provider.IsConfigured ? provider.Products : [],
             }));
 
         return app;

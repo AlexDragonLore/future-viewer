@@ -48,6 +48,7 @@ public sealed class YukassaClient : IPaymentProvider
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_options.ShopId)
         && !string.IsNullOrWhiteSpace(_options.SecretKey)
         && PaymentEndpointSafety.IsYukassaApi(_options.ApiBaseUrl)
+        && _options.WeeklyPriceAmount > 0 && decimal.Round(_options.WeeklyPriceAmount, 2) == _options.WeeklyPriceAmount
         && _options.MonthlyPriceAmount > 0 && decimal.Round(_options.MonthlyPriceAmount, 2) == _options.MonthlyPriceAmount
         && string.Equals(_options.Currency, "RUB", StringComparison.OrdinalIgnoreCase);
 
@@ -58,6 +59,18 @@ public sealed class YukassaClient : IPaymentProvider
         Currency = _options.Currency,
         AccessDays = 30
     };
+
+    public IReadOnlyList<PaymentProductDescriptor> Products =>
+    [
+        new()
+        {
+            TariffCode = "pro-7d",
+            Amount = _options.WeeklyPriceAmount,
+            Currency = _options.Currency,
+            AccessDays = 7
+        },
+        Product
+    ];
 
     public bool IsWebhookSourceAllowed(string? sourceAddress)
     {
@@ -75,6 +88,7 @@ public sealed class YukassaClient : IPaymentProvider
     public async Task<PaymentCreationResult> CreateSubscriptionPaymentAsync(
         Guid publicOrderId,
         string idempotencyKey,
+        PaymentProductDescriptor product,
         CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(_options.ShopId) || string.IsNullOrWhiteSpace(_options.SecretKey))
@@ -85,8 +99,8 @@ public sealed class YukassaClient : IPaymentProvider
         {
             Amount = new AmountDto
             {
-                Value = _options.MonthlyPriceAmount.ToString("F2", System.Globalization.CultureInfo.InvariantCulture),
-                Currency = _options.Currency
+                Value = product.Amount.ToString("F2", CultureInfo.InvariantCulture),
+                Currency = product.Currency.ToUpperInvariant()
             },
             Capture = true,
             Confirmation = new ConfirmationDto
@@ -94,7 +108,7 @@ public sealed class YukassaClient : IPaymentProvider
                 Type = "redirect",
                 ReturnUrl = _options.ReturnUrl
             },
-            Description = "Разовый доступ к сервису «Вуаль Грядущего» на 30 дней без автопродления",
+            Description = $"Разовый доступ к сервису «Вуаль Грядущего» на {product.AccessDays} дней без автопродления",
             Metadata = new Dictionary<string, string>
             {
                 ["access_type"] = "manual_renewal",

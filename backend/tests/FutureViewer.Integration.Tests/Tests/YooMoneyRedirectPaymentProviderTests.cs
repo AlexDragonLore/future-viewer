@@ -10,13 +10,18 @@ namespace FutureViewer.Integration.Tests.Tests;
 
 public sealed class YooMoneyRedirectPaymentProviderTests
 {
-    [Fact]
-    public async Task CreateSubscriptionPaymentAsync_returns_YooMoney_redirect_url_with_label()
+    [Theory]
+    [InlineData("pro-7d", "99.00", 7)]
+    [InlineData("pro-30d", "299.00", 30)]
+    public async Task CreateSubscriptionPaymentAsync_returns_selected_tariff_amount_with_order_label(
+        string tariffCode, string amount, int accessDays)
     {
         var provider = CreateProvider();
         var orderId = Guid.Parse("9fa80672-2861-46f3-8e24-120d27a9fd1e");
 
-        var result = await provider.CreateSubscriptionPaymentAsync(orderId, "idempotency-key");
+        var product = provider.Products.Single(product => product.TariffCode == tariffCode);
+        product.AccessDays.Should().Be(accessDays);
+        var result = await provider.CreateSubscriptionPaymentAsync(orderId, "idempotency-key", product);
 
         result.Status.Should().Be("pending");
         result.PaymentId.Should().BeNull("the operation ID is assigned when money is transferred");
@@ -24,7 +29,7 @@ public sealed class YooMoneyRedirectPaymentProviderTests
         result.ConfirmationUrl.Should().Contain("receiver=4100111111111111");
         result.ConfirmationUrl.Should().Contain("quickpay-form=button");
         result.ConfirmationUrl.Should().Contain("paymentType=AC");
-        result.ConfirmationUrl.Should().Contain("sum=300.00");
+        result.ConfirmationUrl.Should().Contain($"sum={amount}");
         result.ConfirmationUrl.Should().Contain($"label=fv-order%3A{orderId:N}%3A");
         result.ConfirmationUrl.Should().NotContain("%40");
         result.ConfirmationUrl.Should().Contain("successURL=http%3A%2F%2Flocalhost%3A5173%2Fpayment%2Fsuccess");
@@ -125,7 +130,6 @@ public sealed class YooMoneyRedirectPaymentProviderTests
             Receiver = "4100111111111111",
             NotificationSecret = "secret123",
             ReturnUrl = "http://localhost:5173/payment/success",
-            MonthlyPriceAmount = 300m,
             Targets = "Future Viewer Pro"
         });
 

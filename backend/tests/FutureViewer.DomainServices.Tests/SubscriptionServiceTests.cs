@@ -148,7 +148,10 @@ public sealed class SubscriptionServiceTests
         status.FreeReadingsUsedToday.Should().Be(1);
     }
 
-    private static CreatePaymentRequest AcceptedOffer() => new() { OfferAccepted = true, OfferVersion = "test-offer-v1" };
+    private static CreatePaymentRequest AcceptedOffer(string tariffCode = "pro-30d") => new()
+    {
+        TariffCode = tariffCode, OfferAccepted = true, OfferVersion = "test-offer-v1"
+    };
 
     private static Mock<IPrivacyRepository> PrivacyRepoForOffer()
     {
@@ -167,28 +170,36 @@ public sealed class SubscriptionServiceTests
         return privacy;
     }
 
-    private static Mock<IPaymentProvider> PaymentProvider(decimal price = 300m)
+    private static Mock<IPaymentProvider> PaymentProvider(decimal price = 299m)
     {
         var payments = new Mock<IPaymentProvider>();
         payments.SetupGet(x => x.ProviderName).Returns("YooKassa");
-        payments.SetupGet(x => x.Product).Returns(new PaymentProductDescriptor
+        var monthly = new PaymentProductDescriptor
         {
             TariffCode = "pro-30d",
             Amount = price,
             Currency = "RUB",
             AccessDays = 30
-        });
+        };
+        payments.SetupGet(x => x.Product).Returns(monthly);
+        payments.SetupGet(x => x.Products).Returns([
+            new PaymentProductDescriptor
+            {
+                TariffCode = "pro-7d", Amount = 99m, Currency = "RUB", AccessDays = 7
+            },
+            monthly
+        ]);
         return payments;
     }
 
-    private static PaymentOrder NewOrder(User user, string? paymentId = "pay-1") => new()
+    private static PaymentOrder NewOrder(User user, string? paymentId = "pay-1", decimal amount = 300m, int accessDays = 30) => new()
     {
         UserId = user.Id,
         SubjectReference = user.PrivacySubjectId,
         TariffCode = "original-30d",
-        Amount = 300m,
+        Amount = amount,
         Currency = "RUB",
-        AccessDays = 30,
+        AccessDays = accessDays,
         Provider = "YooKassa",
         IdempotencyKey = Guid.NewGuid().ToString("N"),
         ProviderPaymentId = paymentId,
@@ -234,9 +245,12 @@ public sealed class SubscriptionServiceTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CreatePayment_persists_order_and_sends_no_user_identifiers(bool activeSubscriber)
+    [InlineData(false, "pro-7d", 99, 7)]
+    [InlineData(true, "pro-7d", 99, 7)]
+    [InlineData(false, "pro-30d", 299, 30)]
+    [InlineData(true, "pro-30d", 299, 30)]
+    public async Task CreatePayment_persists_order_and_sends_no_user_identifiers(
+        bool activeSubscriber, string tariffCode, decimal price, int accessDays)
     {
         var user = NewUser(activeSubscriber ? SubscriptionStatus.Active : SubscriptionStatus.None,
             activeSubscriber ? DateTime.UtcNow.AddDays(5) : null);
@@ -247,7 +261,7 @@ public sealed class SubscriptionServiceTests
             .Callback<PaymentOrder, CancellationToken>((order, _) => persisted = order)
             .ReturnsAsync((PaymentOrder order, CancellationToken _) => order);
         payments.Setup(x => x.CreateSubscriptionPaymentAsync(
-                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<PaymentProductDescriptor>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PaymentCreationResult
             {
                 PaymentId = "provider-payment-1",
@@ -258,10 +272,14 @@ public sealed class SubscriptionServiceTests
         var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object,
             payments.Object, ProcessedPaymentsAcceptAll().Object, Uow(), orders.Object, privacy: privacy.Object);
 
-        var result = await sut.CreatePaymentAsync(user.Id, AcceptedOffer());
+        var result = await sut.CreatePaymentAsync(user.Id, AcceptedOffer(tariffCode));
 
         persisted.Should().NotBeNull();
-        persisted!.UserId.Should().Be(user.Id);
+        persisted!.TariffCode.Should().Be(tariffCode);
+        persisted.Amount.Should().Be(price);
+        persisted.Currency.Should().Be("RUB");
+        persisted.AccessDays.Should().Be(accessDays);
+        persisted.UserId.Should().Be(user.Id);
         persisted.SubjectReference.Should().Be(user.PrivacySubjectId);
         persisted.ProviderPaymentId.Should().Be("provider-payment-1");
         result.PaymentId.Should().Be(persisted.PublicId.ToString("N"));
@@ -274,9 +292,11 @@ public sealed class SubscriptionServiceTests
             && consent.CollectionSource == $"checkout:{persisted.PublicId:N}"),
             It.IsAny<CancellationToken>()), Times.Once);
         payments.Verify(x => x.CreateSubscriptionPaymentAsync(
-            persisted.PublicId, persisted.IdempotencyKey, It.IsAny<CancellationToken>()), Times.Once);
+            persisted.PublicId, persisted.IdempotencyKey, It.Is<PaymentProductDescriptor>(product =>
+                product.TariffCode == tariffCode && product.Amount == price && product.AccessDays == accessDays),
+            It.IsAny<CancellationToken>()), Times.Once);
         payments.Verify(x => x.CreateSubscriptionPaymentAsync(
-            user.Id, user.Email, It.IsAny<CancellationToken>()), Times.Never);
+            user.Id, user.Email, It.IsAny<PaymentProductDescriptor>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -290,7 +310,7 @@ public sealed class SubscriptionServiceTests
         await sut.Invoking(x => x.CreatePaymentAsync(user.Id, AcceptedOffer())).Should().ThrowAsync<InvalidOperationException>();
 
         payments.Verify(x => x.CreateSubscriptionPaymentAsync(
-            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<PaymentProductDescriptor>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
@@ -314,7 +334,29 @@ public sealed class SubscriptionServiceTests
         orders.Verify(x => x.AddAsync(It.IsAny<PaymentOrder>(), It.IsAny<CancellationToken>()), Times.Never);
         privacy.Verify(x => x.AddConsentAsync(It.IsAny<UserConsent>(), It.IsAny<CancellationToken>()), Times.Never);
         payments.Verify(x => x.CreateSubscriptionPaymentAsync(
-            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<PaymentProductDescriptor>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("pro-1d")]
+    [InlineData("PRO-7D")]
+    public async Task CreatePayment_rejects_unknown_tariffs_without_creating_orders_or_charging(string tariffCode)
+    {
+        var user = NewUser();
+        var payments = PaymentProvider();
+        var orders = new Mock<IPaymentOrderRepository>();
+        var privacy = PrivacyRepoForOffer();
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object,
+            payments.Object, ProcessedPaymentsAcceptAll().Object, Uow(), orders.Object, privacy: privacy.Object);
+
+        await sut.Invoking(x => x.CreatePaymentAsync(user.Id, AcceptedOffer(tariffCode)))
+            .Should().ThrowAsync<DomainException>();
+
+        orders.Verify(x => x.AddAsync(It.IsAny<PaymentOrder>(), It.IsAny<CancellationToken>()), Times.Never);
+        privacy.Verify(x => x.AddConsentAsync(It.IsAny<UserConsent>(), It.IsAny<CancellationToken>()), Times.Never);
+        payments.Verify(x => x.CreateSubscriptionPaymentAsync(
+            It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<PaymentProductDescriptor>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -333,16 +375,19 @@ public sealed class SubscriptionServiceTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task ProcessWebhook_activates_or_extends_access_using_original_order_price_and_term(bool alreadyActive)
+    [InlineData(false, 30, 300)]
+    [InlineData(true, 30, 300)]
+    [InlineData(false, 7, 99)]
+    [InlineData(true, 7, 99)]
+    public async Task ProcessWebhook_activates_or_extends_access_using_original_order_price_and_term(
+        bool alreadyActive, int accessDays, decimal originalAmount)
     {
         var existingExpiry = DateTime.UtcNow.AddDays(5);
         var user = NewUser(alreadyActive ? SubscriptionStatus.Active : SubscriptionStatus.None,
             alreadyActive ? existingExpiry : null);
-        var order = NewOrder(user);
-        var payments = PaymentProvider(price: 500m);
-        SetupWebhook(payments, order);
+        var order = NewOrder(user, amount: originalAmount, accessDays: accessDays);
+        var payments = PaymentProvider();
+        SetupWebhook(payments, order, amount: originalAmount);
         var orders = OrderRepoFor(order);
         var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object,
             payments.Object, ProcessedPaymentsAcceptAll().Object, Uow(), orders.Object, privacy: PrivacyRepoForOffer().Object);
@@ -369,7 +414,7 @@ public sealed class SubscriptionServiceTests
             .Callback<PaymentOrder, CancellationToken>((order, _) => persisted = order)
             .ReturnsAsync((PaymentOrder order, CancellationToken _) => order);
         payments.Setup(x => x.CreateSubscriptionPaymentAsync(
-                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                It.IsAny<Guid>(), It.IsAny<string>(), It.IsAny<PaymentProductDescriptor>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new PaymentCreationResult
             {
                 PaymentId = null,
@@ -381,9 +426,12 @@ public sealed class SubscriptionServiceTests
 
         await sut.CreatePaymentAsync(user.Id, AcceptedOffer());
         persisted!.ProviderPaymentId.Should().BeNull();
+        persisted.TariffCode.Should().Be("pro-30d", "legacy clients omit the tariff code");
+        persisted.Amount.Should().Be(299m);
+        persisted.AccessDays.Should().Be(30);
         orders.Setup(x => x.GetByPublicIdForUpdateAsync(persisted.PublicId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(() => persisted);
-        SetupWebhook(payments, persisted, paymentId: "real-transfer-operation-id");
+        SetupWebhook(payments, persisted, paymentId: "real-transfer-operation-id", amount: persisted.Amount);
 
         (await sut.ProcessWebhookWithOutcomeAsync("{}")).Should().Be(PaymentWebhookHandling.Processed);
         persisted.ProviderPaymentId.Should().Be("real-transfer-operation-id");
