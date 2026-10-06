@@ -60,9 +60,10 @@
     { "name": "legal-data-request", "path": "/legal/data-request", "title": "Права пользователя и обращения о данных | Вуаль Грядущего" },
     { "name": "legal-processors", "path": "/legal/processors", "title": "Реестр обработчиков | Вуаль Грядущего" },
     { "name": "admin", "path": "/admin", "title": "Админ-панель | Вуаль Грядущего" },
+    { "name": "admin-readings", "path": "/admin/readings", "title": "Сообщения — админ-панель | Вуаль Грядущего" },
     { "name": "admin-users", "path": "/admin/users", "title": "Пользователи | Вуаль Грядущего" },
     { "name": "admin-user-detail", "path": "/admin/users/:id", "title": "Пользователь | Вуаль Грядущего" },
-    { "name": "admin-feedbacks", "path": "/admin/feedbacks", "title": "Фидбек | Вуаль Грядущего" },
+    { "name": "admin-feedbacks", "path": "/admin/feedbacks", "title": "Отзывы — админ-панель | Вуаль Грядущего" },
     { "name": "admin-stats", "path": "/admin/stats", "title": "Статистика | Вуаль Грядущего" }
   ]
 }

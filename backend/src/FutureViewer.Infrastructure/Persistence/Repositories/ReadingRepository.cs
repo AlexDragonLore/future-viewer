@@ -59,6 +59,35 @@ public sealed class ReadingRepository : IReadingRepository
         await _db.SaveChangesAsync(ct);
     }
 
+    public async Task<IReadOnlyList<Reading>> SearchForAdminAsync(
+        Guid? userId, string? search, int skip, int take, CancellationToken ct = default) =>
+        await AdminReadingsQuery(userId, search)
+            .Include(r => r.User)
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenByDescending(r => r.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(ct);
+
+    public Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default) =>
+        AdminReadingsQuery(userId, search).CountAsync(ct);
+
+    private IQueryable<Reading> AdminReadingsQuery(Guid? userId, string? search)
+    {
+        // Retained content stays available to admins after removal from user history.
+        // Anonymous previews and older minimized operational rows have no saved content.
+        var query = _db.Readings.AsNoTracking().Where(r => r.UserId != null && r.SavedToHistory);
+        if (userId.HasValue) query = query.Where(r => r.UserId == userId.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var escaped = search.Trim().Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+            var pattern = $"%{escaped}%";
+            query = query.Where(r => EF.Functions.ILike(r.Question, pattern, "\\")
+                                     || (r.User != null && EF.Functions.ILike(r.User.Email, pattern, "\\")));
+        }
+        return query;
+    }
+
     public Task<int> CountTodayByUserAsync(Guid userId, CancellationToken ct = default)
     {
         var todayUtc = DateTime.UtcNow.Date;
@@ -70,13 +99,19 @@ public sealed class ReadingRepository : IReadingRepository
             .CountAsync(ct);
     }
 
-    public async Task<bool> AttachGuestAsync(Guid id, Guid userId, CancellationToken ct = default)
+    public async Task<bool> AttachGuestAsync(
+        Guid id, Guid userId, string question, string? interpretation, CancellationToken ct = default)
     {
-        // One atomic update prevents two accounts claiming the same guest reading.
+        // Claim and store the protected ticket together. The owner may retry, but a
+        // second account cannot claim it and removing it from history is permanent.
         var updated = await _db.Readings
-            .Where(r => r.Id == id && (r.UserId == null || r.UserId == userId)
-                        && !r.SavedToHistory && r.DeletedFromHistoryAt == null)
-            .ExecuteUpdateAsync(update => update.SetProperty(r => r.UserId, userId), ct);
+            .Where(r => r.Id == id && ((r.UserId == null && !r.SavedToHistory) || r.UserId == userId)
+                        && r.DeletedFromHistoryAt == null)
+            .ExecuteUpdateAsync(update => update
+                .SetProperty(r => r.UserId, userId)
+                .SetProperty(r => r.Question, question)
+                .SetProperty(r => r.AiInterpretation, interpretation)
+                .SetProperty(r => r.SavedToHistory, true), ct);
         return updated == 1;
     }
 

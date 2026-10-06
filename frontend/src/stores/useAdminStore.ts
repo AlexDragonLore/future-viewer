@@ -6,6 +6,7 @@ import { extractApiError } from '@/api/httpClient'
 import type { FeedbackStatus } from '@/types'
 import type {
   AdminFeedback,
+  AdminReading,
   AdminStats,
   AdminUserDetail,
   AdminUserListItem,
@@ -16,6 +17,18 @@ import type {
 } from '@/types/admin'
 
 export const useAdminStore = defineStore('admin', () => {
+  const readings = ref<AdminReading[]>([])
+  const readingTotal = ref(0)
+  const readingPage = ref(1)
+  const readingPageSize = ref(20)
+  const readingSearch = ref<string | null>(null)
+  const readingLoading = ref(false)
+  const readingError = ref<string | null>(null)
+  let readingRequest = 0
+  let userRequest = 0
+  let detailRequest = 0
+  let feedbackRequest = 0
+
   const feedbacks = ref<AdminFeedback[]>([])
   const feedbackTotal = ref(0)
   const feedbackPage = ref(1)
@@ -43,9 +56,40 @@ export const useAdminStore = defineStore('admin', () => {
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
 
-  resetOnAccountChange({ feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError })
+  resetOnAccountChange({ readings, readingTotal, readingPage, readingPageSize, readingSearch, readingLoading, readingError, feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => { readingRequest++; userRequest++; detailRequest++; feedbackRequest++ })
+
+  async function loadReadings(): Promise<void> {
+    const request = ++readingRequest
+    readingLoading.value = true
+    readingError.value = null
+    try {
+      const result = await adminApi.listReadings({
+        search: readingSearch.value, page: readingPage.value, pageSize: readingPageSize.value,
+      })
+      if (request !== readingRequest) return
+      readings.value = result.items
+      readingTotal.value = result.total
+    } catch (e) {
+      if (request !== readingRequest) return
+      readings.value = []
+      readingTotal.value = 0
+      readingError.value = extractApiError(e, 'Не удалось загрузить сообщения')
+    } finally {
+      if (request === readingRequest) readingLoading.value = false
+    }
+  }
+
+  function setReadingSearch(value: string): void {
+    readingSearch.value = value.trim() || null
+    readingPage.value = 1
+  }
+
+  function setReadingPage(value: number): void {
+    readingPage.value = Math.max(1, value)
+  }
 
   async function loadFeedbacks(): Promise<void> {
+    const request = ++feedbackRequest
     feedbackLoading.value = true
     feedbackError.value = null
     try {
@@ -55,12 +99,14 @@ export const useAdminStore = defineStore('admin', () => {
         page: feedbackPage.value,
         pageSize: feedbackPageSize.value,
       })
+      if (request !== feedbackRequest) return
       feedbacks.value = result.items
       feedbackTotal.value = result.total
     } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось загрузить фидбеки')
+      if (request !== feedbackRequest) return
+      feedbackError.value = extractApiError(e, 'Не удалось загрузить отзывы')
     } finally {
-      feedbackLoading.value = false
+      if (request === feedbackRequest) feedbackLoading.value = false
     }
   }
 
@@ -82,11 +128,11 @@ export const useAdminStore = defineStore('admin', () => {
     feedbackError.value = null
     try {
       const created = await adminApi.createFeedback(payload)
-      feedbackToast.value = 'Фидбек создан'
+      feedbackToast.value = 'Отзыв создан'
       await loadFeedbacks()
       return created
     } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось создать фидбек')
+      feedbackError.value = extractApiError(e, 'Не удалось создать отзыв')
       return null
     }
   }
@@ -95,11 +141,11 @@ export const useAdminStore = defineStore('admin', () => {
     feedbackError.value = null
     try {
       const created = await adminApi.createSyntheticFeedback(payload)
-      feedbackToast.value = 'Синтетический фидбек создан'
+      feedbackToast.value = 'Синтетический отзыв создан'
       await loadFeedbacks()
       return created
     } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось создать синтетический фидбек')
+      feedbackError.value = extractApiError(e, 'Не удалось создать синтетический отзыв')
       return null
     }
   }
@@ -113,7 +159,7 @@ export const useAdminStore = defineStore('admin', () => {
       feedbackToast.value = 'Сохранено'
       return updated
     } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось сохранить фидбек')
+      feedbackError.value = extractApiError(e, 'Не удалось сохранить отзыв')
       return null
     }
   }
@@ -127,7 +173,7 @@ export const useAdminStore = defineStore('admin', () => {
       feedbackToast.value = 'Удалено'
       return true
     } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось удалить фидбек')
+      feedbackError.value = extractApiError(e, 'Не удалось удалить отзыв')
       return false
     }
   }
@@ -137,6 +183,7 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   async function loadUsers(): Promise<void> {
+    const request = ++userRequest
     userLoading.value = true
     userError.value = null
     try {
@@ -145,12 +192,14 @@ export const useAdminStore = defineStore('admin', () => {
         page: userPage.value,
         pageSize: userPageSize.value,
       })
+      if (request !== userRequest) return
       users.value = result.items
       userTotal.value = result.total
     } catch (e) {
+      if (request !== userRequest) return
       userError.value = extractApiError(e, 'Не удалось загрузить пользователей')
     } finally {
-      userLoading.value = false
+      if (request === userRequest) userLoading.value = false
     }
   }
 
@@ -164,19 +213,26 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   async function loadUserDetail(id: string): Promise<void> {
+    const request = ++detailRequest
+    selectedUser.value = null
     selectedUserLoading.value = true
     selectedUserError.value = null
     try {
-      selectedUser.value = await adminApi.getUser(id)
+      const result = await adminApi.getUser(id)
+      if (request !== detailRequest) return
+      selectedUser.value = result
     } catch (e) {
+      if (request !== detailRequest) return
       selectedUserError.value = extractApiError(e, 'Не удалось загрузить пользователя')
       selectedUser.value = null
     } finally {
-      selectedUserLoading.value = false
+      if (request === detailRequest) selectedUserLoading.value = false
     }
   }
 
   function clearUserDetail(): void {
+    detailRequest++
+    selectedUserLoading.value = false
     selectedUser.value = null
     selectedUserError.value = null
   }
@@ -217,7 +273,7 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       const detail = await adminApi.setUserSubscription(id, payload)
-      selectedUser.value = detail
+      if (selectedUser.value?.id === id) selectedUser.value = detail
       const idx = users.value.findIndex((u) => u.id === id)
       if (idx >= 0) {
         users.value[idx] = {
@@ -238,11 +294,11 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       await adminApi.grantAchievement(id, code)
-      userToast.value = `Ачивка ${code} выдана`
+      userToast.value = `Достижение ${code} выдана`
       if (selectedUser.value?.id === id) await loadUserDetail(id)
       return true
     } catch (e) {
-      userError.value = extractApiError(e, 'Не удалось выдать ачивку')
+      userError.value = extractApiError(e, 'Не удалось выдать достижение')
       return false
     }
   }
@@ -251,11 +307,11 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       await adminApi.revokeAchievement(id, code)
-      userToast.value = `Ачивка ${code} снята`
+      userToast.value = `Достижение ${code} снята`
       if (selectedUser.value?.id === id) await loadUserDetail(id)
       return true
     } catch (e) {
-      userError.value = extractApiError(e, 'Не удалось снять ачивку')
+      userError.value = extractApiError(e, 'Не удалось снять достижение')
       return false
     }
   }
@@ -265,12 +321,12 @@ export const useAdminStore = defineStore('admin', () => {
     try {
       const granted = await adminApi.recheckAchievements(id)
       userToast.value = granted.length > 0
-        ? `Выдано новых ачивок: ${granted.length}`
-        : 'Новых ачивок нет'
+        ? `Выдано новых достижений: ${granted.length}`
+        : 'Новых достижений нет'
       if (selectedUser.value?.id === id) await loadUserDetail(id)
       return granted.length
     } catch (e) {
-      userError.value = extractApiError(e, 'Не удалось пересчитать ачивки')
+      userError.value = extractApiError(e, 'Не удалось пересчитать достижения')
       return null
     }
   }
@@ -292,6 +348,8 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   return {
+    readings, readingTotal, readingPage, readingPageSize, readingSearch, readingLoading, readingError,
+    loadReadings, setReadingSearch, setReadingPage,
     feedbacks,
     feedbackTotal,
     feedbackPage,

@@ -53,6 +53,16 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
         (await anonymous.PostAsJsonAsync("/api/readings/guest/unlock", request)).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await anonymous.GetAsync($"/api/readings/{guest.Reading.Id}")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 
+        using (var anonymousScope = fixture.Services.CreateScope())
+        {
+            var anonymousReading = (await anonymousScope.ServiceProvider.GetRequiredService<IReadingRepository>()
+                .GetByIdAsync(guest.Reading.Id))!;
+            anonymousReading.UserId.Should().BeNull();
+            anonymousReading.SavedToHistory.Should().BeFalse();
+            anonymousReading.Question.Should().BeEmpty();
+            anonymousReading.AiInterpretation.Should().BeNull();
+        }
+
         var owner = await Login();
         var response = await owner.PostAsJsonAsync("/api/readings/guest/unlock", request);
         response.EnsureSuccessStatusCode();
@@ -64,16 +74,32 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
         full.Interpretation.Should().StartWith(guest.Reading.Interpretation![..^1]);
         guest.Reading.Interpretation.Length.Should().BeLessThanOrEqualTo(full.Interpretation!.Length / 2 + 1);
 
-        // Idempotent resume costs no additional reading and never silently opts into history.
+        // Idempotent resume saves the same full reading without consuming another draw.
         (await owner.PostAsJsonAsync("/api/readings/guest/unlock", request)).EnsureSuccessStatusCode();
-        (await (await owner.GetAsync("/api/readings/history")).Content.ReadFromJsonAsync<ReadingResult[]>()).Should().BeEmpty();
+        var history = (await (await owner.GetAsync("/api/readings/history")).Content.ReadFromJsonAsync<ReadingResult[]>())!;
+        history.Should().ContainSingle().Which.Should().BeEquivalentTo(full);
+        var detail = await (await owner.GetAsync($"/api/readings/{full.Id}")).Content.ReadFromJsonAsync<ReadingResult>();
+        detail.Should().BeEquivalentTo(full);
         using var scope = fixture.Services.CreateScope();
         var readings = scope.ServiceProvider.GetRequiredService<IReadingRepository>();
         var stored = (await readings.GetByIdAsync(full.Id))!;
-        stored.Question.Should().BeEmpty();
-        stored.AiInterpretation.Should().BeNull();
-        stored.SavedToHistory.Should().BeFalse();
+        stored.Question.Should().Be(full.Question);
+        stored.AiInterpretation.Should().Be(full.Interpretation);
+        stored.SavedToHistory.Should().BeTrue();
         (await readings.CountByUserAsync(stored.UserId!.Value)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Unlock_does_not_restore_a_reading_removed_from_history()
+    {
+        var guest = await CreateGuest();
+        var owner = await Login();
+        var request = new GuestReadingTicketRequest(guest.Ticket);
+        (await owner.PostAsJsonAsync("/api/readings/guest/unlock", request)).EnsureSuccessStatusCode();
+        (await owner.DeleteAsync($"/api/readings/{guest.Reading.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await owner.PostAsJsonAsync("/api/readings/guest/unlock", request)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await (await owner.GetAsync("/api/readings/history")).Content.ReadFromJsonAsync<ReadingResult[]>()).Should().BeEmpty();
     }
 
     [Fact]

@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { FeedbackStatus } from '@/types'
 import type { AdminFeedback } from '@/types/admin'
+import { clearAccountSession } from '@/utils/accountSession'
+import { adminReadingFixtures, adminUserDetailFixture } from '../fixtures/admin'
 
 const listMock = vi.fn()
 const createMock = vi.fn()
@@ -9,9 +11,15 @@ const createSyntheticMock = vi.fn()
 const updateMock = vi.fn()
 const deleteMock = vi.fn()
 const getStatsMock = vi.fn()
+const readingsMock = vi.fn()
+const userDetailMock = vi.fn()
+const usersMock = vi.fn()
 
 vi.mock('@/api/adminApi', () => ({
   adminApi: {
+    listReadings: (...args: unknown[]) => readingsMock(...args),
+    getUser: (...args: unknown[]) => userDetailMock(...args),
+    listUsers: (...args: unknown[]) => usersMock(...args),
     listFeedbacks: (...args: unknown[]) => listMock(...args),
     createFeedback: (...args: unknown[]) => createMock(...args),
     createSyntheticFeedback: (...args: unknown[]) => createSyntheticMock(...args),
@@ -52,6 +60,9 @@ describe('useAdminStore', () => {
     updateMock.mockReset()
     deleteMock.mockReset()
     getStatsMock.mockReset()
+    readingsMock.mockReset()
+    userDetailMock.mockReset()
+    usersMock.mockReset()
   })
 
   it('loadFeedbacks populates list and total', async () => {
@@ -61,6 +72,70 @@ describe('useAdminStore', () => {
     expect(store.feedbacks).toHaveLength(1)
     expect(store.feedbackTotal).toBe(1)
     expect(store.feedbackError).toBeNull()
+  })
+
+  it('searches messages from the first page and ignores an older response', async () => {
+    let finishOld!: (value: unknown) => void
+    readingsMock.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+    readingsMock.mockResolvedValueOnce({ items: [adminReadingFixtures[1]], total: 1 })
+    const store = useAdminStore()
+    store.setReadingPage(2)
+    const older = store.loadReadings()
+    store.setReadingSearch('  сложного разговора  ')
+    await store.loadReadings()
+    expect(readingsMock).toHaveBeenLastCalledWith({ search: 'сложного разговора', page: 1, pageSize: 20 })
+    finishOld({ items: [adminReadingFixtures[0]], total: 21 })
+    await older
+    expect(store.readings[0].id).toBe(adminReadingFixtures[1].id)
+    expect(store.readingTotal).toBe(1)
+  })
+
+  it('does not restore message contents after the account session ends', async () => {
+    let finish!: (value: unknown) => void
+    readingsMock.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const store = useAdminStore()
+    const loading = store.loadReadings()
+    clearAccountSession()
+    finish({ items: adminReadingFixtures, total: 21 })
+    await loading
+    expect(store.readings).toEqual([])
+    expect(store.readingLoading).toBe(false)
+  })
+
+  it('clears stale message results when a new search fails', async () => {
+    readingsMock.mockResolvedValueOnce({ items: adminReadingFixtures, total: 21 })
+    readingsMock.mockRejectedValueOnce(new Error('network down'))
+    const store = useAdminStore()
+    await store.loadReadings()
+    store.setReadingSearch('new query')
+    await store.loadReadings()
+    expect(store.readings).toEqual([])
+    expect(store.readingError).toBeTruthy()
+    expect(store.readingLoading).toBe(false)
+  })
+
+  it('keeps the latest selected user when requests finish out of order', async () => {
+    let finishFirst!: (value: unknown) => void
+    userDetailMock.mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve }))
+    userDetailMock.mockResolvedValueOnce({ ...adminUserDetailFixture, id: 'new-user' })
+    const store = useAdminStore()
+    const first = store.loadUserDetail('old-user')
+    await store.loadUserDetail('new-user')
+    finishFirst(adminUserDetailFixture)
+    await first
+    expect(store.selectedUser?.id).toBe('new-user')
+  })
+
+  it('does not reopen a closed user detail after its request completes', async () => {
+    let finish!: (value: unknown) => void
+    userDetailMock.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const store = useAdminStore()
+    const loading = store.loadUserDetail('user')
+    store.clearUserDetail()
+    finish(adminUserDetailFixture)
+    await loading
+    expect(store.selectedUser).toBeNull()
+    expect(store.selectedUserLoading).toBe(false)
   })
 
   it('loadFeedbacks captures errors', async () => {

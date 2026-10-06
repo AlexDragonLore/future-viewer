@@ -18,10 +18,10 @@
     {
       "policy_id": "reading-history",
       "data_categories": ["question", "cards", "ai_interpretation"],
-      "trigger": "history_enabled_until_user_deletion",
+      "trigger": "authenticated_reading_created_or_guest_claimed",
       "retention_period": null,
       "legal_basis_reference": null,
-      "deletion_mechanism": "reading_or_history_deletion",
+      "deletion_mechanism": "history_soft_delete_retains_data_until_account_or_data_deletion",
       "backup_handling": null,
       "status": "proposed",
       "manual_approved": false

@@ -13,6 +13,14 @@ interface RowState {
 }
 
 const edits = reactive<Record<string, RowState>>({})
+const editing = reactive<Record<string, boolean>>({})
+const busy = reactive<Record<string, boolean>>({})
+
+function toggleEditing(f: AdminFeedback): void {
+  if (busy[f.id]) return
+  if (!editing[f.id]) edits[f.id] = { aiScore: f.aiScore, status: f.status, isSincere: f.isSincere }
+  editing[f.id] = !editing[f.id]
+}
 
 function ensureRowState(f: AdminFeedback): RowState {
   if (!edits[f.id]) {
@@ -22,25 +30,37 @@ function ensureRowState(f: AdminFeedback): RowState {
 }
 
 async function saveRow(f: AdminFeedback): Promise<void> {
+  if (busy[f.id]) return
   const state = ensureRowState(f)
-  await store.updateFeedback(f.id, {
-    aiScore: state.aiScore,
-    status: state.status,
-    isSincere: state.isSincere,
-  })
+  busy[f.id] = true
+  try {
+    const updated = await store.updateFeedback(f.id, {
+      aiScore: state.aiScore === null || String(state.aiScore).trim() === '' ? null : state.aiScore,
+      status: state.status,
+      isSincere: state.isSincere,
+    })
+    if (updated) editing[f.id] = false
+  } finally {
+    busy[f.id] = false
+  }
 }
 
 async function deleteRow(f: AdminFeedback): Promise<void> {
-  if (!confirm(`Удалить фидбек ${f.id.slice(0, 8)}…?`)) return
-  await store.deleteFeedback(f.id)
+  if (busy[f.id] || !confirm(`Удалить отзыв ${f.id.slice(0, 8)}…?`)) return
+  busy[f.id] = true
+  try {
+    await store.deleteFeedback(f.id)
+  } finally {
+    busy[f.id] = false
+  }
 }
 
 function statusName(s: FeedbackStatus): string {
   switch (s) {
-    case FeedbackStatus.Pending: return 'Pending'
-    case FeedbackStatus.Notified: return 'Notified'
-    case FeedbackStatus.Answered: return 'Answered'
-    case FeedbackStatus.Scored: return 'Scored'
+    case FeedbackStatus.Pending: return 'Ожидает ответа'
+    case FeedbackStatus.Notified: return 'Уведомлён'
+    case FeedbackStatus.Answered: return 'Ответ получен'
+    case FeedbackStatus.Scored: return 'Оценён'
   }
 }
 </script>
@@ -48,7 +68,7 @@ function statusName(s: FeedbackStatus): string {
 <template>
   <div v-if="store.feedbackLoading" class="empty" data-testid="admin-feedbacks-loading">Загрузка…</div>
   <div v-else-if="store.feedbacks.length === 0" class="empty" data-testid="admin-feedbacks-empty">
-    Нет фидбеков по фильтру
+    По выбранным фильтрам отзывов нет.
   </div>
   <template v-else>
     <div class="table-scroll">
@@ -56,47 +76,62 @@ function statusName(s: FeedbackStatus): string {
         <thead>
           <tr>
             <th class="mobile-hide">Создан</th>
-            <th>Email</th>
-            <th class="mobile-hide">Reading</th>
+            <th>Пользователь и отзыв</th>
             <th>Статус</th>
-            <th>Score</th>
-            <th class="mobile-hide">Sincere</th>
-            <th></th>
+            <th>Баллы</th>
+            <th class="mobile-hide">Искренность</th>
+            <th>Действия</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="f in store.feedbacks" :key="f.id" data-testid="admin-feedback-row">
             <td class="mono mobile-hide">{{ new Date(f.createdAt).toLocaleString() }}</td>
-            <td>{{ f.userEmail || f.userId.slice(0, 8) }}</td>
-            <td class="mono mobile-hide">{{ f.readingId.slice(0, 8) }}</td>
+            <td class="feedback-text-cell">
+              <strong>{{ f.userEmail || f.userId.slice(0, 8) }}</strong>
+              <div class="feedback-id mono">Расклад {{ f.readingId.slice(0, 8) }}</div>
+              <details v-if="f.question || f.selfReport || f.aiScoreReason" class="feedback-content" data-testid="admin-feedback-content">
+                <summary>Читать вопрос и отзыв</summary>
+                <div v-if="f.question"><span>Вопрос</span><p>{{ f.question }}</p></div>
+                <div v-if="f.selfReport"><span>Отзыв</span><p>{{ f.selfReport }}</p></div>
+                <div v-if="f.aiScoreReason"><span>Обоснование оценки</span><p>{{ f.aiScoreReason }}</p></div>
+              </details>
+              <p v-else class="feedback-id">Текст отзыва пока отсутствует.</p>
+            </td>
             <td>
-              <select v-model="ensureRowState(f).status" class="cell-input">
-                <option :value="0">Pending</option>
-                <option :value="1">Notified</option>
-                <option :value="2">Answered</option>
-                <option :value="3">Scored</option>
+              <select v-if="editing[f.id]" v-model="ensureRowState(f).status" class="cell-input" aria-label="Статус отзыва" :disabled="busy[f.id]">
+                <option :value="0">Ожидает ответа</option>
+                <option :value="1">Уведомлён</option>
+                <option :value="2">Ответ получен</option>
+                <option :value="3">Оценён</option>
               </select>
-              <span class="status-label">{{ statusName(f.status) }}</span>
+              <span v-else>{{ statusName(f.status) }}</span>
             </td>
             <td>
               <input
+                v-if="editing[f.id]"
                 v-model.number="ensureRowState(f).aiScore"
                 type="number"
                 min="1"
                 max="10"
                 class="cell-input score-input"
+                aria-label="Оценка отзыва от 1 до 10"
+                :disabled="busy[f.id]"
                 data-testid="admin-feedback-score-input"
               />
+              <span v-else>{{ f.aiScore ?? '—' }}</span>
             </td>
             <td class="mobile-hide">
-              <select v-model="ensureRowState(f).isSincere" class="cell-input">
+              <select v-if="editing[f.id]" v-model="ensureRowState(f).isSincere" class="cell-input" aria-label="Искренность отзыва" :disabled="busy[f.id]">
+                <option :value="null">Не оценена</option>
                 <option :value="true">Да</option>
                 <option :value="false">Нет</option>
               </select>
+              <span v-else>{{ f.isSincere === null ? '—' : f.isSincere ? 'Да' : 'Нет' }}</span>
             </td>
             <td class="actions">
-              <button class="row-btn" data-testid="admin-feedback-save" @click="saveRow(f)">💾</button>
-              <button class="row-btn danger" data-testid="admin-feedback-delete" @click="deleteRow(f)">🗑</button>
+              <button v-if="editing[f.id]" class="row-btn" :disabled="busy[f.id]" data-testid="admin-feedback-save" @click="saveRow(f)">{{ busy[f.id] ? 'Сохраняю…' : 'Сохранить' }}</button>
+              <button class="row-btn" :disabled="busy[f.id]" :aria-expanded="Boolean(editing[f.id])" data-testid="admin-feedback-edit" @click="toggleEditing(f)">{{ editing[f.id] ? 'Отмена' : 'Изменить' }}</button>
+              <button class="row-btn danger" :disabled="busy[f.id]" data-testid="admin-feedback-delete" @click="deleteRow(f)">Удалить</button>
             </td>
           </tr>
         </tbody>
@@ -109,38 +144,49 @@ function statusName(s: FeedbackStatus): string {
           <strong>{{ f.userEmail || f.userId.slice(0, 8) }}</strong>
           <span class="mono">{{ new Date(f.createdAt).toLocaleDateString() }}</span>
         </div>
-        <div class="feedback-id mono">reading {{ f.readingId.slice(0, 8) }}</div>
-        <div class="mobile-controls">
+        <div class="feedback-id mono">Расклад {{ f.readingId.slice(0, 8) }}</div>
+        <div class="feedback-summary">{{ statusName(f.status) }} · Оценка: {{ f.aiScore ?? '—' }}</div>
+        <details v-if="f.question || f.selfReport || f.aiScoreReason" class="feedback-content" data-testid="admin-feedback-content">
+          <summary>Читать вопрос и отзыв</summary>
+          <div v-if="f.question"><span>Вопрос</span><p>{{ f.question }}</p></div>
+          <div v-if="f.selfReport"><span>Отзыв</span><p>{{ f.selfReport }}</p></div>
+          <div v-if="f.aiScoreReason"><span>Обоснование оценки</span><p>{{ f.aiScoreReason }}</p></div>
+        </details>
+        <p v-else class="feedback-id">Текст отзыва пока отсутствует.</p>
+        <div v-if="editing[f.id]" class="mobile-controls">
           <label>
             <span>Статус</span>
-            <select v-model="ensureRowState(f).status" class="cell-input">
-              <option :value="0">Pending</option>
-              <option :value="1">Notified</option>
-              <option :value="2">Answered</option>
-              <option :value="3">Scored</option>
+            <select v-model="ensureRowState(f).status" class="cell-input" :disabled="busy[f.id]">
+              <option :value="0">Ожидает ответа</option>
+              <option :value="1">Уведомлён</option>
+              <option :value="2">Ответ получен</option>
+              <option :value="3">Оценён</option>
             </select>
           </label>
           <label>
-            <span>Score</span>
+            <span>Оценка от 1 до 10</span>
             <input
               v-model.number="ensureRowState(f).aiScore"
               type="number"
               min="1"
               max="10"
               class="cell-input score-input"
+              :disabled="busy[f.id]"
             />
           </label>
           <label>
-            <span>Sincere</span>
-            <select v-model="ensureRowState(f).isSincere" class="cell-input">
+            <span>Искренность</span>
+            <select v-model="ensureRowState(f).isSincere" class="cell-input" :disabled="busy[f.id]">
+              <option :value="null">Не оценена</option>
               <option :value="true">Да</option>
               <option :value="false">Нет</option>
             </select>
           </label>
         </div>
         <div class="actions mobile-actions">
-          <button class="row-btn" @click="saveRow(f)">Сохранить</button>
-          <button class="row-btn danger" @click="deleteRow(f)">Удалить</button>
+          <button v-if="editing[f.id]" class="row-btn" :disabled="busy[f.id]" @click="saveRow(f)">{{ busy[f.id] ? 'Сохраняю…' : 'Сохранить' }}</button>
+          <button class="row-btn" :disabled="busy[f.id]" :aria-expanded="Boolean(editing[f.id])" data-testid="admin-feedback-edit-mobile" @click="toggleEditing(f)">{{ editing[f.id] ? 'Отмена' : 'Изменить' }}</button>
+          <button class="row-btn danger" :disabled="busy[f.id]" @click="deleteRow(f)">Удалить</button>
         </div>
       </li>
     </ul>
@@ -179,13 +225,52 @@ function statusName(s: FeedbackStatus): string {
   padding: 0.5rem 0.5rem;
   color: rgba(224, 212, 186, 0.9);
   font-size: 0.85rem;
-  vertical-align: middle;
+  vertical-align: top;
+}
+.feedback-text-cell {
+  width: 38%;
+  min-width: 14rem;
+  overflow-wrap: anywhere;
+}
+.feedback-id {
+  margin-top: 0.25rem;
+  color: rgba(224, 212, 186, 0.55);
+  font-size: 0.75rem;
+}
+.feedback-summary {
+  margin-top: 0.65rem;
+  color: rgba(245, 194, 107, 0.85);
+  font-size: 0.82rem;
+}
+.feedback-content {
+  margin-top: 0.65rem;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.feedback-content summary {
+  min-height: 44px;
+  padding: 0.6rem 0;
+  color: #f5c26b;
+  cursor: pointer;
+}
+.feedback-content > div {
+  margin-top: 0.65rem;
+}
+.feedback-content span {
+  color: rgba(224, 212, 186, 0.55);
+  font-size: 0.75rem;
+}
+.feedback-content p {
+  white-space: pre-wrap;
 }
 .mono {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.78rem;
 }
 .cell-input {
+  min-height: 44px;
+  max-width: 100%;
   background: rgba(20, 16, 32, 0.6);
   border: 1px solid rgba(245, 194, 107, 0.2);
   border-radius: 0.3rem;
@@ -196,20 +281,24 @@ function statusName(s: FeedbackStatus): string {
 .score-input {
   width: 4rem;
 }
-.status-label {
-  display: none;
-}
 .actions {
-  white-space: nowrap;
   text-align: right;
 }
 .row-btn {
+  min-height: 44px;
   padding: 0.25rem 0.45rem;
   border-radius: 0.3rem;
   margin-left: 0.25rem;
   border: 1px solid rgba(245, 194, 107, 0.3);
   background: rgba(245, 194, 107, 0.05);
   cursor: pointer;
+}
+.actions .row-btn {
+  margin-bottom: 0.3rem;
+}
+.row-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 .row-btn:hover {
   background: rgba(245, 194, 107, 0.15);
@@ -246,6 +335,7 @@ function statusName(s: FeedbackStatus): string {
   }
   .feedback-head {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     gap: 0.75rem;
     color: rgba(224, 212, 186, 0.92);
@@ -277,12 +367,13 @@ function statusName(s: FeedbackStatus): string {
   }
   .mobile-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: stretch;
     gap: 0.5rem;
     margin-top: 0.75rem;
   }
   .mobile-actions .row-btn {
-    flex: 1;
+    flex: 1 1 6rem;
     margin-left: 0;
   }
   .mobile-hide {
@@ -294,7 +385,7 @@ function statusName(s: FeedbackStatus): string {
     font-size: 0.8rem;
   }
   .score-input {
-    width: 3rem;
+    width: 100%;
   }
 }
 </style>

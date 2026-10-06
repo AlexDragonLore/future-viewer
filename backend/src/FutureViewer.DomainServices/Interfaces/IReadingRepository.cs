@@ -8,8 +8,10 @@ public interface IReadingRepository
     Task<Reading?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<Reading>> GetHistoryAsync(Guid userId, int take = 50, CancellationToken ct = default);
     Task<IReadOnlyList<Reading>> GetByUserAsync(Guid userId, int take, CancellationToken ct = default);
+    Task<IReadOnlyList<Reading>> SearchForAdminAsync(Guid? userId, string? search, int skip, int take, CancellationToken ct = default);
+    Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default);
     Task UpdateAsync(Reading reading, CancellationToken ct = default);
-    Task<bool> AttachGuestAsync(Guid id, Guid userId, CancellationToken ct = default);
+    Task<bool> AttachGuestAsync(Guid id, Guid userId, string question, string? interpretation, CancellationToken ct = default);
     Task<int> CountTodayByUserAsync(Guid userId, CancellationToken ct = default);
     Task<int> CountByUserAsync(Guid userId, CancellationToken ct = default);
     Task<int> CountAsync(CancellationToken ct = default);

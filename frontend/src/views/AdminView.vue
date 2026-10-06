@@ -7,29 +7,31 @@ const auth = useAuthStore()
 const route = useRoute()
 
 const tabs = [
-  { name: 'admin-feedbacks', label: 'Фидбеки', testId: 'admin-tab-feedbacks' },
+  { name: 'admin-readings', label: 'Сообщения', testId: 'admin-tab-readings' },
+  { name: 'admin-feedbacks', label: 'Отзывы', testId: 'admin-tab-feedbacks' },
   { name: 'admin-users', label: 'Пользователи', testId: 'admin-tab-users' },
   { name: 'admin-stats', label: 'Статистика', testId: 'admin-tab-stats' },
 ]
 
-const activeTab = computed(() => route.name?.toString() ?? '')
+const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-users' : route.name?.toString() ?? '')
 </script>
 
 <template>
-  <main class="admin-page min-h-screen px-4 sm:px-6 py-10 sm:py-12 max-w-6xl mx-auto" data-testid="admin-view">
+  <main class="admin-page w-full min-h-screen px-4 sm:px-6 py-10 sm:py-12 max-w-6xl mx-auto" data-testid="admin-view">
     <header class="mb-6 text-center">
       <div class="admin-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АДМИН ✦</div>
       <h1 class="admin-title font-display text-4xl gold-text">Панель администратора</h1>
       <p class="admin-email text-mystic-muted mt-2 text-sm">{{ auth.email }}</p>
     </header>
 
-    <nav class="flex gap-2 justify-center mb-8 flex-wrap" data-testid="admin-tabs">
+    <nav class="flex gap-2 justify-center mb-8 flex-wrap" aria-label="Разделы администрирования" data-testid="admin-tabs">
       <RouterLink
         v-for="tab in tabs"
         :key="tab.name"
         :to="{ name: tab.name }"
         class="admin-tab"
         :class="{ active: activeTab === tab.name }"
+        :aria-current="activeTab === tab.name ? 'page' : undefined"
         :data-testid="tab.testId"
       >
         {{ tab.label }}
@@ -42,6 +44,10 @@ const activeTab = computed(() => route.name?.toString() ?? '')
 
 <style scoped>
 .admin-tab {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.5rem 1.25rem;
   border-radius: 999px;
   font-family: 'Cinzel', serif;
@@ -54,6 +60,9 @@ const activeTab = computed(() => route.name?.toString() ?? '')
     color 0.2s ease,
     border-color 0.2s ease,
     background-color 0.2s ease;
+}
+.admin-email {
+  overflow-wrap: anywhere;
 }
 .admin-tab:hover {
   color: rgba(245, 194, 107, 0.9);

@@ -67,6 +67,15 @@ public sealed class HistoryEndpointTests : IClassFixture<IntegrationTestFixture>
         detailResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
         var history = await historyResponse.Content.ReadFromJsonAsync<List<ReadingResult>>();
         history!.Select(r => r.Id).Should().NotContain(created.Id);
+
+        using var scope = _fixture.Services.CreateScope();
+        var readings = scope.ServiceProvider.GetRequiredService<IReadingRepository>();
+        var stored = (await readings.GetByIdAsync(created.Id))!;
+        stored.DeletedFromHistoryAt.Should().NotBeNull();
+        stored.Question.Should().Be(created.Question);
+        stored.AiInterpretation.Should().Be(created.Interpretation);
+        (await readings.CountTodayByUserAsync(stored.UserId!.Value)).Should().Be(1);
+        (await client.DeleteAsync($"/api/readings/{created.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
     [Fact]

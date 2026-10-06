@@ -37,6 +37,36 @@ public sealed class AdminService
         _privacy = privacy;
     }
 
+    public async Task<AdminReadingListResult> SearchReadingsAsync(
+        Guid? userId,
+        string? search,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var safeSize = Math.Clamp(pageSize, 1, 100);
+        var safePage = Math.Clamp(page, 1, int.MaxValue / safeSize);
+        var skip = (safePage - 1) * safeSize;
+        var readings = await _readings.SearchForAdminAsync(userId, search, skip, safeSize, ct);
+        var total = await _readings.CountForAdminAsync(userId, search, ct);
+        return new AdminReadingListResult
+        {
+            Items = readings.Select(r => new AdminReadingDto
+            {
+                Id = r.Id,
+                UserId = r.UserId!.Value,
+                UserEmail = r.User?.Email,
+                Question = r.Question,
+                Interpretation = r.AiInterpretation,
+                SpreadType = r.SpreadType,
+                DeckType = r.DeckType,
+                CreatedAt = r.CreatedAt,
+                DeletedFromHistoryAt = r.DeletedFromHistoryAt
+            }).ToList(),
+            Total = total
+        };
+    }
+
     public async Task<AdminFeedbackListResult> SearchFeedbacksAsync(
         Guid? userId,
         FeedbackStatus? status,
@@ -253,7 +283,7 @@ public sealed class AdminService
         var totalScore = scoredFeedbacks.Sum(f => f.AiScore ?? 0);
         var allFeedbacksCount = await _feedbacks.CountAsync(userId, null, ct);
 
-        var recentReadings = await _readings.GetByUserAsync(userId, 20, ct);
+        var recentReadings = await _readings.SearchForAdminAsync(userId, null, 0, 20, ct);
         var recentFeedbacks = await _feedbacks.GetByUserAsync(userId, 20, ct);
         var userAchievements = await _achievementsRepo.GetByUserAsync(userId, ct);
         var allAchievements = await _achievementsRepo.GetAllAsync(ct);
@@ -275,9 +305,11 @@ public sealed class AdminService
             {
                 Id = r.Id,
                 Question = r.Question,
+                Interpretation = r.AiInterpretation,
                 SpreadType = r.SpreadType,
                 DeckType = r.DeckType,
-                CreatedAt = r.CreatedAt
+                CreatedAt = r.CreatedAt,
+                DeletedFromHistoryAt = r.DeletedFromHistoryAt
             }).ToList(),
             RecentFeedbacks = recentFeedbacks.Select(f => MapAdmin(f, f.Reading, user)).ToList(),
             Achievements = userAchievements

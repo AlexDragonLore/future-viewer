@@ -79,6 +79,25 @@ export interface AdminReadingSummary {
   spreadType: SpreadType
   deckType: DeckType
   createdAt: string
+  interpretation: string | null
+  deletedFromHistoryAt: string | null
+}
+
+export interface AdminReading extends AdminReadingSummary {
+  userId: string
+  userEmail: string | null
+}
+
+export interface AdminReadingListResponse {
+  items: AdminReading[]
+  total: number
+}
+
+export interface ReadingSearchFilters {
+  search?: string | null
+  userId?: string | null
+  page?: number
+  pageSize?: number
 }
 
 export interface AdminAchievement {

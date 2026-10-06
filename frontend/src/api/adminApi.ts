@@ -3,6 +3,7 @@ import type {
   AdminFeedback,
   AdminFeedbackListResponse,
   AdminGrantedAchievement,
+  AdminReadingListResponse,
   AdminStats,
   AdminUserDetail,
   AdminUserListItem,
@@ -10,12 +11,25 @@ import type {
   CreateAdminFeedbackPayload,
   CreateSyntheticFeedbackPayload,
   FeedbackSearchFilters,
+  ReadingSearchFilters,
   SetSubscriptionPayload,
   UpdateAdminFeedbackPayload,
   UserSearchFilters,
 } from '@/types/admin'
 
 export const adminApi = {
+  async listReadings(filters: ReadingSearchFilters = {}): Promise<AdminReadingListResponse> {
+    const { data } = await httpClient.get<AdminReadingListResponse>('/api/admin/readings', {
+      params: {
+        search: filters.search || undefined,
+        userId: filters.userId || undefined,
+        page: filters.page ?? 1,
+        pageSize: filters.pageSize ?? 20,
+      },
+    })
+    return data
+  },
+
   async listFeedbacks(filters: FeedbackSearchFilters = {}): Promise<AdminFeedbackListResponse> {
     const { data } = await httpClient.get<AdminFeedbackListResponse>('/api/admin/feedbacks', {
       params: {

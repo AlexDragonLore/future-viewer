@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/useAdminStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { SubscriptionStatusValue } from '@/types'
+import { FeedbackStatus, SubscriptionStatusValue } from '@/types'
+import AdminReadingMessage from '@/components/admin/AdminReadingMessage.vue'
 
 const props = defineProps<{ userId: string }>()
 const emit = defineEmits<{ close: [] }>()
@@ -20,6 +21,57 @@ const grantingAchievement = ref(false)
 const revokingCode = ref<string | null>(null)
 const rechecking = ref(false)
 
+const drawer = ref<HTMLElement | null>(null)
+const closeButton = ref<HTMLButtonElement | null>(null)
+let opener: HTMLElement | null = null
+let previousOverflow = ''
+
+onMounted(async () => {
+  opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  previousOverflow = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+  await nextTick()
+  closeButton.value?.focus()
+})
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = previousOverflow
+  store.clearUserDetail()
+  if (opener?.isConnected) opener.focus()
+})
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    emit('close')
+    return
+  }
+  if (event.key !== 'Tab' || !drawer.value) return
+  const focusable = Array.from(drawer.value.querySelectorAll<HTMLElement>(
+    'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]',
+  )).filter(element => element.getClientRects().length > 0)
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last?.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first?.focus()
+  }
+}
+
+function feedbackStatus(status: FeedbackStatus) {
+  return ['Ожидает ответа', 'Уведомление отправлено', 'Получен ответ', 'Оценён'][status] ?? '—'
+}
+
+function localDateTime(value: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
+
 const isSelf = computed(() => store.selectedUser?.id === auth.userId)
 
 watch(
@@ -35,7 +87,7 @@ watch(
   (u) => {
     if (!u) return
     statusInput.value = u.subscriptionStatus
-    expiresInput.value = u.subscriptionExpiresAt ? u.subscriptionExpiresAt.slice(0, 16) : ''
+    expiresInput.value = localDateTime(u.subscriptionExpiresAt)
   },
   { immediate: true },
 )
@@ -91,7 +143,7 @@ async function grantAchievement(): Promise<void> {
 
 async function revokeAchievement(code: string): Promise<void> {
   if (!store.selectedUser) return
-  if (!confirm(`Снять ачивку «${code}» с пользователя?`)) return
+  if (!confirm(`Снять достижение «${code}» с пользователя?`)) return
   revokingCode.value = code
   try {
     await store.revokeAchievement(store.selectedUser.id, code)
@@ -113,8 +165,13 @@ async function recheckAchievements(): Promise<void> {
 </script>
 
 <template>
-  <aside class="drawer" data-testid="admin-user-drawer">
-    <button class="close" data-testid="admin-user-drawer-close" @click="emit('close')">✕</button>
+  <Teleport to="body">
+  <div class="drawer-backdrop" @click.self="emit('close')">
+  <aside ref="drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="admin-user-dialog-title" data-testid="admin-user-drawer" @keydown="handleKeydown">
+    <div class="drawer-topbar">
+      <h2 id="admin-user-dialog-title">Карточка пользователя</h2>
+      <button ref="closeButton" class="close" aria-label="Закрыть карточку пользователя" data-testid="admin-user-drawer-close" @click="emit('close')">✕</button>
+    </div>
 
     <div v-if="store.selectedUserLoading" class="empty">Загрузка…</div>
     <div v-else-if="store.selectedUserError" class="error">{{ store.selectedUserError }}</div>
@@ -126,10 +183,33 @@ async function recheckAchievements(): Promise<void> {
       </header>
 
       <section class="section">
+        <h4>Последние сообщения ({{ store.selectedUser.recentReadings.length }})</h4>
+        <ul v-if="store.selectedUser.recentReadings.length" class="list recent-messages">
+          <li v-for="reading in store.selectedUser.recentReadings" :key="reading.id">
+            <AdminReadingMessage :reading="reading" />
+          </li>
+        </ul>
+        <p v-else class="text-mystic-muted text-sm">Раскладов пока нет.</p>
+      </section>
+
+      <section class="section">
+        <h4>Последние отзывы ({{ store.selectedUser.recentFeedbacks.length }})</h4>
+        <ul v-if="store.selectedUser.recentFeedbacks.length" class="list recent-messages">
+          <li v-for="feedback in store.selectedUser.recentFeedbacks" :key="feedback.id">
+            <div class="feedback-meta">{{ feedbackStatus(feedback.status) }} · {{ new Date(feedback.createdAt).toLocaleDateString('ru-RU') }} · Балл: {{ feedback.aiScore ?? '—' }}</div>
+            <p v-if="feedback.question" class="feedback-question">{{ feedback.question }}</p>
+            <p class="feedback-report">{{ feedback.selfReport || 'Пользователь ещё не ответил.' }}</p>
+            <details v-if="feedback.aiScoreReason" class="mt-2"><summary>Комментарий к оценке</summary><p class="feedback-report">{{ feedback.aiScoreReason }}</p></details>
+          </li>
+        </ul>
+        <p v-else class="text-mystic-muted text-sm">Отзывов пока нет.</p>
+      </section>
+
+      <section class="section">
         <h4>Роль</h4>
         <div class="flex items-center gap-3">
           <span :class="['badge', store.selectedUser.isAdmin ? 'admin' : 'muted']">
-            {{ store.selectedUser.isAdmin ? 'admin' : 'user' }}
+            {{ store.selectedUser.isAdmin ? 'Администратор' : 'Пользователь' }}
           </span>
           <button
             class="admin-btn"
@@ -149,10 +229,10 @@ async function recheckAchievements(): Promise<void> {
           <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
             <span>Статус</span>
             <select v-model.number="statusInput" class="admin-input" data-testid="admin-user-sub-status">
-              <option :value="SubscriptionStatusValue.None">None</option>
-              <option :value="SubscriptionStatusValue.Active">Active</option>
-              <option :value="SubscriptionStatusValue.Expired">Expired</option>
-              <option :value="SubscriptionStatusValue.Cancelled">Cancelled</option>
+              <option :value="SubscriptionStatusValue.None">Бесплатный</option>
+              <option :value="SubscriptionStatusValue.Active">Активный</option>
+              <option :value="SubscriptionStatusValue.Expired">Истёк</option>
+              <option :value="SubscriptionStatusValue.Cancelled">Отменён</option>
             </select>
           </label>
           <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
@@ -179,37 +259,14 @@ async function recheckAchievements(): Promise<void> {
       <section class="section">
         <h4>Статистика</h4>
         <div class="grid grid-cols-3 gap-2 text-sm">
-          <div><span class="text-mystic-muted">Читок:</span> {{ store.selectedUser.totalReadings }}</div>
-          <div><span class="text-mystic-muted">Фидбеков:</span> {{ store.selectedUser.totalFeedbacks }}</div>
+          <div><span class="text-mystic-muted">Раскладов:</span> {{ store.selectedUser.totalReadings }}</div>
+          <div><span class="text-mystic-muted">Отзывов:</span> {{ store.selectedUser.totalFeedbacks }}</div>
           <div><span class="text-mystic-muted">Баллов:</span> {{ store.selectedUser.totalScore }}</div>
         </div>
       </section>
 
       <section class="section">
-        <h4>Последние раскладки ({{ store.selectedUser.recentReadings.length }})</h4>
-        <ul v-if="store.selectedUser.recentReadings.length > 0" class="list">
-          <li v-for="r in store.selectedUser.recentReadings" :key="r.id">
-            <span class="mono">{{ r.id.slice(0, 8) }}</span>
-            <span class="text-mystic-muted"> · {{ new Date(r.createdAt).toLocaleDateString() }} · </span>
-            <span class="truncate">{{ r.question }}</span>
-          </li>
-        </ul>
-        <p v-else class="text-mystic-muted text-sm">—</p>
-      </section>
-
-      <section class="section">
-        <h4>Последние фидбеки ({{ store.selectedUser.recentFeedbacks.length }})</h4>
-        <ul v-if="store.selectedUser.recentFeedbacks.length > 0" class="list">
-          <li v-for="f in store.selectedUser.recentFeedbacks" :key="f.id">
-            <span class="mono">{{ f.id.slice(0, 8) }}</span>
-            <span class="text-mystic-muted"> · status={{ f.status }} · score={{ f.aiScore ?? '—' }}</span>
-          </li>
-        </ul>
-        <p v-else class="text-mystic-muted text-sm">—</p>
-      </section>
-
-      <section class="section">
-        <h4>Ачивки ({{ store.selectedUser.achievements.length }})</h4>
+        <h4>Достижения ({{ store.selectedUser.achievements.length }})</h4>
         <ul v-if="store.selectedUser.achievements.length > 0" class="list">
           <li
             v-for="a in store.selectedUser.achievements"
@@ -234,7 +291,7 @@ async function recheckAchievements(): Promise<void> {
             v-model="achievementCodeInput"
             type="text"
             class="admin-input flex-1"
-            placeholder="код ачивки (например first_reading)"
+            placeholder="код достижения (например first_reading)"
             data-testid="admin-user-achievement-input"
           />
           <button
@@ -270,15 +327,26 @@ async function recheckAchievements(): Promise<void> {
       </section>
     </div>
   </aside>
+  </div>
+  </Teleport>
 </template>
 
 <style scoped>
+.drawer-backdrop { position: fixed; inset: 0; z-index: 80; background: rgba(0, 0, 0, 0.55); }
+.drawer-topbar { position: sticky; top: -1.5rem; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: -1.5rem -1.5rem 1.2rem; padding: 0.75rem 1.5rem; background: #100b1d; border-bottom: 1px solid rgba(245, 194, 107, 0.2); }
+.drawer-topbar h2 { color: #f5c26b; font-size: 0.9rem; }
+.recent-messages > li + li { border-top: 1px solid rgba(245, 194, 107, 0.15); padding-top: 1rem; margin-top: 1rem; }
+.feedback-meta { color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; }
+.feedback-question { margin: 0.65rem 0; font-style: italic; color: #f5c26b; white-space: pre-wrap; }
+.feedback-report { white-space: pre-wrap; line-height: 1.6; margin-top: 0.5rem; }
+summary { color: #f5c26b; cursor: pointer; }
+.drawer :focus-visible { outline: 2px solid #f5c26b; outline-offset: 3px; }
 .drawer {
   position: fixed;
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(520px, 100%);
+  width: min(680px, 100%);
   background: rgba(14, 10, 24, 0.96);
   border-left: 1px solid rgba(245, 194, 107, 0.25);
   padding: 1.5rem;
@@ -288,11 +356,9 @@ async function recheckAchievements(): Promise<void> {
   overflow-wrap: anywhere;
 }
 .close {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  width: 2rem;
-  height: 2rem;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: rgba(245, 194, 107, 0.08);
   color: #f5c26b;
@@ -394,9 +460,10 @@ async function recheckAchievements(): Promise<void> {
   .drawer {
     width: 100%;
     padding: 1rem;
-    padding-top: 3.5rem;
+
     border-left: none;
   }
+  .drawer-topbar { top: -1rem; margin: -1rem -1rem 1rem; padding: 0.65rem 1rem; }
   .section :deep(.grid),
   .section .grid {
     grid-template-columns: 1fr;

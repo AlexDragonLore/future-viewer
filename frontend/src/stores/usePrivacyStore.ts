@@ -12,7 +12,6 @@ import { extractApiError } from '@/api/httpClient'
 
 export const usePrivacyStore = defineStore('privacy', () => {
   const settings = ref<PrivacySettings>({
-    historyEnabled: false,
     ageConfirmed18: false,
     personalizationEnabled: false,
     marketingEnabled: false,
@@ -47,10 +46,6 @@ export const usePrivacyStore = defineStore('privacy', () => {
     loading.value = false
   }
 
-  async function updateHistory(enabled: boolean) {
-    settings.value = await privacyApi.updateHistory(enabled)
-  }
-
   async function revoke(type: OptionalConsentType) {
     await privacyApi.revokeConsent(type)
     const normalized = type.toLowerCase()
@@ -74,7 +69,6 @@ export const usePrivacyStore = defineStore('privacy', () => {
     loadConsents,
     loadDeletionStatus,
     loadAll,
-    updateHistory,
     revoke,
   }
 })

@@ -3,7 +3,6 @@ import { httpClient } from './httpClient'
 export type OptionalConsentType = 'personalization' | 'marketing' | 'analytics'
 
 export interface PrivacySettings {
-  historyEnabled: boolean
   ageConfirmed18: boolean
   personalizationEnabled: boolean
   marketingEnabled: boolean
@@ -35,11 +34,6 @@ export const privacyApi = {
     return data
   },
 
-  async updateHistory(enabled: boolean): Promise<PrivacySettings> {
-    const { data } = await httpClient.put<PrivacySettings>('/api/privacy/settings/history', { enabled })
-    return data
-  },
-
   async consents(): Promise<UserConsentRecord[]> {
     const { data } = await httpClient.get<UserConsentRecord[]>('/api/privacy/consents')
     return data
@@ -52,14 +46,6 @@ export const privacyApi = {
   async exportData(password: string): Promise<Blob> {
     const { data } = await httpClient.post('/api/privacy/export', { password }, { responseType: 'blob' })
     return data as Blob
-  },
-
-  async deleteReading(id: string, password: string): Promise<void> {
-    await httpClient.delete(`/api/privacy/readings/${encodeURIComponent(id)}`, { data: { password } })
-  },
-
-  async deleteAllReadings(password: string): Promise<void> {
-    await httpClient.delete('/api/privacy/readings', { data: { password } })
   },
 
   async requestAccountDeletion(password: string): Promise<AccountDeletionStatus> {

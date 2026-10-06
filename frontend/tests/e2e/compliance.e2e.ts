@@ -86,11 +86,10 @@ test('question containing an email is blocked locally and never starts the readi
   await expect(page).toHaveURL(/\/$/)
 })
 
-test('home defaults history off and displays the exact AI/Tarot disclaimer', async ({ page }) => {
+test('home keeps the reading form free of history and disclaimer panels', async ({ page }) => {
   await acceptNecessary(page)
   await expect(page.getByTestId('save-to-history')).toHaveCount(0)
-  await expect(page.getByTestId('ai-disclaimer')).toContainText('развлекательную и информационную интерпретацию карт')
-  await expect(page.getByTestId('ai-disclaimer')).toContainText('не является достоверным предсказанием')
+  await expect(page.getByTestId('ai-disclaimer')).toHaveCount(0)
 })
 
 test('all legal routes publish their actual text and remain noindex', async ({ page }) => {

@@ -13,12 +13,29 @@ public static class AdminEndpoints
             .WithTags("Admin")
             .RequireAuthorization("Admin");
 
+        MapReadingEndpoints(group);
         MapFeedbackEndpoints(group);
         MapUserEndpoints(group);
         MapAchievementEndpoints(group);
         MapStatsEndpoints(group);
 
         return app;
+    }
+
+    private static void MapReadingEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/readings", async (
+            Guid? userId,
+            string? search,
+            int? page,
+            int? pageSize,
+            AdminService service,
+            HttpContext ctx,
+            CancellationToken ct) =>
+        {
+            ctx.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(await service.SearchReadingsAsync(userId, search, page ?? 1, pageSize ?? 20, ct));
+        });
     }
 
     private static void MapStatsEndpoints(RouteGroupBuilder group)
@@ -125,8 +142,10 @@ public static class AdminEndpoints
         group.MapGet("/users/{id:guid}", async (
             Guid id,
             AdminService service,
+            HttpContext ctx,
             CancellationToken ct) =>
         {
+            ctx.Response.Headers.CacheControl = "no-store";
             var dto = await service.GetUserDetailAsync(id, ct);
             return Results.Ok(dto);
         });

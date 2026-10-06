@@ -19,7 +19,6 @@ public sealed class ReadingService
     private readonly PersonalizationService _personalization;
     private readonly IAIQuestionValidator _questionValidator;
     private readonly IAiPrivacyGateway _privacyGateway;
-    private readonly IUserRepository _users;
     private readonly ILogger<ReadingService> _logger;
 
     public ReadingService(
@@ -43,7 +42,7 @@ public sealed class ReadingService
         _personalization = personalization;
         _questionValidator = questionValidator;
         _ = memoryExtractor; // Kept in the constructor for binary/test compatibility; extraction is disabled.
-        _users = users;
+        _ = users; // Retained for constructor compatibility; history no longer has an account switch.
         _logger = logger;
         _privacyGateway = privacyGateway ?? new AiPrivacyGateway();
     }
@@ -63,7 +62,7 @@ public sealed class ReadingService
 
     public async Task<ReadingResult> UnlockGuestAsync(ReadingResult reading, Guid userId, CancellationToken ct = default)
     {
-        if (!await _repo.AttachGuestAsync(reading.Id, userId, ct))
+        if (!await _repo.AttachGuestAsync(reading.Id, userId, reading.Question, reading.Interpretation, ct))
             throw new NotFoundException("Этот расклад уже недоступен. Начните новый расклад.");
         return reading;
     }
@@ -81,8 +80,7 @@ public sealed class ReadingService
             : new UserPromptContext { Today = DateOnly.FromDateTime(DateTime.UtcNow), MemoryRules = [] };
         if (userId is { } uid)
             await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
-        var saveToHistory = userId is { } historyUserId
-            && await IsHistoryStorageAllowedAsync(historyUserId, request.SaveToHistory, ct);
+        var saveToHistory = userId is not null;
         var questionValidation = await ValidateQuestionAccessAsync(
             privacy.SafeText,
             request.QuestionWarningAcknowledged,
@@ -116,9 +114,8 @@ public sealed class ReadingService
             Cards = cards
         };
 
-        // DB-first after deterministic minimization: no raw text crosses the AI boundary
-        // before a local operational record exists. With history off the row contains no
-        // question or interpretation and is used only for quota/accounting.
+        // Persist the safe question before AI interpretation. Anonymous previews keep
+        // their full content only in the protected ticket until an account claims them.
         await _repo.AddAsync(reading, ct);
 
         var interpretationQuestion = BuildQuestionForInterpretation(privacy.SafeText, questionValidation);
@@ -167,7 +164,6 @@ public sealed class ReadingService
         var promptContext = await PreparePromptContextAsync(request, userId, ct);
         var uid = userId ?? throw new UnauthorizedException("Authentication required");
         await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
-        var saveToHistory = await IsHistoryStorageAllowedAsync(uid, request.SaveToHistory, ct);
         var questionValidation = await ValidateQuestionAccessAsync(
             privacy.SafeText,
             request.QuestionWarningAcknowledged,
@@ -193,8 +189,8 @@ public sealed class ReadingService
         {
             UserId = userId,
             SpreadType = spread.Type,
-            Question = saveToHistory ? privacy.SafeText : string.Empty,
-            SavedToHistory = saveToHistory,
+            Question = privacy.SafeText,
+            SavedToHistory = true,
             AiInterpretation = null,
             AiModel = _interpreter.Model,
             DeckType = request.DeckType,
@@ -218,7 +214,7 @@ public sealed class ReadingService
         }
         finally
         {
-            if (saveToHistory && sb.Length > 0)
+            if (sb.Length > 0)
             {
                 reading.AiInterpretation = sb.ToString();
                 try
@@ -231,7 +227,7 @@ public sealed class ReadingService
                 }
             }
 
-            if (saveToHistory && sb.Length > 0 && reading.UserId is not null)
+            if (sb.Length > 0 && reading.UserId is not null)
             {
                 try
                 {
@@ -295,17 +291,6 @@ public sealed class ReadingService
             request.ClientDate,
             request.ClientTimeZone,
             ct);
-    }
-
-    private async Task<bool> IsHistoryStorageAllowedAsync(
-        Guid userId,
-        bool requested,
-        CancellationToken ct)
-    {
-        if (!requested) return false;
-        var user = await _users.GetByIdAsync(userId, ct)
-            ?? throw new UnauthorizedException("Authentication required");
-        return user.HistoryEnabled;
     }
 
     private async Task<QuestionValidationResult> ValidateQuestionAccessAsync(

@@ -2,6 +2,8 @@
 
 Актуально после технической remediation на 1 августа 2026 года. Красным отмечены внешние контуры, которые остаются выключенными до документального подтверждения; жёлтым — фактическое размещение, которое нельзя установить по репозиторию.
 
+Поведение истории обновлено 6 октября 2026 года: расклады авторизованных пользователей сохраняются автоматически, гостевые — при привязке к аккаунту. Удаление в интерфейсе истории устанавливает `DeletedFromHistoryAt`; запись остаётся в базе и в экспорте данных. Отдельного выбора сохранения больше нет.
+
 ```mermaid
 flowchart LR
     U[Пользователь / браузер]
@@ -29,8 +31,8 @@ flowchart LR
     GW -->|minimized text + random request ID| REG
     REG -->|approved only| AI
     AI -->|interpretation only| API
-    API -->|current response; persist only with account and per-reading history settings (default on)| U
-    API -->|safe question/answer only if history enabled + per-reading choice| DB
+    API -->|current response| U
+    API -->|safe question/answer saved for authenticated readings| DB
 
     API -->|email + one-time link; registry required| REG
     REG -->|approved only| SMTP
@@ -92,22 +94,20 @@ sequenceDiagram
     participant D as PostgreSQL
     participant R as Processor registry
     participant X as Approved AI
-    B->>A: question + saveToHistory=true by default (signed-in users)
+    B->>A: authenticated reading request with question
     A->>G: raw input in-process
     alt PII / third party / special category / high-stakes request
         G-->>B: local block or safe emergency response
     else eligible minimized question
-        A->>D: operational row; question/answer empty when history is off
+        A->>D: reading with minimized question and SavedToHistory=true
         A->>R: provider + exact HTTPS endpoint
         alt provider is not fully verified
             R-->>B: feature unavailable; no disclosure
         else manually approved provider
             A->>X: minimal prompt + cards + random request ID; no email/FIO/DOB/Telegram/IP/user UUID
             X-->>A: interpretation
-            opt account history enabled AND per-reading choice checked
-                A->>D: persist minimized question and interpretation
-            end
-            A-->>B: transient result with AI/Tarot disclaimer
+            A->>D: persist interpretation automatically
+            A-->>B: result with AI/Tarot disclaimer
         end
     end
 ```

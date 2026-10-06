@@ -108,7 +108,7 @@ async function clearMemory() {
 </script>
 
 <template>
-  <main class="profile-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-3xl mx-auto">
+  <main class="profile-page w-full min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-3xl mx-auto">
     <header class="mb-8 text-center">
       <div class="profile-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ ПРОФИЛЬ ✦</div>
       <h1 class="profile-title font-display text-4xl gold-text">{{ auth.email ?? 'Мой профиль' }}</h1>
@@ -254,6 +254,9 @@ async function clearMemory() {
 </template>
 
 <style scoped>
+.profile-title {
+  overflow-wrap: anywhere;
+}
 .stat {
   display: flex;
   flex-direction: column;
@@ -338,6 +341,7 @@ async function clearMemory() {
   color: rgba(224, 212, 186, 0.86);
   font-size: 0.86rem;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 .memory-action {
   flex: 0 0 auto;
@@ -367,7 +371,6 @@ async function clearMemory() {
   .profile-title {
     font-size: 2rem;
     line-height: 1.15;
-    overflow-wrap: anywhere;
   }
   .feedback-row {
     align-items: flex-start;

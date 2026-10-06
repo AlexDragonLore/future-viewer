@@ -111,6 +111,7 @@ public sealed class ReadingServiceTests
                 Id = id,
                 Email = "a@b.c",
                 PasswordHash = "x",
+                HistoryEnabled = false,
                 FirstName = "Ada",
                 LastName = "Lovelace",
                 BirthYear = 1815,
@@ -134,7 +135,7 @@ public sealed class ReadingServiceTests
                 SpreadType = SpreadType.SingleCard,
                 Question = "q",
                 DeckType = DeckType.Thoth,
-                SaveToHistory = true
+                SaveToHistory = false
             },
             userId: Guid.NewGuid());
 
@@ -142,7 +143,7 @@ public sealed class ReadingServiceTests
         capturedNotes.Should().NotBeNull();
         capturedNotes!.Values.Should().OnlyContain(v => v.Contains("Thoth"));
         saved!.DeckType.Should().Be(DeckType.Thoth);
-        saved.SavedToHistory.Should().BeTrue();
+        saved.SavedToHistory.Should().BeTrue("authenticated readings ignore the legacy account and request switches");
         saved.Question.Should().Be("q");
         saved.AiInterpretation.Should().Be("ok");
         result.Question.Should().Be("q");

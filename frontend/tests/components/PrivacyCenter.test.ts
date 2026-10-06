@@ -4,22 +4,18 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const settingsMock = vi.fn()
-const updateHistoryMock = vi.fn()
 const consentsMock = vi.fn()
 const revokeConsentMock = vi.fn()
 const exportDataMock = vi.fn()
-const deleteAllReadingsMock = vi.fn()
 const requestDeletionMock = vi.fn()
 const deletionStatusMock = vi.fn()
 
 vi.mock('@/api/privacyApi', () => ({
   privacyApi: {
     settings: () => settingsMock(),
-    updateHistory: (enabled: boolean) => updateHistoryMock(enabled),
     consents: () => consentsMock(),
     revokeConsent: (type: string) => revokeConsentMock(type),
     exportData: (password: string) => exportDataMock(password),
-    deleteAllReadings: (password: string) => deleteAllReadingsMock(password),
     requestAccountDeletion: (password: string) => requestDeletionMock(password),
     accountDeletionStatus: () => deletionStatusMock(),
   },
@@ -50,19 +46,11 @@ async function mountCenter() {
 describe('PrivacyCenter', () => {
   beforeEach(() => {
     settingsMock.mockReset().mockResolvedValue({
-      historyEnabled: false,
       ageConfirmed18: true,
       personalizationEnabled: false,
       marketingEnabled: true,
       analyticsEnabled: false,
     })
-    updateHistoryMock.mockReset().mockImplementation(async (enabled: boolean) => ({
-      historyEnabled: enabled,
-      ageConfirmed18: true,
-      personalizationEnabled: false,
-      marketingEnabled: true,
-      analyticsEnabled: false,
-    }))
     consentsMock.mockReset().mockResolvedValue([
       {
         id: 'c1',
@@ -75,7 +63,6 @@ describe('PrivacyCenter', () => {
     ])
     revokeConsentMock.mockReset().mockResolvedValue(undefined)
     exportDataMock.mockReset().mockResolvedValue(new Blob(['{}'], { type: 'application/json' }))
-    deleteAllReadingsMock.mockReset().mockResolvedValue(undefined)
     requestDeletionMock.mockReset().mockResolvedValue({ requested: true, status: 'Scheduled' })
     deletionStatusMock.mockReset().mockResolvedValue({ requested: false, status: null })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
@@ -84,12 +71,15 @@ describe('PrivacyCenter', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
   })
 
-  it('changes history and revokes each optional consent independently', async () => {
+  it('leaves history removal in the archive without saving settings or bulk permanent deletion', async () => {
     const wrapper = await mountCenter()
-    await wrapper.get('[data-testid="history-setting"]').setValue(true)
-    await flushPromises()
-    expect(updateHistoryMock).toHaveBeenCalledWith(true)
+    expect(wrapper.find('[data-testid="history-setting"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="delete-all-readings"]').exists()).toBe(false)
+    expect(wrapper.get('a[href="/history"]').text()).toBe('Удалить отдельный расклад')
+  })
 
+  it('revokes each optional consent independently', async () => {
+    const wrapper = await mountCenter()
     await wrapper.get('[data-testid="revoke-marketing"]').trigger('click')
     await flushPromises()
     expect(revokeConsentMock).toHaveBeenCalledWith('marketing')
@@ -116,13 +106,8 @@ describe('PrivacyCenter', () => {
     expect(exportDataMock).toHaveBeenCalledWith('current-password')
   })
 
-  it('starts all-history and account deletion through dedicated APIs', async () => {
+  it('keeps account deletion behind password re-authentication', async () => {
     const wrapper = await mountCenter()
-    await wrapper.get('[data-testid="privacy-password"]').setValue('current-password')
-    await wrapper.get('[data-testid="delete-all-readings"]').trigger('click')
-    await flushPromises()
-    expect(deleteAllReadingsMock).toHaveBeenCalledWith('current-password')
-
     await wrapper.get('[data-testid="privacy-password"]').setValue('current-password')
     await wrapper.get('[data-testid="request-account-deletion"]').trigger('click')
     await flushPromises()

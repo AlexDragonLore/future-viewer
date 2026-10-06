@@ -13,7 +13,6 @@ export interface PendingReading {
   spreadType: SpreadType
   question: string
   questionWarningAcknowledged: boolean
-  saveToHistory: boolean
   validated: boolean
 }
 
@@ -139,7 +138,7 @@ export const useReadingStore = defineStore('reading', () => {
     }
   }
 
-  async function create(spreadType: SpreadType, question: string, questionWarningAcknowledged = false, saveToHistory = true) {
+  async function create(spreadType: SpreadType, question: string, questionWarningAcknowledged = false) {
     loading.value = true
     error.value = null
     try {
@@ -148,7 +147,6 @@ export const useReadingStore = defineStore('reading', () => {
         question,
         useDeckStore().current,
         questionWarningAcknowledged,
-        saveToHistory,
       )
       void useAuthStore().refreshSubscription()
     } catch (e) {
@@ -164,7 +162,6 @@ export const useReadingStore = defineStore('reading', () => {
     question: string,
     signal?: AbortSignal,
     questionWarningAcknowledged = false,
-    saveToHistory = true,
   ) {
     loading.value = true
     error.value = null
@@ -205,7 +202,7 @@ export const useReadingStore = defineStore('reading', () => {
           }
           void useAuthStore().refreshSubscription()
         },
-      }, signal, questionWarningAcknowledged, saveToHistory)
+      }, signal, questionWarningAcknowledged)
       .catch((e) => {
         if (session !== accountSessionVersion()) {
           rejectCards(e)

@@ -57,7 +57,6 @@ export const readingApi = {
     question: string,
     deckType: DeckType,
     questionWarningAcknowledged = false,
-    saveToHistory = true,
   ): Promise<Reading> {
     const { data } = await httpClient.post<Reading>('/api/readings', {
       spreadType,
@@ -66,7 +65,6 @@ export const readingApi = {
       clientDate: todayLocal(),
       clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       questionWarningAcknowledged,
-      saveToHistory,
     })
     return data
   },
@@ -93,7 +91,6 @@ export const readingApi = {
     handlers: ReadingStreamHandlers,
     signal?: AbortSignal,
     questionWarningAcknowledged = false,
-    saveToHistory = true,
   ): Promise<void> {
     const baseURL = (httpClient.defaults.baseURL ?? '').replace(/\/$/, '')
     const token = localStorage.getItem('fv_token')
@@ -119,7 +116,6 @@ export const readingApi = {
           clientDate: todayLocal(),
           clientTimeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           questionWarningAcknowledged,
-          saveToHistory,
         }),
         signal,
       })

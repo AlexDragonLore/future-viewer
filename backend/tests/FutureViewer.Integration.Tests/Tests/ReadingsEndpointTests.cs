@@ -6,9 +6,7 @@ using FluentAssertions;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
-using FutureViewer.Infrastructure.Persistence;
 using FutureViewer.Integration.Tests.Fixtures;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureViewer.Integration.Tests.Tests;
@@ -235,65 +233,50 @@ public sealed class ReadingsEndpointTests : IClassFixture<IntegrationTestFixture
     }
 
     [Theory]
-    [InlineData("/api/readings", true, null)]
-    [InlineData("/api/readings/stream", true, null)]
-    [InlineData("/api/readings", true, false)]
-    [InlineData("/api/readings/stream", true, false)]
-    [InlineData("/api/readings", false, null)]
-    [InlineData("/api/readings/stream", false, null)]
-    [InlineData("/api/readings", false, true)]
-    [InlineData("/api/readings/stream", false, true)]
-    public async Task History_saves_by_default_and_honors_account_and_reading_opt_outs(
-        string endpoint, bool accountHistoryEnabled, bool? saveToHistory)
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Authenticated_readings_always_save_even_with_legacy_history_disabled(bool streaming, bool sendLegacyFlag)
     {
-        var client = await CreateAuthenticatedSubscribedClient();
-        if (!accountHistoryEnabled)
+        var (client, auth) = await CreateAuthenticatedClientWithAuth();
+        using (var scope = _fixture.Services.CreateScope())
         {
-            (await client.PutAsJsonAsync("/api/privacy/settings/history", new UpdateHistorySettingRequest { Enabled = false }))
-                .EnsureSuccessStatusCode();
+            var users = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+            var user = (await users.GetByIdAsync(auth.UserId))!;
+            user.SubscriptionStatus = SubscriptionStatus.Active;
+            user.SubscriptionExpiresAt = DateTime.UtcNow.AddDays(30);
+            user.HistoryEnabled = false;
+            await users.UpdateAsync(user);
         }
+        var settingsResponse = await client.PutAsJsonAsync(
+            "/api/privacy/settings/history", new UpdateHistorySettingRequest { Enabled = false });
+        settingsResponse.EnsureSuccessStatusCode();
+        (await settingsResponse.Content.ReadFromJsonAsync<PrivacySettingsDto>())!.HistoryEnabled.Should().BeTrue();
 
-        // Send a missing JSON property to exercise the API default, not only the DTO initializer.
         const string question = "What can I reflect on today?";
         var request = new Dictionary<string, object>
         {
             ["spreadType"] = SpreadType.SingleCard,
             ["question"] = question
         };
-        if (saveToHistory.HasValue) request["saveToHistory"] = saveToHistory.Value;
-        var response = await client.PostAsJsonAsync(endpoint, request);
+        if (sendLegacyFlag) request["saveToHistory"] = false;
+        var response = await client.PostAsJsonAsync(streaming ? "/api/readings/stream" : "/api/readings", request);
         response.EnsureSuccessStatusCode();
-
-        Guid readingId;
-        if (endpoint.EndsWith("/stream"))
+        if (streaming)
         {
             var frames = (await response.Content.ReadAsStringAsync()).Split('\n', StringSplitOptions.RemoveEmptyEntries);
-            using var cards = JsonDocument.Parse(frames[0]);
-            readingId = cards.RootElement.GetProperty("reading").GetProperty("id").GetGuid();
-            using var done = JsonDocument.Parse(frames[^1]);
-            done.RootElement.GetProperty("type").GetString().Should().Be("done");
-        }
-        else
-        {
-            var created = await response.Content.ReadFromJsonAsync<ReadingResult>();
-            created!.Question.Should().Be(question);
-            created.Interpretation.Should().StartWith("Stub interpretation");
-            readingId = created.Id;
+            using var lastFrame = JsonDocument.Parse(frames[^1]);
+            lastFrame.RootElement.GetProperty("type").GetString().Should().Be("done");
         }
 
-        var shouldSave = accountHistoryEnabled && saveToHistory != false;
-        using var scope = _fixture.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var stored = await db.Readings.SingleAsync(x => x.Id == readingId);
-        stored.SavedToHistory.Should().Be(shouldSave);
-        stored.Question.Should().Be(shouldSave ? question : string.Empty);
-        if (shouldSave) stored.AiInterpretation.Should().StartWith("Stub interpretation");
-        else stored.AiInterpretation.Should().BeNull();
         var history = await (await client.GetAsync("/api/readings/history"))
             .Content.ReadFromJsonAsync<List<ReadingResult>>();
-        history.Should().HaveCount(shouldSave ? 1 : 0);
-        (await client.GetAsync($"/api/readings/{readingId}")).StatusCode
-            .Should().Be(shouldSave ? HttpStatusCode.OK : HttpStatusCode.NotFound);
+        var saved = history.Should().ContainSingle().Which;
+        saved.Question.Should().Be(question);
+        saved.Interpretation.Should().StartWith("Stub interpretation");
+        var detail = await (await client.GetAsync($"/api/readings/{saved.Id}")).Content.ReadFromJsonAsync<ReadingResult>();
+        detail.Should().BeEquivalentTo(saved);
     }
 
     private async Task<HttpClient> CreateAuthenticatedSubscribedClient(bool clearProfile = false)

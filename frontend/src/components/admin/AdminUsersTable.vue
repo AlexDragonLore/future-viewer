@@ -8,10 +8,10 @@ const emit = defineEmits<{ select: [id: string] }>()
 
 function statusLabel(s: SubscriptionStatusValue): string {
   switch (s) {
-    case SubscriptionStatusValue.Active: return 'Active'
-    case SubscriptionStatusValue.Expired: return 'Expired'
-    case SubscriptionStatusValue.Cancelled: return 'Cancelled'
-    default: return 'None'
+    case SubscriptionStatusValue.Active: return 'Активен'
+    case SubscriptionStatusValue.Expired: return 'Истёк'
+    case SubscriptionStatusValue.Cancelled: return 'Отменён'
+    default: return 'Бесплатный'
   }
 }
 
@@ -31,11 +31,11 @@ function onRow(u: AdminUserListItem): void {
         <thead>
           <tr>
             <th>Email</th>
-            <th class="mobile-hide">Создан</th>
+            <th class="mobile-hide">Регистрация</th>
             <th class="mobile-hide">Админ</th>
             <th>Доступ</th>
-            <th class="num">Читок</th>
-            <th class="num mobile-hide">Фидбеков</th>
+            <th class="num">Раскладов</th>
+            <th class="num mobile-hide">Отзывов</th>
             <th class="num">Баллов</th>
           </tr>
         </thead>
@@ -47,10 +47,10 @@ function onRow(u: AdminUserListItem): void {
             class="cursor-pointer"
             @click="onRow(u)"
           >
-            <td>{{ u.email }}</td>
+            <td><button type="button" class="user-link" @click.stop="onRow(u)">{{ u.email }}</button></td>
             <td class="mono mobile-hide">{{ new Date(u.createdAt).toLocaleDateString() }}</td>
             <td class="mobile-hide">
-              <span v-if="u.isAdmin" class="badge admin">admin</span>
+              <span v-if="u.isAdmin" class="badge admin">Админ</span>
               <span v-else class="badge muted">—</span>
             </td>
             <td>
@@ -73,12 +73,11 @@ function onRow(u: AdminUserListItem): void {
       <li
         v-for="u in store.users"
         :key="`mobile-${u.id}`"
-        class="admin-user-card"
-        @click="onRow(u)"
       >
+        <button type="button" class="admin-user-card" data-testid="admin-user-card-button" @click="onRow(u)">
         <div class="mobile-card-head">
           <strong>{{ u.email }}</strong>
-          <span v-if="u.isAdmin" class="badge admin">admin</span>
+          <span v-if="u.isAdmin" class="badge admin">Админ</span>
         </div>
         <div class="mobile-card-meta mono">{{ new Date(u.createdAt).toLocaleDateString() }}</div>
         <div class="mobile-card-grid">
@@ -88,9 +87,9 @@ function onRow(u: AdminUserListItem): void {
               {{ statusLabel(u.subscriptionStatus) }}
             </span>
           </span>
-          <span>Читок</span>
+          <span>Раскладов</span>
           <strong>{{ u.totalReadings }}</strong>
-          <span>Фидбеков</span>
+          <span>Отзывов</span>
           <strong>{{ u.totalFeedbacks }}</strong>
           <span>Баллов</span>
           <strong>{{ u.totalScore }}</strong>
@@ -98,6 +97,8 @@ function onRow(u: AdminUserListItem): void {
         <div v-if="u.subscriptionExpiresAt" class="expiry mobile-expiry">
           до {{ new Date(u.subscriptionExpiresAt).toLocaleDateString() }}
         </div>
+        <span class="mobile-open">Открыть профиль →</span>
+        </button>
       </li>
     </ul>
   </template>
@@ -136,6 +137,20 @@ function onRow(u: AdminUserListItem): void {
   color: rgba(224, 212, 186, 0.9);
   font-size: 0.85rem;
   vertical-align: middle;
+}
+.user-link {
+  text-align: left;
+  overflow-wrap: anywhere;
+  color: #f5c26b;
+  min-height: 44px;
+}
+.user-link:hover {
+  text-decoration: underline;
+}
+.user-link:focus-visible,
+.admin-user-card:focus-visible {
+  outline: 2px solid #f5c26b;
+  outline-offset: 3px;
 }
 .mono {
   font-family: 'JetBrains Mono', monospace;
@@ -193,11 +208,20 @@ function onRow(u: AdminUserListItem): void {
     list-style: none;
   }
   .admin-user-card {
+    display: block;
+    width: 100%;
+    text-align: left;
     padding: 0.85rem;
     border: 1px solid rgba(245, 194, 107, 0.18);
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.2);
     cursor: pointer;
+  }
+  .mobile-open {
+    display: block;
+    margin-top: 0.75rem;
+    color: #f5c26b;
+    font-size: 0.8rem;
   }
   .mobile-card-head {
     display: flex;

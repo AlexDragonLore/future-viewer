@@ -65,26 +65,7 @@ describe('useReadingStore', () => {
     deck.select(DeckType.Thoth)
     const store = useReadingStore()
     await store.create(SpreadType.ThreeCard, 'what?')
-    expect(createMock).toHaveBeenCalledWith(SpreadType.ThreeCard, 'what?', DeckType.Thoth, false, true)
-  })
-
-  it('create preserves an explicit history opt-out', async () => {
-    createMock.mockResolvedValue(sampleReading)
-    await useReadingStore().create(SpreadType.SingleCard, 'q', false, false)
-    expect(createMock).toHaveBeenCalledWith(SpreadType.SingleCard, 'q', expect.any(Number), false, false)
-  })
-
-  it.each([undefined, false])('createStream forwards the history default or opt-out (%s)', async (saveToHistory) => {
-    createStreamMock.mockImplementation(async (_type, _question, _deckType, handlers) => {
-      handlers.onCards(sampleReading)
-      handlers.onDone()
-    })
-    const { cardsPromise, donePromise } = useReadingStore().createStream(SpreadType.SingleCard, 'q', undefined, false, saveToHistory)
-    await cardsPromise
-    await donePromise
-    expect(createStreamMock).toHaveBeenCalledWith(
-      SpreadType.SingleCard, 'q', expect.any(Number), expect.any(Object), undefined, false, saveToHistory ?? true,
-    )
+    expect(createMock).toHaveBeenCalledWith(SpreadType.ThreeCard, 'what?', DeckType.Thoth, false)
   })
 
   it('create surfaces validation error details from backend', async () => {

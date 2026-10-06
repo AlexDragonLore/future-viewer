@@ -13,12 +13,7 @@ vi.mock('@/api/readingApi', () => ({
     create: vi.fn(),
     get: vi.fn(),
     history: () => historyMock(),
-  },
-}))
-
-vi.mock('@/api/privacyApi', () => ({
-  privacyApi: {
-    deleteReading: (id: string, password: string) => deleteMock(id, password),
+    delete: (id: string) => deleteMock(id),
   },
 }))
 
@@ -98,34 +93,43 @@ describe('HistoryView', () => {
 
   it('keeps the history and allows retry after a failed deletion', async () => {
     historyMock.mockResolvedValue([sample])
-    deleteMock.mockRejectedValue({ response: { data: { message: 'Неверный пароль' } } })
+    deleteMock.mockRejectedValueOnce({ response: { data: { message: 'Попробуйте позже' } } })
     const wrapper = await mountHistory()
     await flushPromises()
     await wrapper.get('[data-testid="delete-reading"]').trigger('click')
-    await wrapper.get('[data-testid="reading-deletion-password"]').setValue('wrong-password')
     await wrapper.get('[data-testid="delete-reading-form"]').trigger('submit')
     await flushPromises()
-    expect(wrapper.text()).toContain('Неверный пароль')
+    expect(wrapper.text()).toContain('Попробуйте позже')
     expect(wrapper.find('a[href="/reading/r1"]').exists()).toBe(true)
-    expect((wrapper.get('[data-testid="reading-deletion-password"]').element as HTMLInputElement).value).toBe('')
+    await wrapper.get('[data-testid="delete-reading-form"]').trigger('submit')
+    await flushPromises()
+    expect(deleteMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('a[href="/reading/r1"]').exists()).toBe(false)
+  })
+
+  it('cancels removal without sending a deletion request', async () => {
+    historyMock.mockResolvedValue([sample])
+    const wrapper = await mountHistory()
+    await flushPromises()
+    await wrapper.get('[data-testid="delete-reading"]').trigger('click')
     await wrapper.get('[data-testid="cancel-delete-reading"]').trigger('click')
+    expect(deleteMock).not.toHaveBeenCalled()
+    expect(wrapper.find('a[href="/reading/r1"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="delete-reading-form"]').exists()).toBe(false)
   })
 
-  it('deletes a reading from the rendered history after confirmation', async () => {
+  it('soft-deletes a reading from the rendered history without a password', async () => {
     historyMock.mockResolvedValue([sample])
     const wrapper = await mountHistory()
     await flushPromises()
 
     await wrapper.find('[data-testid="delete-reading"]').trigger('click')
     expect(deleteMock).not.toHaveBeenCalled()
-    const password = wrapper.get('[data-testid="reading-deletion-password"]')
-    expect(password.attributes('type')).toBe('password')
-    await password.setValue('current-password')
+    expect(wrapper.find('input[type="password"]').exists()).toBe(false)
     await wrapper.get('[data-testid="delete-reading-form"]').trigger('submit')
     await flushPromises()
 
-    expect(deleteMock).toHaveBeenCalledWith('r1', 'current-password')
+    expect(deleteMock).toHaveBeenCalledWith('r1')
     expect(wrapper.text()).toContain('Пока что пусто')
   })
 })

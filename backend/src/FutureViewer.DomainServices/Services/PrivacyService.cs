@@ -111,7 +111,7 @@ public sealed class PrivacyService
         var active = consents.Where(x => x.RevokedAt is null).Select(x => x.ConsentType).ToHashSet();
         return new PrivacySettingsDto
         {
-            HistoryEnabled = user.HistoryEnabled,
+            HistoryEnabled = true,
             AgeConfirmed18 = user.IsAdultConfirmed,
             PersonalizationEnabled = active.Contains(ConsentType.Personalization),
             MarketingEnabled = active.Contains(ConsentType.Marketing),
@@ -119,18 +119,14 @@ public sealed class PrivacyService
         };
     }
 
-    public async Task<PrivacySettingsDto> UpdateHistoryAsync(
+    public Task<PrivacySettingsDto> UpdateHistoryAsync(
         Guid userId,
         bool enabled,
         string correlationId,
         CancellationToken ct = default)
     {
-        var user = await GetUserAsync(userId, allowDeletionPending: false, ct);
-        user.HistoryEnabled = enabled;
-        await _users.UpdateAsync(user, ct);
-        await AuditAsync(user, "privacy.history_setting_changed", "user", user.PrivacySubjectId,
-            "success", enabled ? "enabled" : "disabled", correlationId, ct);
-        return await GetSettingsAsync(userId, ct);
+        // Compatibility endpoint for older clients; saving history is always enabled.
+        return GetSettingsAsync(userId, ct);
     }
 
     public async Task<IReadOnlyList<ConsentDto>> GetConsentsAsync(Guid userId, CancellationToken ct = default)

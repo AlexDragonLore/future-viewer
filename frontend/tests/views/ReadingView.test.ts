@@ -55,7 +55,6 @@ async function mountReading(pending: Parameters<ReturnType<typeof useReadingStor
   spreadType: SpreadType.SingleCard,
   question: 'Question?',
   questionWarningAcknowledged: false,
-  saveToHistory: false,
   validated: true,
 }) {
   setActivePinia(createPinia())
@@ -122,12 +121,11 @@ describe('ReadingView', () => {
     expect(sessionStorage.length).toBe(0)
   })
 
-  it('passes history choice to the streaming API and consumes raw pending state', async () => {
+  it('starts the stream without a history override and consumes raw pending state', async () => {
     const pending = {
       spreadType: SpreadType.SingleCard,
       question: 'Question?',
       questionWarningAcknowledged: false,
-      saveToHistory: true,
       validated: true,
     }
     createStreamMock.mockImplementation(async (_spreadType, _question, _deckType, handlers) => {
@@ -139,7 +137,7 @@ describe('ReadingView', () => {
     await flushPromises()
 
     expect(createStreamMock).toHaveBeenCalled()
-    expect(createStreamMock.mock.calls[0][6]).toBe(true)
+    expect(createStreamMock.mock.calls[0]).toHaveLength(6)
     expect(store.pending).toBeNull()
     expect(sessionStorage.length).toBe(0)
   })

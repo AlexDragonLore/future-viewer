@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/useAdminStore'
 import { FeedbackStatus } from '@/types'
 import AdminFeedbacksTable from '@/components/admin/AdminFeedbacksTable.vue'
@@ -8,24 +8,23 @@ import AdminCreateFeedbackForm from '@/components/admin/AdminCreateFeedbackForm.
 const store = useAdminStore()
 const showCreate = ref(false)
 
-const userInput = ref('')
-const statusInput = ref<FeedbackStatus | ''>('')
-
-let userDebounce: ReturnType<typeof setTimeout> | null = null
+const userInput = ref(store.feedbackUserFilter ?? '')
+const statusInput = ref<FeedbackStatus | ''>(store.feedbackStatusFilter ?? '')
+const pageCount = computed(() => Math.max(1, Math.ceil(store.feedbackTotal / store.feedbackPageSize)))
 
 onMounted(() => store.loadFeedbacks())
 
-watch(userInput, (value) => {
-  if (userDebounce) clearTimeout(userDebounce)
-  userDebounce = setTimeout(() => {
-    store.setFeedbackUserFilter(value)
-    store.loadFeedbacks()
-  }, 300)
-})
-
-function applyStatus(): void {
+function applyFilters(): void {
+  if (store.feedbackLoading) return
+  store.setFeedbackUserFilter(userInput.value)
   store.setFeedbackStatusFilter(statusInput.value === '' ? null : (statusInput.value as FeedbackStatus))
   store.loadFeedbacks()
+}
+
+function resetFilters(): void {
+  userInput.value = ''
+  statusInput.value = ''
+  applyFilters()
 }
 
 function nextPage(): void {
@@ -42,13 +41,14 @@ function prevPage(): void {
 
 <template>
   <section class="space-y-6" data-testid="admin-feedbacks-view">
-    <div class="admin-toolbar mystic-card p-4 flex flex-wrap gap-3 items-end">
-      <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
-        <span>UserId</span>
+    <form class="admin-toolbar mystic-card p-4 flex flex-wrap gap-3 items-end" @submit.prevent="applyFilters">
+      <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1 flex-grow">
+        <span>ID пользователя</span>
         <input
           v-model="userInput"
           type="text"
           placeholder="UUID пользователя"
+          autocomplete="off"
           class="admin-input"
           data-testid="admin-feedback-filter-user"
         />
@@ -57,34 +57,26 @@ function prevPage(): void {
         <span>Статус</span>
         <select
           v-model="statusInput"
-          @change="applyStatus()"
           class="admin-input"
           data-testid="admin-feedback-filter-status"
         >
           <option value="">Все</option>
-          <option :value="0">Pending</option>
-          <option :value="1">Notified</option>
-          <option :value="2">Answered</option>
-          <option :value="3">Scored</option>
+          <option :value="0">Ожидает ответа</option>
+          <option :value="1">Уведомлён</option>
+          <option :value="2">Ответ получен</option>
+          <option :value="3">Оценён</option>
         </select>
       </label>
-      <div class="admin-actions ml-auto flex gap-2">
-        <button
-          class="admin-btn primary"
-          data-testid="admin-feedback-create"
-          @click="showCreate = !showCreate"
-        >
-          {{ showCreate ? 'Скрыть' : 'Создать фидбек' }}
-        </button>
+      <div class="admin-actions flex gap-2">
+        <button type="submit" class="admin-btn primary" :disabled="store.feedbackLoading" data-testid="admin-feedback-apply">Применить</button>
+        <button type="button" class="admin-btn" :disabled="store.feedbackLoading" data-testid="admin-feedback-reset" @click="resetFilters">Сбросить</button>
       </div>
-    </div>
+    </form>
 
-    <AdminCreateFeedbackForm v-if="showCreate" @done="showCreate = false" />
-
-    <div v-if="store.feedbackError" class="error" data-testid="admin-feedback-error">
+    <div v-if="store.feedbackError" class="error" role="alert" data-testid="admin-feedback-error">
       {{ store.feedbackError }}
     </div>
-    <div v-if="store.feedbackToast" class="toast" data-testid="admin-feedback-toast">
+    <div v-if="store.feedbackToast" class="toast" role="status" data-testid="admin-feedback-toast">
       {{ store.feedbackToast }}
     </div>
 
@@ -93,15 +85,25 @@ function prevPage(): void {
     <div class="admin-pager flex justify-between items-center mt-4 text-sm text-mystic-muted">
       <span data-testid="admin-feedback-total">Всего: {{ store.feedbackTotal }}</span>
       <div class="flex gap-2 items-center">
-        <button class="admin-btn" :disabled="store.feedbackPage === 1" @click="prevPage">‹</button>
-        <span>Стр. {{ store.feedbackPage }}</span>
+        <button class="admin-btn" :disabled="store.feedbackLoading || store.feedbackPage === 1" aria-label="Предыдущая страница отзывов" @click="prevPage">←</button>
+        <span class="page-number">{{ store.feedbackPage }} / {{ pageCount }}</span>
         <button
           class="admin-btn"
-          :disabled="store.feedbackPage * store.feedbackPageSize >= store.feedbackTotal"
+          :disabled="store.feedbackLoading || store.feedbackPage * store.feedbackPageSize >= store.feedbackTotal"
+          aria-label="Следующая страница отзывов"
           @click="nextPage"
         >
-          ›
+          →
         </button>
+      </div>
+    </div>
+
+    <div class="advanced-actions">
+      <button class="admin-btn" type="button" :aria-expanded="showCreate" aria-controls="admin-feedback-create-panel" data-testid="admin-feedback-create" @click="showCreate = !showCreate">
+        {{ showCreate ? 'Скрыть создание отзыва' : 'Дополнительно: создать отзыв' }}
+      </button>
+      <div v-if="showCreate" id="admin-feedback-create-panel" class="mt-3">
+        <AdminCreateFeedbackForm @done="showCreate = false" />
       </div>
     </div>
   </section>
@@ -109,6 +111,7 @@ function prevPage(): void {
 
 <style scoped>
 .admin-input {
+  min-height: 44px;
   background: rgba(20, 16, 32, 0.6);
   border: 1px solid rgba(245, 194, 107, 0.25);
   border-radius: 0.4rem;
@@ -118,6 +121,7 @@ function prevPage(): void {
   width: 100%;
 }
 .admin-btn {
+  min-height: 44px;
   padding: 0.45rem 0.9rem;
   border: 1px solid rgba(245, 194, 107, 0.4);
   border-radius: 0.4rem;
@@ -128,6 +132,14 @@ function prevPage(): void {
     background-color 0.2s ease,
     border-color 0.2s ease,
     opacity 0.2s ease;
+}
+.page-number {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.advanced-actions {
+  border-top: 1px solid rgba(245, 194, 107, 0.15);
+  padding-top: 1rem;
 }
 .admin-btn:hover:not(:disabled) {
   background: rgba(245, 194, 107, 0.1);

@@ -27,7 +27,6 @@ const showRealCards = ref(false)
 const pendingSpread = ref<SpreadType | null>(null)
 const pendingQuestion = ref('')
 const pendingQuestionWarningAcknowledged = ref(false)
-const pendingSaveToHistory = ref(false)
 const boardWidth = ref(0)
 const cardWidth = computed(() =>
   pendingSpread.value !== null ? computeCardWidth(pendingSpread.value, boardWidth.value) : 140,
@@ -104,7 +103,6 @@ onMounted(async () => {
   pendingSpread.value = saved.spreadType
   pendingQuestion.value = saved.question
   pendingQuestionWarningAcknowledged.value = saved.questionWarningAcknowledged
-  pendingSaveToHistory.value = saved.saveToHistory
 
   const count = saved.spreadType as number
   placeholders.value = Array.from({ length: count }, (_, i) => ({
@@ -154,7 +152,6 @@ async function startReading() {
     pendingQuestion.value,
     streamAbort.signal,
     pendingQuestionWarningAcknowledged.value,
-    pendingSaveToHistory.value,
   ) : store.createGuest(pendingQuestion.value, streamAbort.signal)
   donePromise.catch(() => {})
   let cardsFailed = false

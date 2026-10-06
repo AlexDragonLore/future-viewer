@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/useAdminStore'
 import AdminUsersTable from '@/components/admin/AdminUsersTable.vue'
@@ -8,22 +8,24 @@ import AdminUserDetailDrawer from '@/components/admin/AdminUserDetailDrawer.vue'
 const store = useAdminStore()
 const route = useRoute()
 const router = useRouter()
-const searchInput = ref('')
+const searchInput = ref(store.userSearch ?? '')
+const pageCount = computed(() => Math.max(1, Math.ceil(store.userTotal / store.userPageSize)))
 const openUserId = computed<string | null>(() => {
   const id = route.params.id
   return typeof id === 'string' && id.length > 0 ? id : null
 })
-let searchDebounce: ReturnType<typeof setTimeout> | null = null
-
 onMounted(() => store.loadUsers())
 
-watch(searchInput, (value) => {
-  if (searchDebounce) clearTimeout(searchDebounce)
-  searchDebounce = setTimeout(() => {
-    store.setUserSearch(value)
-    store.loadUsers()
-  }, 300)
-})
+function refresh(): void {
+  if (store.userLoading) return
+  if ((searchInput.value.trim() || null) !== store.userSearch) store.setUserSearch(searchInput.value)
+  store.loadUsers()
+}
+
+function clearSearch(): void {
+  searchInput.value = ''
+  refresh()
+}
 
 function nextPage(): void {
   store.setUserPage(store.userPage + 1)
@@ -48,35 +50,41 @@ function onCloseDrawer(): void {
 
 <template>
   <section class="space-y-6" data-testid="admin-users-view">
-    <div class="admin-toolbar mystic-card p-4 flex flex-wrap gap-3 items-end">
+    <form class="admin-toolbar mystic-card p-4 flex flex-wrap gap-3 items-end" @submit.prevent="refresh">
       <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1 flex-grow">
-        <span>Email</span>
+        <span>Поиск пользователя</span>
         <input
           v-model="searchInput"
-          type="text"
-          placeholder="поиск по email"
+          type="search"
+          placeholder="Email или его часть"
+          autocomplete="off"
           class="admin-input"
           data-testid="admin-user-search"
         />
       </label>
-    </div>
+      <button class="admin-btn" type="submit" :disabled="store.userLoading" data-testid="admin-users-refresh">
+        {{ store.userLoading ? 'Загрузка…' : 'Найти / обновить' }}
+      </button>
+      <button v-if="searchInput || store.userSearch" class="admin-btn" type="button" :disabled="store.userLoading" data-testid="admin-users-reset" @click="clearSearch">Сбросить</button>
+    </form>
 
-    <div v-if="store.userError" class="error" data-testid="admin-user-error">{{ store.userError }}</div>
-    <div v-if="store.userToast" class="toast" data-testid="admin-user-toast">{{ store.userToast }}</div>
+    <div v-if="store.userError" class="error" role="alert" data-testid="admin-user-error">{{ store.userError }}</div>
+    <div v-if="store.userToast" class="toast" role="status" data-testid="admin-user-toast">{{ store.userToast }}</div>
 
     <AdminUsersTable @select="onSelect" />
 
     <div class="admin-pager flex justify-between items-center mt-4 text-sm text-mystic-muted">
       <span data-testid="admin-user-total">Всего: {{ store.userTotal }}</span>
       <div class="flex gap-2 items-center">
-        <button class="admin-btn" :disabled="store.userPage === 1" @click="prevPage">‹</button>
-        <span>Стр. {{ store.userPage }}</span>
+        <button class="admin-btn" :disabled="store.userLoading || store.userPage === 1" aria-label="Предыдущая страница пользователей" @click="prevPage">←</button>
+        <span class="page-number">{{ store.userPage }} / {{ pageCount }}</span>
         <button
           class="admin-btn"
-          :disabled="store.userPage * store.userPageSize >= store.userTotal"
+          :disabled="store.userLoading || store.userPage * store.userPageSize >= store.userTotal"
+          aria-label="Следующая страница пользователей"
           @click="nextPage"
         >
-          ›
+          →
         </button>
       </div>
     </div>
@@ -87,6 +95,7 @@ function onCloseDrawer(): void {
 
 <style scoped>
 .admin-input {
+  min-height: 44px;
   background: rgba(20, 16, 32, 0.6);
   border: 1px solid rgba(245, 194, 107, 0.25);
   border-radius: 0.4rem;
@@ -95,11 +104,16 @@ function onCloseDrawer(): void {
   width: 100%;
 }
 .admin-btn {
+  min-height: 44px;
   padding: 0.45rem 0.9rem;
   border: 1px solid rgba(245, 194, 107, 0.4);
   border-radius: 0.4rem;
   color: rgba(224, 212, 186, 0.9);
   font-size: 0.85rem;
+}
+.page-number {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .admin-btn:hover:not(:disabled) {
   background: rgba(245, 194, 107, 0.1);

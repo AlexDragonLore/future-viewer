@@ -41,34 +41,35 @@ function refresh(): void {
         test-id="admin-stat-total-users"
       />
       <AdminStatTile
-        label="Админов"
+        label="Администраторов"
         :value="store.stats.adminCount"
         test-id="admin-stat-admin-count"
       />
       <AdminStatTile
-        label="Активных подписок"
+        label="С платным доступом"
         :value="store.stats.activeSubscriptions"
         test-id="admin-stat-active-subs"
       />
       <AdminStatTile
-        label="Читок сегодня"
+        label="Раскладов сегодня"
         :value="store.stats.readingsToday"
         test-id="admin-stat-readings-today"
       />
       <AdminStatTile
-        label="Читок за неделю"
+        label="Раскладов за неделю"
         :value="store.stats.readingsThisWeek"
         hint="последние 7 дней"
         test-id="admin-stat-readings-week"
       />
       <AdminStatTile
-        label="Оценено за месяц"
+        label="Оценённых отзывов"
         :value="store.stats.scoredFeedbacksThisMonth"
         hint="последние 30 дней"
         test-id="admin-stat-scored-month"
       />
     </div>
 
+    <div v-else-if="store.statsLoading" class="empty" role="status">Загружаю статистику…</div>
     <div
       v-else-if="!store.statsLoading"
       class="empty"
@@ -81,6 +82,7 @@ function refresh(): void {
 
 <style scoped>
 .admin-btn {
+  min-height: 44px;
   padding: 0.5rem 1.1rem;
   border: 1px solid rgba(245, 194, 107, 0.4);
   border-radius: 0.4rem;

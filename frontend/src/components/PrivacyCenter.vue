@@ -6,7 +6,6 @@ import { useProfileStore } from '@/stores/useProfileStore'
 import { extractApiError } from '@/api/httpClient'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useRouter } from 'vue-router'
-import { useReadingStore } from '@/stores/useReadingStore'
 
 const privacy = usePrivacyStore()
 const profile = useProfileStore()
@@ -56,14 +55,6 @@ async function run(action: string, callback: () => Promise<void>) {
   }
 }
 
-async function toggleHistory(event: Event) {
-  const enabled = (event.target as HTMLInputElement).checked
-  await run('history', async () => {
-    await privacy.updateHistory(enabled)
-    message.value = enabled ? 'Сохранение новых раскладов включено.' : 'Сохранение новых раскладов отключено.'
-  })
-}
-
 async function revoke(type: OptionalConsentType) {
   await run(`revoke:${type}`, async () => {
     await privacy.revoke(type)
@@ -84,18 +75,6 @@ async function exportData() {
     URL.revokeObjectURL(url)
     password.value = ''
     message.value = 'Экспорт сформирован и передан браузеру для скачивания.'
-  })
-}
-
-async function deleteAllReadings() {
-  if (!requirePassword()) return
-  if (!confirm('Удалить всю историю раскладов? Действие нельзя отменить.')) return
-  await run('delete-readings', async () => {
-    await privacyApi.deleteAllReadings(password.value)
-    useReadingStore().reset()
-    profile.feedbacks = []
-    password.value = ''
-    message.value = 'История удалена.'
   })
 }
 
@@ -126,21 +105,6 @@ async function requestAccountDeletion() {
     <p v-if="actionError" class="privacy-error" data-testid="privacy-action-error">{{ actionError }}</p>
     <p v-if="message" class="privacy-success" data-testid="privacy-action-success">{{ message }}</p>
 
-    <div class="privacy-row">
-      <div>
-        <strong>Сохранение истории</strong>
-        <p>Влияет только на новые расклады; для каждого расклада выбор всё равно показывается перед отправкой.</p>
-      </div>
-      <input
-        :checked="privacy.settings.historyEnabled"
-        :disabled="Boolean(busyAction) || privacy.loading"
-        type="checkbox"
-        aria-label="Сохранять историю новых раскладов"
-        data-testid="history-setting"
-        @change="toggleHistory"
-      />
-    </div>
-
     <div class="consent-list">
       <h3>Необязательные согласия</h3>
       <div v-for="type in optionalTypes" :key="type" class="privacy-row">
@@ -166,7 +130,7 @@ async function requestAccountDeletion() {
     </div>
 
     <div class="reauth-block">
-      <label for="privacy-password">Текущий пароль для экспорта и удаления</label>
+      <label for="privacy-password">Текущий пароль для экспорта и удаления аккаунта</label>
       <input
         id="privacy-password"
         v-model="password"
@@ -183,9 +147,6 @@ async function requestAccountDeletion() {
         Скачать мои данные
       </button>
       <RouterLink to="/history" class="privacy-button">Удалить отдельный расклад</RouterLink>
-      <button type="button" class="privacy-button danger" :disabled="Boolean(busyAction)" data-testid="delete-all-readings" @click="deleteAllReadings">
-        Удалить всю историю
-      </button>
       <button type="button" class="privacy-button danger" :disabled="Boolean(busyAction)" data-testid="request-account-deletion" @click="requestAccountDeletion">
         Удалить аккаунт
       </button>
@@ -238,9 +199,6 @@ async function requestAccountDeletion() {
   color: rgba(224, 212, 186, 0.62);
   font-size: 0.75rem;
   line-height: 1.45;
-}
-.privacy-row input {
-  accent-color: #f5c26b;
 }
 .consent-list,
 .reauth-block {

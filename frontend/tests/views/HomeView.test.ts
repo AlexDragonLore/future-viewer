@@ -6,7 +6,6 @@ import { SpreadType, SubscriptionStatusValue } from '@/types'
 
 const validateQuestionMock = vi.fn()
 const statusMock = vi.fn()
-const privacySettingsMock = vi.fn()
 
 vi.mock('@/api/readingApi', () => ({
   readingApi: {
@@ -21,14 +20,6 @@ vi.mock('@/api/readingApi', () => ({
 
 vi.mock('@/api/subscriptionApi', () => ({
   subscriptionApi: { status: () => statusMock() },
-}))
-
-vi.mock('@/api/privacyApi', () => ({
-  privacyApi: {
-    settings: () => privacySettingsMock(),
-    consents: vi.fn(async () => []),
-    accountDeletionStatus: vi.fn(async () => null),
-  },
 }))
 
 import HomeView from '@/views/HomeView.vue'
@@ -74,7 +65,6 @@ describe('HomeView privacy and question safety', () => {
     sessionStorage.clear()
     validateQuestionMock.mockReset()
     statusMock.mockReset()
-    privacySettingsMock.mockReset()
     validateQuestionMock.mockResolvedValue({
       status: 'accepted',
       reason: 'ok',
@@ -91,17 +81,14 @@ describe('HomeView privacy and question safety', () => {
       freeReadingsDailyLimit: 1,
       canCreateFreeReading: true,
     })
-    privacySettingsMock.mockResolvedValue({ historyEnabled: true })
   })
 
-  it('uses default-on account settings for history saving and shows the exact disclaimer', async () => {
+  it('keeps the reading form free of the history checkbox and disclaimer panel', async () => {
     authenticate()
     const { wrapper } = await mountHome()
-    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(true)
-    expect(wrapper.get('[data-testid="history-save-choice"]').text()).toContain('По умолчанию включено')
-    expect(wrapper.get('[data-testid="ai-disclaimer"]').text()).toContain(
-      'Результат не является достоверным предсказанием, медицинской, юридической, психологической или финансовой консультацией',
-    )
+    expect(wrapper.find('[data-testid="history-save-choice"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="save-to-history"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ai-disclaimer"]').exists()).toBe(false)
   })
 
   it('does not require or collect profile fields before a reading', async () => {
@@ -123,9 +110,9 @@ describe('HomeView privacy and question safety', () => {
       question: 'На что обратить внимание в проекте?',
       spreadType: SpreadType.SingleCard,
       validated: true,
-      saveToHistory: true,
     })
     expect(sessionStorage.getItem('fv_pending')).toBeNull()
+    expect(store.pending).not.toHaveProperty('saveToHistory')
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
@@ -135,7 +122,7 @@ describe('HomeView privacy and question safety', () => {
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
 
-    expect(store.pending).toMatchObject({ question: 'Как посмотреть на новую задачу?', validated: true, spreadType: SpreadType.SingleCard, saveToHistory: false })
+    expect(store.pending).toMatchObject({ question: 'Как посмотреть на новую задачу?', validated: true, spreadType: SpreadType.SingleCard })
     expect(sessionStorage.length).toBe(0)
     expect(router.currentRoute.value.name).toBe('reading')
     expect(validateQuestionMock).not.toHaveBeenCalled()
@@ -228,68 +215,23 @@ describe('HomeView privacy and question safety', () => {
     expect(wrapper.find('[data-testid="continue-with-warning"]').exists()).toBe(false)
   })
 
-  it('passes an explicit per-reading history opt-out to pending state', async () => {
+  it('restores a draft question without reintroducing a legacy history choice', async () => {
     authenticate()
-    const { wrapper, store } = await mountHome()
-    await selectSingleCardAndType(wrapper, 'Какой аспект задачи рассмотреть?')
-    await wrapper.get('[data-testid="save-to-history"]').setValue(false)
-    await wrapper.get('button.glow-button').trigger('click')
-    await flushPromises()
-    expect(store.pending?.saveToHistory).toBe(false)
-  })
-
-  it('honors an account history opt-out for new readings', async () => {
-    authenticate()
-    privacySettingsMock.mockResolvedValue({ historyEnabled: false })
-    const { wrapper, store } = await mountHome()
-    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(false)
-    await selectSingleCardAndType(wrapper, 'Какой аспект задачи рассмотреть?')
-    await wrapper.get('button.glow-button').trigger('click')
-    await flushPromises()
-    expect(store.pending?.saveToHistory).toBe(false)
-  })
-
-  it('waits for history settings before allowing a reading or selecting a default', async () => {
-    authenticate()
-    let resolveSettings!: (settings: { historyEnabled: boolean }) => void
-    privacySettingsMock.mockReturnValue(new Promise((resolve) => { resolveSettings = resolve }))
-    const { wrapper } = await mountHome()
-    await selectSingleCardAndType(wrapper, 'Какой аспект задачи рассмотреть?')
-    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(false)
-    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).disabled).toBe(true)
-    expect((wrapper.get('button.glow-button').element as HTMLButtonElement).disabled).toBe(true)
-    resolveSettings({ historyEnabled: true })
-    await flushPromises()
-    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(true)
-    expect((wrapper.get('button.glow-button').element as HTMLButtonElement).disabled).toBe(false)
-  })
-
-  it('does not enable history when loading the account preference fails', async () => {
-    authenticate()
-    privacySettingsMock.mockRejectedValue(new Error('Settings unavailable'))
-    const { wrapper, store } = await mountHome()
-    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(false)
-    await selectSingleCardAndType(wrapper, 'Какой аспект задачи рассмотреть?')
-    await wrapper.get('button.glow-button').trigger('click')
-    await flushPromises()
-    expect(store.pending?.saveToHistory).toBe(false)
-  })
-
-  it('preserves an explicit history opt-out when restoring an unfinished draft', async () => {
-    authenticate()
+    const question = 'Какой аспект задачи рассмотреть?'
     const { wrapper, store } = await mountHome(() => {
-      useReadingStore().setPending({
+      const legacyDraft = {
+        question,
         spreadType: SpreadType.SingleCard,
-        question: 'Какой аспект задачи рассмотреть?',
         questionWarningAcknowledged: false,
         saveToHistory: false,
         validated: false,
-      })
+      }
+      useReadingStore().setPending(legacyDraft)
     })
-    expect((wrapper.get('[data-testid="save-to-history"]').element as HTMLInputElement).checked).toBe(false)
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe(question)
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
-    expect(store.pending?.saveToHistory).toBe(false)
+    expect(store.pending).not.toHaveProperty('saveToHistory')
   })
 
   it('shows a content-free workflow error without restoring a raw question from storage', async () => {

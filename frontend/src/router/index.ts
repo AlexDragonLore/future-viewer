@@ -46,7 +46,8 @@ export const router = createRouter({
       component: () => import('@/views/AdminView.vue'),
       meta: { requiresAuth: true, requiresAdmin: true, noindex: true },
       children: [
-        { path: '', name: 'admin', redirect: { name: 'admin-users' } },
+        { path: '', name: 'admin', redirect: { name: 'admin-readings' } },
+        { path: 'readings', name: 'admin-readings', component: () => import('@/views/admin/AdminReadingsView.vue'), meta: { noindex: true } },
         { path: 'feedbacks', name: 'admin-feedbacks', component: () => import('@/views/admin/AdminFeedbacksView.vue'), meta: { noindex: true } },
         { path: 'users', name: 'admin-users', component: () => import('@/views/admin/AdminUsersView.vue'), meta: { noindex: true } },
         { path: 'users/:id', name: 'admin-user-detail', component: () => import('@/views/admin/AdminUsersView.vue'), props: true, meta: { noindex: true } },

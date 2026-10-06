@@ -10,5 +10,6 @@ public sealed class CreateReadingRequest
     public DateOnly? ClientDate { get; init; }
     public string? ClientTimeZone { get; init; }
     public bool QuestionWarningAcknowledged { get; init; } = false;
+    // Legacy clients may still send this field; authenticated readings are always saved.
     public bool SaveToHistory { get; init; } = true;
 }

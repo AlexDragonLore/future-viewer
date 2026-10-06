@@ -55,6 +55,19 @@ public sealed class PrivacyServiceTests
     }
 
     [Fact]
+    public async Task Legacy_history_setting_cannot_disable_automatic_saving()
+    {
+        var fixture = CreateFixture();
+        fixture.User.HistoryEnabled = false;
+        fixture.Privacy.Setup(x => x.GetConsentsAsync(fixture.User.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<UserConsent>());
+
+        (await fixture.Sut.GetSettingsAsync(fixture.User.Id)).HistoryEnabled.Should().BeTrue();
+        (await fixture.Sut.UpdateHistoryAsync(fixture.User.Id, false, "legacy-client"))
+            .HistoryEnabled.Should().BeTrue();
+    }
+
+    [Fact]
     public void Registration_validator_requires_mandatory_choices_but_not_optional_consents()
     {
         var validator = new RegisterRequestValidator();

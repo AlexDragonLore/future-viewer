@@ -179,12 +179,12 @@ describe('account data isolation', () => {
     const profile = useProfileStore()
     const reading = useReadingStore()
     const admin = useAdminStore()
-    privacy.settings.historyEnabled = true
-    reading.setPending({ spreadType: SpreadType.ThreeCard, question: 'private question', questionWarningAcknowledged: false, saveToHistory: true, validated: false })
+    privacy.settings.personalizationEnabled = true
+    reading.setPending({ spreadType: SpreadType.ThreeCard, question: 'private question', questionWarningAcknowledged: false, validated: false })
     reading.streamingText = 'private interpretation'
     admin.userSearch = 'another-user@example.com'
     auth.logout()
-    expect(privacy.settings.historyEnabled).toBe(false)
+    expect(privacy.settings.personalizationEnabled).toBe(false)
     expect(reading.pending).toBeNull()
     expect(reading.streamingText).toBe('')
     expect(admin.userSearch).toBeNull()

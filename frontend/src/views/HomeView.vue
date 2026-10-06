@@ -4,10 +4,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useDeckStore } from '@/stores/useDeckStore'
 import { useReadingStore } from '@/stores/useReadingStore'
-import { usePrivacyStore } from '@/stores/usePrivacyStore'
 import { SpreadType } from '@/types'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
-import AiDisclaimer from '@/components/AiDisclaimer.vue'
 import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 import { findDeckMeta } from '@/data/decks'
 import { SPREADS_META, findSpreadMeta } from '@/data/spreads'
@@ -22,7 +20,6 @@ const router = useRouter()
 const auth = useAuthStore()
 const deck = useDeckStore()
 const readingStore = useReadingStore()
-const privacyStore = usePrivacyStore()
 const publicConfig = usePublicConfigStore()
 const paidProduct = computed(() => publicConfig.paidProduct)
 const showGuestPaidOffer = computed(() => !auth.isAuthenticated
@@ -33,8 +30,6 @@ const validationMessage = ref<string | null>(null)
 const validationSuggestion = ref<string | null>(null)
 const validatingQuestion = ref(false)
 const spreadType = ref<SpreadType>(SpreadType.SingleCard)
-const saveToHistory = ref(false)
-const historySettingsLoading = ref(auth.isAuthenticated)
 const hasGuestReading = ref(Boolean(getGuestContinuation()))
 
 const currentDeckMeta = computed(() => findDeckMeta(deck.current))
@@ -51,16 +46,14 @@ function ensureSuggestion(suggestedQuestion: string | null | undefined, source =
   return suggestedQuestion?.trim() || buildFallbackSuggestion(source)
 }
 
-function restorePendingPayload(payload: { question?: string; spreadType?: SpreadType; saveToHistory?: boolean } | null) {
+function restorePendingPayload(payload: { question?: string; spreadType?: SpreadType } | null) {
   if (!payload) return
   question.value = payload.question ?? ''
   if (payload.spreadType) spreadType.value = payload.spreadType
-  saveToHistory.value = payload.saveToHistory === true
 }
 
 onMounted(async () => {
   const pendingPayload = readingStore.takePending()
-  const hadPendingDraft = Boolean(pendingPayload && !pendingPayload.validated)
   if (pendingPayload && !pendingPayload.validated) restorePendingPayload(pendingPayload)
 
   const workflowIssue = readingStore.takeWorkflowIssue()
@@ -70,14 +63,7 @@ onMounted(async () => {
   }
 
   if (auth.isAuthenticated) {
-    await Promise.allSettled([
-      auth.refreshSubscription(),
-      privacyStore.loadSettings().then(() => {
-        if (!hadPendingDraft) saveToHistory.value = privacyStore.settings.historyEnabled
-      }).finally(() => {
-        historySettingsLoading.value = false
-      }),
-    ])
+    await auth.refreshSubscription()
   }
 })
 
@@ -106,7 +92,6 @@ const blockMessage = computed(() => {
 
 const canBegin = computed(() => {
   if (validatingQuestion.value) return false
-  if (auth.isAuthenticated && historySettingsLoading.value) return false
   if (auth.isAuthenticated && auth.subscriptionLoading) return false
   if (auth.isAuthenticated && !question.value.trim()) return false
   if (!auth.isAuthenticated) return true
@@ -146,7 +131,6 @@ async function begin() {
     spreadType: auth.isAuthenticated ? spreadType.value : SpreadType.SingleCard,
     question: question.value.trim() || 'На что мне сейчас стоит обратить внимание?',
     questionWarningAcknowledged: false,
-    saveToHistory: saveToHistory.value,
     validated: false,
   }
 
@@ -158,7 +142,7 @@ async function begin() {
   }
 
   if (!auth.isAuthenticated) {
-    readingStore.setPending({ ...pending, saveToHistory: false, validated: true })
+    readingStore.setPending({ ...pending, validated: true })
     router.push({ name: 'reading' })
     return
   }
@@ -283,15 +267,6 @@ async function begin() {
         <span>Сверяю вопрос с Вуалью…</span>
       </div>
 
-      <label v-if="auth.isAuthenticated" class="history-choice" data-testid="history-save-choice">
-        <input v-model="saveToHistory" :disabled="historySettingsLoading" type="checkbox" data-testid="save-to-history" />
-        <span v-if="historySettingsLoading">Загружаю настройку сохранения истории…</span>
-        <span v-else>
-          Сохранить вопрос, карты и интерпретацию в истории. По умолчанию включено. Можно отключить для этого
-          расклада или в разделе «Данные и конфиденциальность».
-        </span>
-      </label>
-
       <div v-if="blocked" class="block-warning" data-testid="block-warning">
         {{ blockMessage }}
       </div>
@@ -304,8 +279,6 @@ async function begin() {
           Все 3 расклада безлимитно — {{ paidProduct.price }} за {{ paidProduct.period }}. Без автосписаний.
         </p>
       </div>
-
-      <AiDisclaimer />
 
       <SubscriptionBanner
         v-if="auth.isAuthenticated && !auth.isSubscribed && blocked"
@@ -518,23 +491,6 @@ async function begin() {
   color: #fca5a5;
   font-size: 0.8rem;
   line-height: 1.4;
-}
-.history-choice {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  border: 1px solid rgba(245, 194, 107, 0.2);
-  border-radius: 0.75rem;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 0.8rem 0.9rem;
-  color: rgba(224, 212, 186, 0.76);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-.history-choice input {
-  flex: 0 0 auto;
-  margin-top: 0.2rem;
-  accent-color: #f5c26b;
 }
 .legal-payment-block {
   border-left: 2px solid rgba(252, 165, 165, 0.7);
