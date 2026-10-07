@@ -26,6 +26,7 @@ export const adminReadingFixtures = Array.from({ length: 21 }, (_, index) => ({
   deckType: 0,
   createdAt: new Date(Date.UTC(2026, 9, 6, 12, 0) - index * 3_600_000).toISOString(),
   deletedFromHistoryAt: index === 1 ? '2026-10-06T11:30:00Z' : null,
+  expiresAt: null,
 }))
 
 export const adminFeedbackFixtures = [{

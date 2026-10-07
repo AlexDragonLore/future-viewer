@@ -5,7 +5,7 @@ import { findDeckMeta } from '@/data/decks'
 import { safeMarkdown } from '@/utils/safeMarkdown'
 import type { AdminReadingSummary } from '@/types/admin'
 
-const props = defineProps<{ reading: AdminReadingSummary }>()
+const props = defineProps<{ reading: AdminReadingSummary & { expiresAt?: string | null } }>()
 const interpretationHtml = computed(() => safeMarkdown(props.reading.interpretation))
 </script>
 
@@ -16,6 +16,9 @@ const interpretationHtml = computed(() => safeMarkdown(props.reading.interpretat
       <span>{{ findDeckMeta(reading.deckType)?.label }}</span>
       <time :datetime="reading.createdAt">{{ new Date(reading.createdAt).toLocaleString('ru-RU') }}</time>
     </div>
+    <p v-if="reading.expiresAt" class="message-retention" data-testid="admin-reading-retention">
+      Хранится 24 часа · до <time :datetime="reading.expiresAt">{{ new Date(reading.expiresAt).toLocaleString('ru-RU') }}</time>
+    </p>
     <span v-if="reading.deletedFromHistoryAt" class="hidden-badge" data-testid="admin-reading-hidden">Скрыт из истории пользователем</span>
     <p class="message-label">Вопрос</p>
     <p class="message-question" data-testid="admin-reading-question">{{ reading.question || 'Текст вопроса не сохранён' }}</p>
@@ -31,6 +34,7 @@ const interpretationHtml = computed(() => safeMarkdown(props.reading.interpretat
 .reading-message { min-width: 0; overflow-wrap: anywhere; }
 .message-meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.85rem; color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; }
 .message-meta time { margin-left: auto; }
+.message-retention { margin-top: 0.7rem; color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; }
 .message-label { margin: 1rem 0 0.35rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f5c26b; }
 .message-question { white-space: pre-wrap; line-height: 1.6; color: #eee0cf; }
 .message-answer { margin-top: 1rem; border-top: 1px solid rgba(245, 194, 107, 0.15); }

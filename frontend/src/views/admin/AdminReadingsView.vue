@@ -32,7 +32,8 @@ function changePage(page: number) {
     <div class="view-heading">
       <div>
         <h2 class="font-display text-xl gold-text">Последние сообщения</h2>
-        <p>Вопросы пользователей и ответы ИИ · сначала новые</p>
+        <p>Вопросы пользователей и гостей, ответы ИИ · сначала новые</p>
+        <p>Анонимные сообщения хранятся 24 часа.</p>
       </div>
       <button class="admin-button" :disabled="store.readingLoading" data-testid="admin-readings-refresh" @click="store.loadReadings()">Обновить</button>
     </div>
@@ -51,7 +52,8 @@ function changePage(page: number) {
     <p v-else-if="!store.readings.length" class="empty" data-testid="admin-readings-empty">{{ store.readingSearch ? 'По этому запросу сообщений нет.' : 'Сохранённых сообщений пока нет.' }}</p>
     <div v-else class="reading-list">
       <article v-for="reading in store.readings" :key="reading.id" class="reading-card mystic-card" data-testid="admin-reading-row">
-        <button class="user-link" data-testid="admin-reading-user" @click="selectedUserId = reading.userId">{{ reading.userEmail ?? 'Открыть пользователя' }} <span aria-hidden="true">↗</span></button>
+        <button v-if="reading.userId" class="user-link" data-testid="admin-reading-user" @click="selectedUserId = reading.userId">{{ reading.userEmail ?? 'Открыть пользователя' }} <span aria-hidden="true">↗</span></button>
+        <p v-else class="guest-label" data-testid="admin-reading-guest">Анонимный гость</p>
         <AdminReadingMessage :reading="reading" />
       </article>
     </div>
@@ -83,6 +85,7 @@ input { background: rgba(20, 16, 32, 0.7); border: 1px solid rgba(245, 194, 107,
 .reading-card { padding: 1.25rem; }
 .user-link { display: block; min-height: 44px; margin-bottom: 0.25rem; text-align: left; color: #f5c26b; overflow-wrap: anywhere; }
 .user-link span { opacity: 0.5; }
+.guest-label { margin-bottom: 0.75rem; color: #e0d4ba; font-size: 0.9rem; }
 .reading-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; color: rgba(224, 212, 186, 0.65); font-size: 0.8rem; }
 .reading-pager > div { display: flex; align-items: center; gap: 0.75rem; }
 .empty { text-align: center; padding: 2rem 0.5rem; color: rgba(224, 212, 186, 0.6); }

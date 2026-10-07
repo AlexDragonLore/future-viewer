@@ -91,6 +91,7 @@ public static class InfrastructureServiceExtensions
         services.AddHostedService<AccountDeletionJob>();
         services.AddHostedService<DataSubjectRequestDeadlineJob>();
         services.AddHostedService<RetentionCleanupJob>();
+        services.AddHostedService<GuestReadingCleanupJob>();
 
         return services;
     }

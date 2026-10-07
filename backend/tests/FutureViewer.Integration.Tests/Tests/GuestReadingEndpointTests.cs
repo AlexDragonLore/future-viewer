@@ -7,8 +7,10 @@ using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.Host.Auth;
+using FutureViewer.Infrastructure.Persistence;
 using FutureViewer.Integration.Tests.Fixtures;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureViewer.Integration.Tests.Tests;
@@ -59,8 +61,9 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
                 .GetByIdAsync(guest.Reading.Id))!;
             anonymousReading.UserId.Should().BeNull();
             anonymousReading.SavedToHistory.Should().BeFalse();
-            anonymousReading.Question.Should().BeEmpty();
-            anonymousReading.AiInterpretation.Should().BeNull();
+            anonymousReading.Question.Should().Be(Request().Question);
+            anonymousReading.AiInterpretation.Should().NotBeNullOrWhiteSpace();
+            anonymousReading.AiInterpretation!.Length.Should().BeGreaterThan(guest.Reading.Interpretation!.Length);
         }
 
         var owner = await Login();
@@ -91,6 +94,27 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
         stored.AiInterpretation.Should().Be(full.Interpretation);
         stored.SavedToHistory.Should().BeTrue();
         (await readings.CountByUserAsync(stored.UserId!.Value)).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Guest_ticket_expires_twenty_four_hours_after_creation()
+    {
+        var guest = await CreateGuest();
+        guest.ExpiresAt.Should().Be(new DateTimeOffset(guest.Reading.CreatedAt, TimeSpan.Zero).AddHours(24));
+    }
+
+    [Fact]
+    public async Task Expired_guest_row_cannot_be_claimed_even_before_cleanup()
+    {
+        var guest = await CreateGuest();
+        using var scope = fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE readings SET created_at = {DateTime.UtcNow.AddHours(-24)} WHERE id = {guest.Reading.Id}");
+
+        var owner = await Login();
+        var response = await owner.PostAsJsonAsync("/api/readings/guest/unlock", new GuestReadingTicketRequest(guest.Ticket));
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.DomainServices;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -75,8 +76,11 @@ public sealed class ReadingRepository : IReadingRepository
     private IQueryable<Reading> AdminReadingsQuery(Guid? userId, string? search)
     {
         // Retained content stays available to admins after removal from user history.
-        // Anonymous previews and older minimized operational rows have no saved content.
-        var query = _db.Readings.AsNoTracking().Where(r => r.UserId != null && r.SavedToHistory);
+        // Guest content expires independently of when the cleanup job next runs.
+        var guestCutoff = DateTime.UtcNow - GuestReadingRetention.Duration;
+        var query = _db.Readings.AsNoTracking().Where(r =>
+            (r.UserId != null && r.SavedToHistory)
+            || (r.UserId == null && r.CreatedAt > guestCutoff && r.Question != string.Empty));
         if (userId.HasValue) query = query.Where(r => r.UserId == userId.Value);
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -104,8 +108,9 @@ public sealed class ReadingRepository : IReadingRepository
     {
         // Claim and store the protected ticket together. The owner may retry, but a
         // second account cannot claim it and removing it from history is permanent.
+        var guestCutoff = DateTime.UtcNow - GuestReadingRetention.Duration;
         var updated = await _db.Readings
-            .Where(r => r.Id == id && ((r.UserId == null && !r.SavedToHistory) || r.UserId == userId)
+            .Where(r => r.Id == id && ((r.UserId == null && !r.SavedToHistory && r.CreatedAt > guestCutoff) || r.UserId == userId)
                         && r.DeletedFromHistoryAt == null)
             .ExecuteUpdateAsync(update => update
                 .SetProperty(r => r.UserId, userId)

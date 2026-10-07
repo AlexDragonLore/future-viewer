@@ -84,8 +84,9 @@ export interface AdminReadingSummary {
 }
 
 export interface AdminReading extends AdminReadingSummary {
-  userId: string
+  userId: string | null
   userEmail: string | null
+  expiresAt: string | null
 }
 
 export interface AdminReadingListResponse {

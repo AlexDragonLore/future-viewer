@@ -276,6 +276,13 @@ public sealed class PrivacyRepository : IPrivacyRepository
         await _db.SaveChangesAsync(ct);
     }
 
+    public Task<int> PurgeGuestReadingsBeforeAsync(
+        DateTime cutoff,
+        CancellationToken ct = default) =>
+        _db.Readings
+            .Where(x => x.UserId == null && x.CreatedAt <= cutoff)
+            .ExecuteDeleteAsync(ct);
+
     public Task<int> PurgeUnsavedReadingsBeforeAsync(
         DateTime cutoff,
         CancellationToken ct = default) =>

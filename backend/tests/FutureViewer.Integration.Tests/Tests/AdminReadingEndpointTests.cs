@@ -7,6 +7,7 @@ using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.DTOs.Admin;
 using FutureViewer.DomainServices.Interfaces;
+using FutureViewer.Host.Auth;
 using FutureViewer.Infrastructure.Persistence;
 using FutureViewer.Integration.Tests.Fixtures;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,7 +44,7 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
         var foreign = Reading(other.UserId, $"{marker} Другой пользователь", "Другой ответ");
         var unsaved = Reading(owner.UserId, $"{marker} Несохранённая запись", null);
         unsaved.SavedToHistory = false;
-        var guest = Reading(null, $"{marker} Гостевая запись", null);
+        var guest = Reading(null, $"{marker} Гостевая запись", "Ответ гостю");
         guest.SavedToHistory = false;
         await Seed(visible, hidden, foreign, unsaved, guest);
 
@@ -51,14 +52,20 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
         response.EnsureSuccessStatusCode();
         response.Headers.CacheControl!.NoStore.Should().BeTrue();
         var all = (await response.Content.ReadFromJsonAsync<AdminReadingListResult>())!;
-        all.Total.Should().Be(3);
-        all.Items.Select(r => r.Id).Should().BeEquivalentTo([visible.Id, hidden.Id, foreign.Id]);
+        all.Total.Should().Be(4);
+        all.Items.Select(r => r.Id).Should().BeEquivalentTo([visible.Id, hidden.Id, foreign.Id, guest.Id]);
         var item = all.Items.Single(r => r.Id == visible.Id);
         item.UserId.Should().Be(owner.UserId);
         item.UserEmail.Should().Be(owner.Email);
         item.Question.Should().Be(visible.Question);
         item.Interpretation.Should().Be(visible.AiInterpretation);
         item.DeletedFromHistoryAt.Should().BeNull();
+        item.ExpiresAt.Should().BeNull();
+        var guestItem = all.Items.Single(r => r.Id == guest.Id);
+        guestItem.UserId.Should().BeNull();
+        guestItem.UserEmail.Should().BeNull();
+        guestItem.Interpretation.Should().Be(guest.AiInterpretation);
+        guestItem.ExpiresAt.Should().BeCloseTo(guest.CreatedAt.AddHours(24), TimeSpan.FromMicroseconds(1));
         all.Items.Single(r => r.Id == hidden.Id).DeletedFromHistoryAt.Should().NotBeNull();
 
         var owned = await Read(admin, $"userId={owner.UserId}&search={marker}");
@@ -77,6 +84,60 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
         detail.RecentReadings.Select(r => r.Id).Should().BeEquivalentTo([visible.Id, hidden.Id]);
         detail.RecentReadings.Single(r => r.Id == visible.Id).Interpretation.Should().Be(visible.AiInterpretation);
         detail.RecentReadings.Single(r => r.Id == hidden.Id).DeletedFromHistoryAt.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task Admin_reads_actual_guest_content_and_claimed_reading_becomes_a_user_message()
+    {
+        var (admin, _) = await CreateClient(admin: true);
+        var marker = Guid.NewGuid().ToString("N");
+        var question = $"На что обратить внимание в работе {marker}?";
+        var response = await fixture.CreateClient().PostAsJsonAsync("/api/readings/guest", new CreateReadingRequest
+        {
+            SpreadType = SpreadType.SingleCard, Question = question
+        });
+        response.EnsureSuccessStatusCode();
+        var guest = (await response.Content.ReadFromJsonAsync<GuestReadingResponse>())!;
+        var message = (await Read(admin, $"search={marker}")).Items.Should().ContainSingle().Which;
+        message.UserId.Should().BeNull();
+        message.Question.Should().Be(question);
+        message.Interpretation.Should().NotBeNullOrWhiteSpace();
+        message.Interpretation!.Length.Should().BeGreaterThan(guest.Reading.Interpretation!.Length);
+        message.ExpiresAt.Should().BeCloseTo(guest.ExpiresAt.UtcDateTime, TimeSpan.FromMicroseconds(1));
+
+        var (ownerClient, owner) = await CreateClient();
+        (await ownerClient.PostAsJsonAsync("/api/readings/guest/unlock", new GuestReadingTicketRequest(guest.Ticket)))
+            .EnsureSuccessStatusCode();
+        var claimed = (await Read(admin, $"search={marker}")).Items.Should().ContainSingle().Which;
+        claimed.Id.Should().Be(message.Id);
+        claimed.UserId.Should().Be(owner.UserId);
+        claimed.UserEmail.Should().Be(owner.Email);
+        claimed.Question.Should().Be(message.Question);
+        claimed.Interpretation.Should().Be(message.Interpretation);
+        claimed.ExpiresAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Admin_excludes_expired_guests_and_legacy_empty_rows_before_cleanup()
+    {
+        var (admin, _) = await CreateClient(admin: true);
+        var marker = Guid.NewGuid().ToString("N");
+        var fresh = Reading(null, $"{marker} Анонимный вопрос", "Свежий ответ");
+        fresh.SavedToHistory = false;
+        var expired = new Reading
+        {
+            SpreadType = SpreadType.SingleCard, Question = $"{marker} Просроченный вопрос",
+            AiInterpretation = "Просроченный ответ", CreatedAt = DateTime.UtcNow.AddHours(-24)
+        };
+        var legacy = Reading(null, string.Empty, null);
+        legacy.SavedToHistory = false;
+        await Seed(fresh, expired, legacy);
+
+        var result = await Read(admin, $"search={marker}&pageSize=1");
+        result.Total.Should().Be(1);
+        result.Items.Should().ContainSingle().Which.Id.Should().Be(fresh.Id);
+        (await Read(admin, $"search={marker}&page=2&pageSize=1")).Items.Should().BeEmpty();
+        (await Read(admin, "")).Items.Should().NotContain(r => r.Id == legacy.Id || r.Id == expired.Id);
     }
 
     [Fact]

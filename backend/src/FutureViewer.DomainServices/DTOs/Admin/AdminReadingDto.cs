@@ -5,7 +5,7 @@ namespace FutureViewer.DomainServices.DTOs.Admin;
 public sealed class AdminReadingDto
 {
     public required Guid Id { get; init; }
-    public required Guid UserId { get; init; }
+    public required Guid? UserId { get; init; }
     public string? UserEmail { get; init; }
     public required string Question { get; init; }
     public string? Interpretation { get; init; }
@@ -13,6 +13,7 @@ public sealed class AdminReadingDto
     public required DeckType DeckType { get; init; }
     public required DateTime CreatedAt { get; init; }
     public DateTime? DeletedFromHistoryAt { get; init; }
+    public DateTime? ExpiresAt { get; init; }
 }
 
 public sealed class AdminReadingListResult

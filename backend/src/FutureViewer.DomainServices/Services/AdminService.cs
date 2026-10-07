@@ -54,14 +54,15 @@ public sealed class AdminService
             Items = readings.Select(r => new AdminReadingDto
             {
                 Id = r.Id,
-                UserId = r.UserId!.Value,
+                UserId = r.UserId,
                 UserEmail = r.User?.Email,
                 Question = r.Question,
                 Interpretation = r.AiInterpretation,
                 SpreadType = r.SpreadType,
                 DeckType = r.DeckType,
                 CreatedAt = r.CreatedAt,
-                DeletedFromHistoryAt = r.DeletedFromHistoryAt
+                DeletedFromHistoryAt = r.DeletedFromHistoryAt,
+                ExpiresAt = r.UserId is null ? r.CreatedAt + GuestReadingRetention.Duration : null
             }).ToList(),
             Total = total
         };

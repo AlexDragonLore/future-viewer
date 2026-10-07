@@ -106,7 +106,7 @@ public sealed class ReadingService
         {
             UserId = userId,
             SpreadType = spread.Type,
-            Question = saveToHistory ? privacy.SafeText : string.Empty,
+            Question = privacy.SafeText,
             SavedToHistory = saveToHistory,
             AiInterpretation = null,
             AiModel = _interpreter.Model,
@@ -114,20 +114,17 @@ public sealed class ReadingService
             Cards = cards
         };
 
-        // Persist the safe question before AI interpretation. Anonymous previews keep
-        // their full content only in the protected ticket until an account claims them.
+        // Persist the safe question before AI interpretation. Unclaimed guest
+        // content is available to admins for 24 hours, then removed by cleanup.
         await _repo.AddAsync(reading, ct);
 
         var interpretationQuestion = BuildQuestionForInterpretation(privacy.SafeText, questionValidation);
         var interpretation = await _interpreter.InterpretAsync(
             spread, interpretationQuestion, cards, request.DeckType, variantNotes, promptContext, ct);
 
-        if (saveToHistory)
-        {
-            reading.AiInterpretation = interpretation.Text;
-            reading.AiModel = interpretation.Model;
-            await _repo.UpdateAsync(reading, ct);
-        }
+        reading.AiInterpretation = interpretation.Text;
+        reading.AiModel = interpretation.Model;
+        await _repo.UpdateAsync(reading, ct);
 
         if (saveToHistory && reading.UserId is not null)
         {
