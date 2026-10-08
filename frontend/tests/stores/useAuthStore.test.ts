@@ -120,6 +120,21 @@ describe('useAuthStore', () => {
     expect(localStorage.getItem('fv_token')).toBe('jwt-new')
   })
 
+  it('publishes the owner identity before the token triggers other tabs to reload', async () => {
+    const originalSetItem = localStorage.setItem.bind(localStorage)
+    const publishedOwners: Array<string | null> = []
+    const setItem = vi.spyOn(localStorage, 'setItem').mockImplementation((key: string, value: string) => {
+      if (key === 'fv_token') publishedOwners.push(localStorage.getItem('fv_user_id'))
+      originalSetItem(key, value)
+    })
+    try {
+      await useAuthStore().verifyEmail('some-token')
+      expect(publishedOwners).toEqual(['u2'])
+    } finally {
+      setItem.mockRestore()
+    }
+  })
+
   it('logout clears store and localStorage', async () => {
     const auth = useAuthStore()
     await auth.login('user@example.com', 'password123')

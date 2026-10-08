@@ -6,6 +6,8 @@ import { DeckType, SpreadType, SubscriptionStatusValue, type Reading } from '@/t
 import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
+import { readingApi } from '@/api/readingApi'
+import { clearUnlockedGuestReading, getUnlockedGuestReading, saveUnlockedGuestReading } from '@/utils/guestReading'
 
 const createPayment = vi.fn()
 vi.mock('@/api/paymentApi', () => ({ paymentApi: { createAccessPayment: (acceptance: unknown) => createPayment(acceptance) } }))
@@ -85,6 +87,7 @@ describe('ResultView', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     localStorage.clear()
+    clearUnlockedGuestReading()
     createPayment.mockReset().mockResolvedValue({ paymentId: 'qa-order', confirmationUrl: '', status: 'pending' })
   })
   afterEach(() => {
@@ -96,6 +99,17 @@ describe('ResultView', () => {
     const { router } = await mountResult(null)
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('guides an authenticated legacy result with no local reference to history', async () => {
+    const getReading = vi.spyOn(readingApi, 'get')
+    const { wrapper, router } = await mountResult(null, enableFreeAccountCheckout)
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('result')
+    expect(wrapper.text()).toContain('Открой сохранённый расклад в истории')
+    expect(wrapper.get('[data-testid="recover-reading-history"]').attributes('href')).toBe('/history')
+    expect(getReading).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Срок хранения расклада истёк')
   })
 
   it('renders reading header and question', async () => {
@@ -186,11 +200,14 @@ describe('ResultView', () => {
   })
 
   it('clicking "новый расклад" resets store and navigates home', async () => {
-    const { wrapper, router } = await mountResult(sample)
+    const { wrapper, router } = await mountResult(sample, () => {
+      saveUnlockedGuestReading({ readingId: sample.id, ownerUserId: 'qa-user', expiresAt: new Date(Date.now() + 86_400_000).toISOString() })
+    })
     await flushPromises()
     await wrapper.find('.glow-button').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('home')
+    expect(getUnlockedGuestReading('qa-user')).toBeNull()
   })
 
   it('ends a guest preview with a registration link back to this result', async () => {
@@ -200,6 +217,40 @@ describe('ResultView', () => {
     expect(wrapper.get('[data-testid="guest-unlock"]').text()).toContain('полное толкование этого расклада')
     expect(wrapper.get('a.guest-register').attributes('href')).toBe('/auth?mode=register&redirect=/result')
     expect(wrapper.text()).not.toContain('begin')
+  })
+
+  it('restores an owner’s full guest result from its saved reference after reload', async () => {
+    const getReading = vi.spyOn(readingApi, 'get').mockResolvedValue(sample)
+    const { wrapper, router } = await mountResult(null, () => {
+      enableFreeAccountCheckout()
+      saveUnlockedGuestReading({ readingId: sample.id, ownerUserId: 'qa-user', expiresAt: new Date(Date.now() + 86_400_000).toISOString() })
+    })
+    await finishTyping()
+    expect(getReading).toHaveBeenCalledWith(sample.id)
+    expect(router.currentRoute.value.path).toBe('/result')
+    expect(wrapper.get('.prose-mystic').text()).toContain(sample.interpretation)
+    expect(wrapper.get('[data-testid="guest-opened-free"]').text()).toBe('Полное толкование открыто бесплатно')
+    expect(wrapper.find('[data-testid="guest-unlock"]').exists()).toBe(false)
+  })
+
+  it('can retry a temporary GET failure with the owner reference after the guest ticket was cleared', async () => {
+    const getReading = vi.spyOn(readingApi, 'get')
+      .mockRejectedValueOnce(new Error('Сеть временно недоступна'))
+      .mockResolvedValueOnce(sample)
+    const { wrapper } = await mountResult(null, () => {
+      enableFreeAccountCheckout()
+      saveUnlockedGuestReading({ readingId: sample.id, ownerUserId: 'qa-user', expiresAt: new Date(Date.now() + 86_400_000).toISOString() })
+    })
+    await flushPromises()
+    expect(wrapper.get('[role="alert"]').text()).toBe('Сеть временно недоступна')
+    expect(wrapper.find('[data-testid="recover-reading-history"]').exists()).toBe(true)
+    const retry = wrapper.findAll('button').find(button => button.text() === 'Попробовать ещё раз')!
+    expect(retry.exists()).toBe(true)
+    await retry.trigger('click')
+    await finishTyping()
+    expect(getReading).toHaveBeenCalledTimes(2)
+    expect(wrapper.get('.prose-mystic').text()).toContain(sample.interpretation)
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
   })
 
   it('shows the whole completed guest preview and registration CTA before animation frames run', async () => {
@@ -225,7 +276,8 @@ describe('ResultView', () => {
     const offer = wrapper.get('[data-testid="result-paid-offer"]')
     expect(offer.text()).toContain('640')
     expect(offer.text()).toContain('45 дней')
-    expect(offer.text()).toContain('Все 3 расклада без лимита')
+    expect(offer.text()).toContain('Для следующих раскладов: все 3 формата без лимита')
+    expect(offer.text()).toContain('Оплатить следующие расклады')
     expect(offer.get('button').attributes('disabled')).toBeDefined()
     expect(createPayment).not.toHaveBeenCalled()
     await offer.get('[data-testid="payment-offer-acceptance"]').setValue(true)

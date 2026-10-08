@@ -3,7 +3,7 @@ import { fullReading, guestResponse, previewReading, verifiedAuth } from './gues
 import { legalDocumentsResponse } from '../fixtures/legalDocuments'
 
 async function mockApi(context: BrowserContext, introAvailable = true) {
-  const calls = { create: 0, unlock: 0 }
+  const calls = { create: 0, unlock: 0, get: 0 }
   await context.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname
     if (!path.startsWith('/api/')) return route.fallback()
@@ -24,6 +24,11 @@ async function mockApi(context: BrowserContext, introAvailable = true) {
       case '/api/readings/guest/unlock':
         expect(route.request().headers().authorization).toBe('Bearer qa-verified-session')
         calls.unlock++
+        body = fullReading
+        break
+      case `/api/readings/${fullReading.id}`:
+        expect(route.request().headers().authorization).toBe('Bearer qa-verified-session')
+        calls.get++
         body = fullReading
         break
       case '/api/auth/verify-email':
@@ -86,8 +91,66 @@ test('one-click guest preview survives reload and email verification in a new ta
   await expect(emailTab.getByRole('heading', { name: 'Следующий шаг' })).toBeVisible({ timeout: 15000 })
   await expect(emailTab.getByTestId('guest-unlock')).toHaveCount(0)
   await expect(emailTab.getByRole('img', { name: 'Солнце' })).toBeVisible()
+  await expect(emailTab.getByTestId('guest-opened-free')).toContainText('Полное толкование открыто бесплатно')
+  await expect(page).toHaveURL(/\/result$/, { timeout: 10000 })
+  await expect(page.getByRole('heading', { name: 'Следующий шаг' })).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('.prose-mystic')).toContainText('где хочется больше поддержки?', { timeout: 15000 })
+  await expect(page.getByTestId('guest-unlock')).toHaveCount(0)
+  await expect(page.getByTestId('guest-opened-free')).toBeVisible()
+  const reference = await page.evaluate(() => localStorage.getItem('fv_guest_reading_unlocked_v1'))
+  expect(reference).toContain(fullReading.id)
+  expect(reference).toContain(verifiedAuth.userId)
+  expect(reference).not.toContain(fullReading.question)
+  expect(reference).not.toContain('Следующий шаг')
+
+  await page.reload()
+  await expect(page).toHaveURL(/\/result$/)
+  await expect(page.getByRole('heading', { name: 'Следующий шаг' })).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('.prose-mystic')).toContainText('где хочется больше поддержки?', { timeout: 15000 })
+  await expect(page.getByTestId('guest-unlock')).toHaveCount(0)
+  await emailTab.reload()
+  await expect(emailTab).toHaveURL(/\/result$/)
+  await expect(emailTab.getByRole('heading', { name: 'Следующий шаг' })).toBeVisible({ timeout: 15000 })
+  await expect(emailTab.locator('.prose-mystic')).toContainText('где хочется больше поддержки?', { timeout: 15000 })
+  await expect(emailTab.getByTestId('guest-unlock')).toHaveCount(0)
+  await expect.poll(() => page.locator('.card-entry img').evaluateAll(images => images.every(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true)
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+  await page.screenshot({ path: testInfo.outputPath('full-result-after-verification.png'), fullPage: true })
   expect(calls.create).toBe(1)
   expect(calls.unlock).toBeGreaterThanOrEqual(1)
+  expect(calls.get).toBeGreaterThanOrEqual(2)
+})
+
+test('an unlocked guest reference cannot restore the result for a different account', async ({ page, context }) => {
+  const calls = await mockApi(context)
+  await page.goto('/')
+  await page.evaluate(({ readingId, ownerUserId }) => {
+    localStorage.setItem('fv_guest_reading_unlocked_v1', JSON.stringify({ readingId, ownerUserId, expiresAt: new Date(Date.now() + 86_400_000).toISOString() }))
+    localStorage.setItem('fv_token', 'other-session')
+    localStorage.setItem('fv_user_id', 'other-user')
+  }, { readingId: fullReading.id, ownerUserId: verifiedAuth.userId })
+  await page.goto('/result')
+  await expect(page).toHaveURL(/\/result$/)
+  await expect(page.getByTestId('recover-reading-history')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Следующий шаг' })).toHaveCount(0)
+  expect(calls.get).toBe(0)
+  expect(calls.unlock).toBe(0)
+})
+
+test('an already verified legacy registration tab offers history when the old guest ticket is gone', async ({ page, context }) => {
+  const calls = await mockApi(context)
+  await page.goto('/')
+  await page.evaluate(({ accessToken, userId }) => {
+    localStorage.setItem('fv_user_id', userId)
+    localStorage.setItem('fv_token', accessToken)
+  }, verifiedAuth)
+  await page.goto('/auth?mode=register&redirect=/result')
+  await expect(page).toHaveURL(/\/result$/)
+  await expect(page.getByText('Открой сохранённый расклад в истории.')).toBeVisible()
+  await expect(page.getByTestId('recover-reading-history')).toHaveAttribute('href', '/history')
+  expect(calls.get).toBe(0)
+  expect(calls.unlock).toBe(0)
 })
 
 test('an existing account with its first reading unused can log in to unlock the same reading', async ({ page, context }) => {

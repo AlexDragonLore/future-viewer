@@ -27,14 +27,15 @@ export const useAuthStore = defineStore('auth', () => {
     email.value = newEmail
     userId.value = newUserId
     isAdmin.value = newIsAdmin
-    if (newToken) localStorage.setItem('fv_token', newToken)
-    else localStorage.removeItem('fv_token')
     if (newEmail) localStorage.setItem('fv_email', newEmail)
     else localStorage.removeItem('fv_email')
     if (newUserId) localStorage.setItem('fv_user_id', newUserId)
     else localStorage.removeItem('fv_user_id')
     if (newIsAdmin) localStorage.setItem('fv_is_admin', 'true')
     else localStorage.removeItem('fv_is_admin')
+    // Other tabs reload on this event, so publish the complete owner identity first.
+    if (newToken) localStorage.setItem('fv_token', newToken)
+    else localStorage.removeItem('fv_token')
   }
 
   async function login(e: string, password: string) {

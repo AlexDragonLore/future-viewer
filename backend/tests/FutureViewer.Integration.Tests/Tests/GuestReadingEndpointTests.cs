@@ -102,6 +102,78 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
     }
 
     [Fact]
+    public async Task Registering_and_verifying_email_opens_the_full_original_guest_reading()
+    {
+        var browser = fixture.CreateClient();
+        var guest = await CreateGuest(browser);
+        var ticketRequest = new GuestReadingTicketRequest(guest.Ticket);
+        var protectedReading = fixture.Services.GetRequiredService<GuestReadingTickets>().Read(guest.Ticket);
+        protectedReading.IsPreview.Should().BeFalse();
+        protectedReading.Interpretation!.Length.Should().BeGreaterThan(guest.Reading.Interpretation!.Length);
+
+        string fullInterpretation;
+        using (var scope = fixture.Services.CreateScope())
+        {
+            var stored = (await scope.ServiceProvider.GetRequiredService<IReadingRepository>()
+                .GetByIdAsync(guest.Reading.Id))!;
+            fullInterpretation = stored.AiInterpretation!;
+            protectedReading.Interpretation.Should().Be(fullInterpretation);
+        }
+
+        var email = $"verified-guest-{Guid.NewGuid():N}@example.com";
+        var registration = await browser.PostAsJsonAsync("/api/auth/register",
+            AuthTestExtensions.CreateRegistrationRequest(email, "password123"));
+        registration.StatusCode.Should().Be(HttpStatusCode.Accepted);
+        var registered = (await registration.Content.ReadFromJsonAsync<RegisterResponse>())!;
+        registered.VerificationRequired.Should().BeTrue();
+        (await browser.PostAsJsonAsync("/api/readings/guest/unlock", ticketRequest))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var emailBody = fixture.EmailSender.LastFor(email)!.HtmlBody;
+        const string marker = "token=";
+        var tokenStart = emailBody.IndexOf(marker, StringComparison.Ordinal);
+        tokenStart.Should().BeGreaterThanOrEqualTo(0);
+        tokenStart += marker.Length;
+        var tokenEnd = emailBody.IndexOfAny(['\"', '<', '&'], tokenStart);
+        if (tokenEnd < 0) tokenEnd = emailBody.Length;
+        var verificationToken = Uri.UnescapeDataString(emailBody[tokenStart..tokenEnd]);
+
+        // Use the real verification endpoint in a separate client, as an email link does.
+        var emailBrowser = fixture.CreateClient();
+        var verification = await emailBrowser.PostAsJsonAsync("/api/auth/verify-email",
+            new VerifyEmailRequest { Token = verificationToken });
+        verification.StatusCode.Should().Be(HttpStatusCode.OK);
+        var verified = (await verification.Content.ReadFromJsonAsync<AuthResponse>())!;
+        verified.UserId.Should().NotBeEmpty();
+        verified.Email.Should().Be(email);
+        emailBrowser.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", verified.AccessToken);
+
+        var unlockedResponse = await emailBrowser.PostAsJsonAsync("/api/readings/guest/unlock", ticketRequest);
+        unlockedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var unlocked = (await unlockedResponse.Content.ReadFromJsonAsync<ReadingResult>())!;
+        unlocked.Should().BeEquivalentTo(protectedReading);
+        unlocked.IsPreview.Should().BeFalse();
+        unlocked.Interpretation.Should().Be(fullInterpretation);
+        unlocked.Cards.Should().HaveCount(3);
+
+        // A retry after the intro/daily quota is consumed still returns the full same result.
+        var retryResponse = await emailBrowser.PostAsJsonAsync("/api/readings/guest/unlock", ticketRequest);
+        retryResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await retryResponse.Content.ReadFromJsonAsync<ReadingResult>()).Should().BeEquivalentTo(unlocked);
+        using var claimedScope = fixture.Services.CreateScope();
+        var readings = claimedScope.ServiceProvider.GetRequiredService<IReadingRepository>();
+        var claimed = (await readings.GetByIdAsync(unlocked.Id))!;
+        claimed.UserId.Should().Be(verified.UserId);
+        claimed.AiInterpretation.Should().Be(fullInterpretation);
+        claimed.SavedToHistory.Should().BeTrue();
+        (await readings.CountByUserAsync(verified.UserId)).Should().Be(1);
+        var status = (await (await emailBrowser.GetAsync("/api/subscription/status"))
+            .Content.ReadFromJsonAsync<SubscriptionStatusDto>())!;
+        status.CanCreateIntroReading.Should().BeFalse();
+        status.FreeReadingsUsedToday.Should().Be(1);
+    }
+
+    [Fact]
     public async Task Guest_ticket_expires_twenty_four_hours_after_creation()
     {
         var guest = await CreateGuest();

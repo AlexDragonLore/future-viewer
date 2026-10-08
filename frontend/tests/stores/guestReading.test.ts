@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { DeckType, SpreadType, type Reading } from '@/types'
-import { clearGuestContinuation, getGuestContinuation, saveGuestContinuation } from '@/utils/guestReading'
+import { clearGuestContinuation, clearUnlockedGuestReading, getGuestContinuation, getUnlockedGuestReading, saveGuestContinuation, saveUnlockedGuestReading } from '@/utils/guestReading'
 import { clearAccountSession } from '@/utils/accountSession'
 
 const createGuest = vi.fn()
 const guestPreview = vi.fn()
 const unlockGuest = vi.fn()
+const getReading = vi.fn()
 vi.mock('@/api/readingApi', () => ({ readingApi: {
   createGuest: (...args: unknown[]) => createGuest(...args),
   guestPreview: (...args: unknown[]) => guestPreview(...args),
   unlockGuest: (...args: unknown[]) => unlockGuest(...args),
+  get: (...args: unknown[]) => getReading(...args),
 } }))
 vi.mock('@/api/subscriptionApi', () => ({ subscriptionApi: { status: vi.fn(async () => null) } }))
 
@@ -28,6 +30,7 @@ describe('guest reading continuation', () => {
   beforeEach(() => {
     localStorage.clear()
     clearGuestContinuation()
+    clearUnlockedGuestReading()
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })
@@ -62,12 +65,66 @@ describe('guest reading continuation', () => {
     store.current = preview
     clearAccountSession()
     useAuthStore().token = 'verified-session'
+    useAuthStore().userId = 'guest-owner'
     unlockGuest.mockResolvedValue({ ...preview, interpretation: 'Полное толкование', isPreview: false })
     expect(await store.restoreGuest()).toBe(true)
     expect(store.current?.id).toBe(preview.id)
     expect(store.current?.isPreview).toBe(false)
     expect(unlockGuest).toHaveBeenCalledWith('server-encrypted-ticket')
     expect(getGuestContinuation()).toBeNull()
+    expect(getUnlockedGuestReading('guest-owner')).toEqual({ readingId: preview.id, ownerUserId: 'guest-owner', expiresAt: expect.any(String) })
+    const persisted = localStorage.getItem('fv_guest_reading_unlocked_v1')!
+    expect(persisted).not.toContain(preview.question)
+    expect(persisted).not.toContain('Полное толкование')
+  })
+
+  it('restores the full unlocked reading after reload without another unlock or a new reading', async () => {
+    const auth = useAuthStore()
+    auth.token = 'verified-session'
+    auth.userId = 'guest-owner'
+    saveUnlockedGuestReading({ readingId: preview.id, ownerUserId: auth.userId, expiresAt: continuation().expiresAt })
+    const full = { ...preview, interpretation: 'Полное толкование', isPreview: false }
+    getReading.mockResolvedValue(full)
+
+    expect(await useReadingStore().restoreGuest()).toBe(true)
+    expect(useReadingStore().current).toEqual(full)
+    expect(getReading).toHaveBeenCalledWith(preview.id)
+    expect(unlockGuest).not.toHaveBeenCalled()
+    expect(createGuest).not.toHaveBeenCalled()
+  })
+
+  it('does not restore an unlocked reference for a different account or an anonymous session', async () => {
+    saveUnlockedGuestReading({ readingId: preview.id, ownerUserId: 'guest-owner', expiresAt: continuation().expiresAt })
+    expect(await useReadingStore().restoreGuest()).toBe(false)
+    useAuthStore().token = 'other-session'
+    useAuthStore().userId = 'other-owner'
+    expect(await useReadingStore().restoreGuest()).toBe(false)
+    expect(getReading).not.toHaveBeenCalled()
+    expect(useReadingStore().current).toBeNull()
+    expect(getUnlockedGuestReading('guest-owner')?.readingId).toBe(preview.id)
+  })
+
+  it('expires the unlocked reference with the original guest ticket and clears it for a new preview', () => {
+    const reference = { readingId: preview.id, ownerUserId: 'guest-owner', expiresAt: new Date(Date.now() - 1000).toISOString() }
+    saveUnlockedGuestReading(reference)
+    expect(getUnlockedGuestReading('guest-owner')).toBeNull()
+    expect(localStorage.getItem('fv_guest_reading_unlocked_v1')).toBeNull()
+    saveUnlockedGuestReading({ ...reference, expiresAt: continuation().expiresAt })
+    saveGuestContinuation(continuation())
+    expect(getUnlockedGuestReading('guest-owner')).toBeNull()
+  })
+
+  it('does not expose a restored full reading after the account changes', async () => {
+    saveUnlockedGuestReading({ readingId: preview.id, ownerUserId: 'guest-owner', expiresAt: continuation().expiresAt })
+    useAuthStore().token = 'verified-session'
+    useAuthStore().userId = 'guest-owner'
+    let resolve!: (reading: Reading) => void
+    getReading.mockImplementation(() => new Promise<Reading>(r => { resolve = r }))
+    const pending = useReadingStore().restoreGuest()
+    clearAccountSession()
+    resolve({ ...preview, isPreview: false, interpretation: 'Private complete text' })
+    expect(await pending).toBe(false)
+    expect(useReadingStore().current).toBeNull()
   })
 
   it('does not expose a response after the account changes', async () => {

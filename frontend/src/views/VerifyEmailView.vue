@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { extractApiError } from '@/api/httpClient'
 import { extractOneTimeToken } from '@/utils/oneTimeToken'
-import { getGuestContinuation } from '@/utils/guestReading'
+import { getGuestContinuation, getUnlockedGuestReading } from '@/utils/guestReading'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,7 +25,7 @@ onMounted(async () => {
     await auth.verifyEmail(token)
     status.value = 'ok'
     message.value = 'Email подтверждён. Перенаправляем вас…'
-    setTimeout(() => router.replace(getGuestContinuation() ? '/result' : '/'), 1200)
+    setTimeout(() => router.replace(getGuestContinuation() || getUnlockedGuestReading(auth.userId) ? '/result' : '/'), 1200)
   } catch (e) {
     status.value = 'error'
     message.value = extractApiError(e)

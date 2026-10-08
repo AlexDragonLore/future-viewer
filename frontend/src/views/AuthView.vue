@@ -7,7 +7,7 @@ import { extractApiError } from '@/api/httpClient'
 import { legalDocumentVersions, loadLegalDocuments } from '@/content/legal'
 import { trackGoal } from '@/analytics/metrika'
 import type { RegisterPayload } from '@/types'
-import { getGuestContinuation } from '@/utils/guestReading'
+import { getGuestContinuation, getUnlockedGuestReading } from '@/utils/guestReading'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -20,9 +20,13 @@ watch(mode, (value) => {
 }, { immediate: true })
 
 function destination() {
-  if (getGuestContinuation()) return '/result'
+  if (getGuestContinuation() || getUnlockedGuestReading(auth.userId)) return '/result'
   const redirect = route.query.redirect
   return typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/'
+}
+// Email verification may finish in a second tab and reload this registration tab.
+if (auth.isAuthenticated) {
+  void router.replace(destination())
 }
 const email = ref('')
 const password = ref('')
@@ -96,7 +100,7 @@ async function submit() {
       }
       const result = await auth.register(payload)
       if (result.verificationRequired) {
-        info.value = `Мы отправили письмо на ${result.email}. Перейдите по ссылке, чтобы подтвердить почту.${continuesReading ? ' Затем откроется полное толкование вашей карты.' : ''}`
+        info.value = `Мы отправили письмо на ${result.email}. Перейдите по ссылке, чтобы подтвердить почту.${continuesReading ? ' Затем бесплатно откроется полное толкование вашего расклада.' : ''}`
         needsVerification.value = true
       } else {
         await auth.login(email.value, password.value)

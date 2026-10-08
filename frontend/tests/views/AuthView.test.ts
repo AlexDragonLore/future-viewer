@@ -34,7 +34,7 @@ vi.mock('@/api/subscriptionApi', () => ({
 }))
 
 import AuthView from '@/views/AuthView.vue'
-import { clearGuestContinuation, getGuestContinuation, saveGuestContinuation } from '@/utils/guestReading'
+import { clearGuestContinuation, clearUnlockedGuestReading, getGuestContinuation, saveGuestContinuation, saveUnlockedGuestReading } from '@/utils/guestReading'
 
 async function mountAuth(initialPath = '/auth'): Promise<{ wrapper: ReturnType<typeof mount>; router: Router }> {
   setActivePinia(createPinia())
@@ -64,6 +64,7 @@ describe('AuthView', () => {
   beforeEach(() => {
     localStorage.clear()
     clearGuestContinuation()
+    clearUnlockedGuestReading()
     loginMock.mockReset()
     registerMock.mockReset()
     statusMock.mockReset()
@@ -93,9 +94,39 @@ describe('AuthView', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
     expect(registerMock).toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Затем откроется полное толкование вашей карты')
+    expect(wrapper.text()).toContain('Затем бесплатно откроется полное толкование вашего расклада')
     expect(getGuestContinuation()?.ticket).toBe('encrypted')
     expect(router.currentRoute.value.path).toBe('/auth')
+  })
+
+  it.each(['ticket', 'unlocked'])('returns an already authenticated registration tab to its %s result', async (source) => {
+    localStorage.setItem('fv_token', 'verified-session')
+    localStorage.setItem('fv_user_id', 'guest-owner')
+    const expiresAt = new Date(Date.now() + 86_400_000).toISOString()
+    if (source === 'ticket') saveGuestContinuation({ ticket: 'encrypted', expiresAt })
+    else saveUnlockedGuestReading({ readingId: 'reading-id', ownerUserId: 'guest-owner', expiresAt })
+    const { router } = await mountAuth('/auth?mode=register&redirect=/result')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/result')
+    expect(loginMock).not.toHaveBeenCalled()
+  })
+
+  it('does not redirect an account to another owner’s unlocked reading', async () => {
+    localStorage.setItem('fv_token', 'other-session')
+    localStorage.setItem('fv_user_id', 'other-owner')
+    saveUnlockedGuestReading({ readingId: 'reading-id', ownerUserId: 'guest-owner', expiresAt: new Date(Date.now() + 86_400_000).toISOString() })
+    const { router } = await mountAuth('/auth?mode=register')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+
+  it.each(['/auth?mode=register', '/auth?redirect=//other-site.example'])('sends an already authenticated session without a continuation home from %s', async (path) => {
+    localStorage.setItem('fv_token', 'verified-session')
+    localStorage.setItem('fv_user_id', 'guest-owner')
+    const { router } = await mountAuth(path)
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/')
+    expect(loginMock).not.toHaveBeenCalled()
   })
 
   it('returns an existing account to its guest reading after login', async () => {

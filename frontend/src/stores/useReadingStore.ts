@@ -6,7 +6,7 @@ import { extractApiError } from '@/api/httpClient'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { useDeckStore } from '@/stores/useDeckStore'
 import type { Reading, SpreadInfo, SpreadType } from '@/types'
-import { clearGuestContinuation, getGuestContinuation, saveGuestContinuation } from '@/utils/guestReading'
+import { clearGuestContinuation, clearUnlockedGuestReading, getGuestContinuation, getUnlockedGuestReading, saveGuestContinuation, saveUnlockedGuestReading } from '@/utils/guestReading'
 import { trackGoal, trackGoalOnce } from '@/analytics/metrika'
 
 export interface PendingReading {
@@ -107,12 +107,14 @@ export const useReadingStore = defineStore('reading', () => {
 
   async function restoreGuest() {
     const continuation = getGuestContinuation()
-    if (!continuation) return false
+    const auth = useAuthStore()
+    const authenticated = auth.isAuthenticated
+    const unlocked = authenticated ? getUnlockedGuestReading(auth.userId) : null
+    if (!continuation && !unlocked) return false
     const session = accountSessionVersion()
     loading.value = true
     error.value = null
     guestUnlockBlocked.value = false
-    const authenticated = useAuthStore().isAuthenticated
     const applyReading = (result: Reading) => {
       cancelStreamFlush()
       current.value = result
@@ -121,13 +123,18 @@ export const useReadingStore = defineStore('reading', () => {
       cardsReady.value = true
     }
     try {
-      const result = authenticated
-        ? await readingApi.unlockGuest(continuation.ticket)
-        : await readingApi.guestPreview(continuation.ticket)
+      const result = continuation
+        ? authenticated
+          ? await readingApi.unlockGuest(continuation.ticket)
+          : await readingApi.guestPreview(continuation.ticket)
+        : await readingApi.get(unlocked!.readingId)
       if (session !== accountSessionVersion()) return false
       applyReading(result)
-      if (authenticated) {
+      if (authenticated && continuation) {
         trackGoalOnce('guest_reading_unlocked', result.id)
+        if (auth.userId) {
+          saveUnlockedGuestReading({ readingId: result.id, ownerUserId: auth.userId, expiresAt: continuation.expiresAt })
+        }
         clearGuestContinuation()
         void useAuthStore().refreshSubscription()
       }
@@ -137,8 +144,11 @@ export const useReadingStore = defineStore('reading', () => {
         error.value = extractApiError(e, 'Не удалось восстановить расклад. Попробуйте ещё раз.')
         const response = (e as { response?: { status?: number; data?: { error?: string } } }).response
         const status = response?.status
-        if (status === 404) clearGuestContinuation()
-        if (authenticated && (status === 402 || status === 429)) {
+        if (status === 404) {
+          if (continuation) clearGuestContinuation()
+          else clearUnlockedGuestReading()
+        }
+        if (authenticated && continuation && (status === 402 || status === 429)) {
           guestUnlockBlocked.value = status === 402 || response?.data?.error === 'quota_exceeded'
           try {
             const preview = current.value?.isPreview ? current.value : await readingApi.guestPreview(continuation.ticket)
@@ -156,6 +166,7 @@ export const useReadingStore = defineStore('reading', () => {
   }
 
   async function create(spreadType: SpreadType, question: string, questionWarningAcknowledged = false) {
+    clearUnlockedGuestReading()
     loading.value = true
     error.value = null
     try {
@@ -180,6 +191,7 @@ export const useReadingStore = defineStore('reading', () => {
     signal?: AbortSignal,
     questionWarningAcknowledged = false,
   ) {
+    clearUnlockedGuestReading()
     loading.value = true
     error.value = null
     current.value = null

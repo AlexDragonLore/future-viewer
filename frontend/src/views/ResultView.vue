@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
-import { getGuestContinuation } from '@/utils/guestReading'
+import { clearUnlockedGuestReading, getGuestContinuation, getUnlockedGuestReading } from '@/utils/guestReading'
 import CardFlip from '@/components/cards/CardFlip.vue'
 import AiDisclaimer from '@/components/AiDisclaimer.vue'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
@@ -19,6 +19,8 @@ const restoring = ref(false)
 const locked = computed(() => reading.value?.isPreview === true)
 
 const reading = computed(() => store.current)
+const guestOpenedFree = computed(() => !locked.value && auth.subscription !== null && !auth.subscriptionLoading
+  && !auth.isSubscribed && reading.value?.id === getUnlockedGuestReading(auth.userId)?.readingId)
 watch(reading, (value) => {
   if (value?.isPreview) trackGoalOnce('guest_preview_viewed', value.id)
 }, { immediate: true, flush: 'post' })
@@ -208,9 +210,10 @@ onMounted(async () => {
   window.addEventListener('wheel', markUserScrollIntent, { passive: true })
   window.addEventListener('touchmove', markUserScrollIntent, { passive: true })
   window.addEventListener('keydown', onKeydown)
-  if ((!reading.value || (locked.value && auth.isAuthenticated)) && getGuestContinuation()) {
+  if ((!reading.value || (locked.value && auth.isAuthenticated))
+    && (getGuestContinuation() || getUnlockedGuestReading(auth.userId))) {
     await resumeGuest()
-  } else if (!reading.value) {
+  } else if (!reading.value && !auth.isAuthenticated) {
     router.replace({ name: 'home' })
   }
 })
@@ -233,6 +236,7 @@ onBeforeUnmount(() => {
 })
 
 function again() {
+  clearUnlockedGuestReading()
   store.reset()
   router.push({ name: 'home' })
 }
@@ -243,6 +247,7 @@ function again() {
     <header class="text-center mb-10">
       <div class="result-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
       <h1 class="font-display text-3xl sm:text-4xl md:text-5xl gold-text">Расклад раскрыт</h1>
+      <p v-if="guestOpenedFree" class="text-mystic-accent mt-3" data-testid="guest-opened-free">Полное толкование открыто бесплатно</p>
       <p class="result-question text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
     </header>
 
@@ -288,8 +293,8 @@ function again() {
       v-if="showPaidOffer"
       class="max-w-2xl w-full mb-6"
       data-testid="result-paid-offer"
-      message="Все 3 расклада без лимита"
-      button-label="Оплатить доступ"
+      :message="locked ? 'Платный доступ к этому и новым раскладам' : 'Для следующих раскладов: все 3 формата без лимита'"
+      :button-label="locked ? 'Оплатить доступ' : 'Оплатить следующие расклады'"
     />
 
     <AiDisclaimer class="max-w-2xl w-full mb-8" />
@@ -301,8 +306,10 @@ function again() {
       <h1 class="font-display text-2xl gold-text">Твой расклад</h1>
       <p v-if="restoring">Открываю сохранённый расклад…</p>
       <template v-else>
-        <p role="alert">{{ store.error || 'Срок хранения расклада истёк. Можно открыть новый расклад.' }}</p>
-        <button v-if="getGuestContinuation()" class="glow-button" @click="resumeGuest">Попробовать ещё раз</button>
+        <p v-if="auth.isAuthenticated && !store.error">Открой сохранённый расклад в истории.</p>
+        <p v-else role="alert">{{ store.error || 'Срок хранения расклада истёк. Можно открыть новый расклад.' }}</p>
+        <RouterLink v-if="auth.isAuthenticated" to="/history" class="glow-button block" data-testid="recover-reading-history">Открыть историю раскладов</RouterLink>
+        <button v-if="getGuestContinuation() || getUnlockedGuestReading(auth.userId)" class="glow-button" @click="resumeGuest">Попробовать ещё раз</button>
         <RouterLink to="/" class="guest-login">Открыть новый расклад</RouterLink>
       </template>
     </section>
