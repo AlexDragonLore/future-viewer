@@ -10,7 +10,7 @@ async function openHistory(page: Page) {
     '/api/public/legal-documents': legalDocumentsResponse,
     '/api/announcements/unread': [],
     '/api/subscription/status': {
-      isActive: false, canCreateFreeReading: false, freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1,
+      isActive: false, canCreateIntroReading: false, canCreateFreeReading: false, freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1,
     },
   }
   await page.route('**/api/**', async route => {

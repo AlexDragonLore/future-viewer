@@ -55,14 +55,14 @@ public sealed class ReadingService
 
     public Task<ReadingResult> CreateGuestAsync(CreateReadingRequest request, CancellationToken ct = default)
     {
-        if (request.SpreadType != SpreadType.SingleCard)
-            throw new QuestionValidationException("guest_single_card_only", "Без регистрации можно открыть одну карту.");
+        if (request.SpreadType is not (SpreadType.SingleCard or SpreadType.ThreeCard))
+            throw new QuestionValidationException("guest_intro_spread_only", "Без регистрации доступен первый расклад на три карты.");
         return CreateCoreAsync(request, null, ct);
     }
 
     public async Task<ReadingResult> UnlockGuestAsync(ReadingResult reading, Guid userId, CancellationToken ct = default)
     {
-        if (!await _repo.AttachGuestAsync(reading.Id, userId, reading.Question, reading.Interpretation, ct))
+        if (!await _subscription.AttachGuestAsync(reading, userId, ct))
             throw new NotFoundException("Этот расклад уже недоступен. Начните новый расклад.");
         return reading;
     }
@@ -116,7 +116,10 @@ public sealed class ReadingService
 
         // Persist the safe question before AI interpretation. Unclaimed guest
         // content is available to admins for 24 hours, then removed by cleanup.
-        await _repo.AddAsync(reading, ct);
+        if (userId is not null)
+            await _subscription.AddReadingAsync(reading, ct);
+        else
+            await _repo.AddAsync(reading, ct);
 
         var interpretationQuestion = BuildQuestionForInterpretation(privacy.SafeText, questionValidation);
         var interpretation = await _interpreter.InterpretAsync(
@@ -195,7 +198,7 @@ public sealed class ReadingService
         };
 
         // Persist the minimized local record before external AI streaming begins.
-        await _repo.AddAsync(reading, ct);
+        await _subscription.AddReadingAsync(reading, ct);
         yield return new ReadingStreamEvent.Cards(Map(reading, spread, privacy.SafeText, null));
 
         var sb = new StringBuilder();

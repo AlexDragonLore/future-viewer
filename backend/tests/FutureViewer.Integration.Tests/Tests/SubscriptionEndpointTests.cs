@@ -153,6 +153,7 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         status.FreeReadingsUsedToday.Should().Be(0);
         status.FreeReadingsDailyLimit.Should().BeGreaterThan(0);
         status.CanCreateFreeReading.Should().BeTrue();
+        status.CanCreateIntroReading.Should().BeTrue();
     }
 
     [Theory]
@@ -255,10 +256,11 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         status!.Status.Should().Be(SubscriptionStatus.Active);
         status.IsActive.Should().BeTrue();
         status.CanCreateFreeReading.Should().BeTrue();
+        status.CanCreateIntroReading.Should().BeFalse();
     }
 
     [Fact]
-    public async Task Free_user_is_limited_to_single_card_spread()
+    public async Task Free_user_gets_one_intro_three_card_reading_then_only_daily_single_card()
     {
         var client = _fixture.CreateClient();
         var email = $"sub-limit-{Guid.NewGuid():N}@example.com";
@@ -269,7 +271,127 @@ public sealed class SubscriptionEndpointTests : IClassFixture<IntegrationTestFix
         var response = await client.PostAsJsonAsync("/api/readings",
             new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "test" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        var reading = (await response.Content.ReadFromJsonAsync<ReadingResult>())!;
+        reading.Cards.Should().HaveCount(3);
+        var status = (await (await client.GetAsync("/api/subscription/status")).Content.ReadFromJsonAsync<SubscriptionStatusDto>())!;
+        status.CanCreateIntroReading.Should().BeFalse();
+        status.CanCreateFreeReading.Should().BeFalse();
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "again" }))
+            .StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "today" }))
+            .StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+
+        // Move the original usage to yesterday to exercise the existing UTC-day boundary.
+        using (var scope = _fixture.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE readings SET created_at = {yesterday} WHERE id = {reading.Id}");
+            await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE users SET last_reading_at = {yesterday} WHERE id = {auth.UserId}");
+        }
+        var nextDayStatus = (await (await client.GetAsync("/api/subscription/status")).Content.ReadFromJsonAsync<SubscriptionStatusDto>())!;
+        nextDayStatus.CanCreateIntroReading.Should().BeFalse();
+        nextDayStatus.CanCreateFreeReading.Should().BeTrue();
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "three again" }))
+            .StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "next day" }))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task New_free_user_cannot_create_celtic_cross()
+    {
+        var client = _fixture.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client, $"sub-celtic-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.CelticCross, Question = "test" }))
+            .StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+    }
+
+    [Fact]
+    public async Task Removing_intro_from_history_does_not_restore_intro_or_daily_quota()
+    {
+        var client = _fixture.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client, $"sub-delete-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "test" });
+        response.EnsureSuccessStatusCode();
+        var reading = (await response.Content.ReadFromJsonAsync<ReadingResult>())!;
+
+        (await client.DeleteAsync($"/api/readings/{reading.Id}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await (await client.GetAsync("/api/readings/history")).Content.ReadFromJsonAsync<ReadingResult[]>()).Should().BeEmpty();
+        var status = (await (await client.GetAsync("/api/subscription/status")).Content.ReadFromJsonAsync<SubscriptionStatusDto>())!;
+        status.CanCreateIntroReading.Should().BeFalse();
+        status.CanCreateFreeReading.Should().BeFalse();
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "again" }))
+            .StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Erasing_reading_content_does_not_restore_intro_or_daily_quota(bool eraseAll)
+    {
+        var client = _fixture.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client, $"sub-erase-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        var response = await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "test" });
+        response.EnsureSuccessStatusCode();
+        var reading = (await response.Content.ReadFromJsonAsync<ReadingResult>())!;
+        var path = eraseAll ? "/api/privacy/readings" : $"/api/privacy/readings/{reading.Id}";
+        var delete = new HttpRequestMessage(HttpMethod.Delete, path)
+        {
+            Content = JsonContent.Create(new ReauthenticationRequest { Password = "password123" })
+        };
+        (await client.SendAsync(delete)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        using var scope = _fixture.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Readings.AnyAsync(r => r.UserId == auth.UserId)).Should().BeFalse();
+        var status = (await (await client.GetAsync("/api/subscription/status")).Content.ReadFromJsonAsync<SubscriptionStatusDto>())!;
+        status.CanCreateIntroReading.Should().BeFalse();
+        status.CanCreateFreeReading.Should().BeFalse();
+        status.FreeReadingsUsedToday.Should().Be(1);
+        var exportResponse = await client.PostAsJsonAsync("/api/privacy/export",
+            new ReauthenticationRequest { Password = "password123" });
+        exportResponse.EnsureSuccessStatusCode();
+        var export = (await exportResponse.Content.ReadFromJsonAsync<PrivacyExportDto>())!;
+        export.Profile.HasUsedIntroReading.Should().BeTrue();
+        export.Profile.LastReadingAt.Should().BeCloseTo(reading.CreatedAt, TimeSpan.FromMicroseconds(1));
+        export.Readings.Should().BeEmpty();
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "again" }))
+            .StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        (await client.PostAsJsonAsync("/api/readings",
+            new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "again" }))
+            .StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task Concurrent_intro_requests_create_only_one_reading()
+    {
+        var client = _fixture.CreateClient();
+        var auth = await _fixture.RegisterAndLoginAsync(client, $"sub-concurrent-{Guid.NewGuid():N}@example.com", "password123");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        var request = new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "test" };
+
+        var responses = await Task.WhenAll(
+            client.PostAsJsonAsync("/api/readings", request),
+            client.PostAsJsonAsync("/api/readings", request));
+
+        responses.Select(r => r.StatusCode).Should().BeEquivalentTo([HttpStatusCode.Created, HttpStatusCode.PaymentRequired]);
+        var history = await (await client.GetAsync("/api/readings/history")).Content.ReadFromJsonAsync<ReadingResult[]>();
+        history.Should().ContainSingle();
     }
 
     [Fact]

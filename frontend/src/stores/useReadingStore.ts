@@ -28,6 +28,7 @@ export const useReadingStore = defineStore('reading', () => {
   const error = ref<string | null>(null)
   const pending = ref<PendingReading | null>(null)
   const workflowIssue = ref<ReadingWorkflowIssue | null>(null)
+  const guestUnlockBlocked = ref(false)
 
   const streamingText = ref('')
   const streamingDone = ref(false)
@@ -35,7 +36,7 @@ export const useReadingStore = defineStore('reading', () => {
   let streamBuffer = ''
   let streamFlushRaf: number | null = null
 
-  resetOnAccountChange({ current, loading, error, pending, workflowIssue, streamingText, streamingDone, cardsReady }, cancelStreamFlush)
+  resetOnAccountChange({ current, loading, error, pending, workflowIssue, guestUnlockBlocked, streamingText, streamingDone, cardsReady }, cancelStreamFlush)
 
   function flushStreamBuffer() {
     streamFlushRaf = null
@@ -94,7 +95,7 @@ export const useReadingStore = defineStore('reading', () => {
       })
       .catch((e) => {
         if (session === accountSessionVersion() && !signal?.aborted) {
-          error.value = extractApiError(e, 'Не удалось открыть карту. Попробуйте ещё раз.')
+          error.value = extractApiError(e, 'Не удалось открыть расклад. Попробуйте ещё раз.')
         }
         throw e
       })
@@ -110,17 +111,21 @@ export const useReadingStore = defineStore('reading', () => {
     const session = accountSessionVersion()
     loading.value = true
     error.value = null
+    guestUnlockBlocked.value = false
     const authenticated = useAuthStore().isAuthenticated
-    try {
-      const result = authenticated
-        ? await readingApi.unlockGuest(continuation.ticket)
-        : await readingApi.guestPreview(continuation.ticket)
-      if (session !== accountSessionVersion()) return false
+    const applyReading = (result: Reading) => {
       cancelStreamFlush()
       current.value = result
       streamingText.value = result.interpretation ?? ''
       streamingDone.value = true
       cardsReady.value = true
+    }
+    try {
+      const result = authenticated
+        ? await readingApi.unlockGuest(continuation.ticket)
+        : await readingApi.guestPreview(continuation.ticket)
+      if (session !== accountSessionVersion()) return false
+      applyReading(result)
       if (authenticated) {
         trackGoalOnce('guest_reading_unlocked', result.id)
         clearGuestContinuation()
@@ -130,7 +135,19 @@ export const useReadingStore = defineStore('reading', () => {
     } catch (e) {
       if (session === accountSessionVersion()) {
         error.value = extractApiError(e, 'Не удалось восстановить расклад. Попробуйте ещё раз.')
-        if ((e as { response?: { status?: number } }).response?.status === 404) clearGuestContinuation()
+        const response = (e as { response?: { status?: number; data?: { error?: string } } }).response
+        const status = response?.status
+        if (status === 404) clearGuestContinuation()
+        if (authenticated && (status === 402 || status === 429)) {
+          guestUnlockBlocked.value = status === 402 || response?.data?.error === 'quota_exceeded'
+          try {
+            const preview = current.value?.isPreview ? current.value : await readingApi.guestPreview(continuation.ticket)
+            if (session === accountSessionVersion()) applyReading(preview)
+          } catch {
+            // Keep the unlock error and ticket so the preview can be restored later.
+          }
+          if (session === accountSessionVersion()) void useAuthStore().refreshSubscription()
+        }
       }
       return false
     } finally {
@@ -235,6 +252,7 @@ export const useReadingStore = defineStore('reading', () => {
   function reset() {
     current.value = null
     error.value = null
+    guestUnlockBlocked.value = false
     cancelStreamFlush()
     streamingText.value = ''
     streamingDone.value = false
@@ -268,6 +286,7 @@ export const useReadingStore = defineStore('reading', () => {
     error,
     pending,
     workflowIssue,
+    guestUnlockBlocked,
     streamingText,
     streamingDone,
     cardsReady,

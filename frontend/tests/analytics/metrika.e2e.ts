@@ -39,7 +39,7 @@ async function analyticsFixture(context: BrowserContext) {
         })
         body = { userId: verifiedAuth.userId, email: verifiedAuth.email, verificationRequired: true }
         break
-      case '/api/subscription/status': body = { isActive: false, canCreateFreeReading: false, freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1 }; break
+      case '/api/subscription/status': body = { isActive: false, canCreateIntroReading: false, canCreateFreeReading: false, freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1 }; break
       case '/api/announcements/unread': body = []; break
       default: return route.fulfill({ status: 404, json: { message: 'Unexpected test request' } })
     }
@@ -61,7 +61,7 @@ test('consented guest funnel counts successful verification and unlock once acro
   await page.getByTestId('accept-all').click()
   await expect.poll(() => analytics.calls.some((call) => call[1] === 'hit')).toBe(true)
   expect(analytics.scriptRequests()).toBe(1)
-  await page.getByRole('button', { name: 'Открыть карту бесплатно' }).click()
+  await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page.getByTestId('guest-unlock')).toBeVisible({ timeout: 20000 })
   await expect.poll(() => analytics.goals()).toEqual(['guest_reading_started', 'guest_preview_viewed'])
   await page.reload()
@@ -101,7 +101,7 @@ test('necessary-only choice keeps the complete guest journey free of analytics r
   const analytics = await analyticsFixture(context)
   await page.goto('/?utm_source=yandex')
   await page.getByTestId('accept-necessary').click()
-  await page.getByRole('button', { name: 'Открыть карту бесплатно' }).click()
+  await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page.getByTestId('guest-unlock')).toBeVisible({ timeout: 20000 })
   await page.getByRole('link', { name: 'Зарегистрироваться и дочитать' }).click()
   await expect(page.getByRole('heading', { name: 'Регистрация', exact: true })).toBeVisible()
@@ -135,7 +135,7 @@ test('only a backend-confirmed paid order counts as a payment conversion', async
     json: { status: 'succeeded', paid: true },
   }))
   await context.route('**/api/subscription/status', route => route.fulfill({
-    json: { isActive: true, canCreateFreeReading: true, freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1 },
+    json: { isActive: true, canCreateIntroReading: false, canCreateFreeReading: true, freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1 },
   }))
   await page.goto('/')
   await page.getByTestId('accept-all').click()
@@ -163,7 +163,7 @@ test('an existing paid subscription cannot turn an unpaid or missing checkout in
     json: { status: 'pending', paid: false },
   }))
   await context.route('**/api/subscription/status', route => route.fulfill({
-    json: { isActive: true, canCreateFreeReading: true, freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1 },
+    json: { isActive: true, canCreateIntroReading: false, canCreateFreeReading: true, freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1 },
   }))
   await page.goto('/')
   await page.getByTestId('accept-all').click()

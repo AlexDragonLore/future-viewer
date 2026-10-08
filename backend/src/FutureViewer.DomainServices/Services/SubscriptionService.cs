@@ -51,14 +51,67 @@ public sealed class SubscriptionService
         if (IsSubscriptionActive(user))
             return;
 
-        if (spreadType != SpreadType.SingleCard)
+        var isIntroReading = spreadType == SpreadType.ThreeCard && !user.HasUsedIntroReading
+            && await _readings.CountByUserAsync(userId, ct) == 0;
+        if (spreadType != SpreadType.SingleCard && !isIntroReading)
             throw new SubscriptionRequiredException(
-                "Active subscription required for this spread type. Free tier supports only single-card readings.");
+                "Первый расклад на три карты бесплатный. После него бесплатно доступна только одна карта в день.");
 
-        var count = await _readings.CountTodayByUserAsync(userId, ct);
+        var count = await GetReadingsUsedTodayAsync(user, ct);
         if (count >= FreeDailyLimit)
             throw new QuotaExceededException(
                 $"Daily free reading limit reached ({FreeDailyLimit}). Subscribe for unlimited access.");
+    }
+
+    public Task<Reading> AddReadingAsync(Reading reading, CancellationToken ct = default)
+    {
+        var userId = reading.UserId ?? throw new UnauthorizedException("Authentication required");
+        return _uow.ExecuteInTransactionAsync(async innerCt =>
+        {
+            // Serialize quota checks and persistence, then release the lock before AI generation.
+            await _users.LockAsync(userId, innerCt);
+            await EnsureReadingAllowedAsync(userId, reading.SpreadType, innerCt);
+            var saved = await _readings.AddAsync(reading, innerCt);
+            await RecordReadingUsageAsync(userId, reading.CreatedAt, innerCt);
+            return saved;
+        }, ct);
+    }
+
+    public Task<bool> AttachGuestAsync(ReadingResult reading, Guid userId, CancellationToken ct = default) =>
+        _uow.ExecuteInTransactionAsync(async innerCt =>
+        {
+            await _users.LockAsync(userId, innerCt);
+            var stored = await _readings.GetByIdAsync(reading.Id, innerCt);
+            if (stored is null || (stored.UserId is not null && stored.UserId != userId)
+                || stored.DeletedFromHistoryAt is not null)
+                return false;
+
+            // A retry of the same claim is idempotent; another guest reading consumes access.
+            if (stored.UserId is null)
+                await EnsureReadingAllowedAsync(userId, reading.SpreadType, innerCt);
+            var attached = await _readings.AttachGuestAsync(
+                reading.Id, userId, reading.Question, reading.Interpretation, innerCt);
+            if (attached)
+                await RecordReadingUsageAsync(userId, reading.CreatedAt, innerCt);
+            return attached;
+        }, ct);
+
+    private async Task RecordReadingUsageAsync(Guid userId, DateTime createdAt, CancellationToken ct)
+    {
+        var user = await _users.GetByIdAsync(userId, ct)
+            ?? throw new UnauthorizedException("User not found");
+        if (user.HasUsedIntroReading && user.LastReadingAt >= createdAt) return;
+        user.HasUsedIntroReading = true;
+        if (user.LastReadingAt is null || user.LastReadingAt < createdAt)
+            user.LastReadingAt = createdAt;
+        await _users.UpdateAsync(user, ct);
+    }
+
+    private async Task<int> GetReadingsUsedTodayAsync(User user, CancellationToken ct)
+    {
+        var count = await _readings.CountTodayByUserAsync(user.Id, ct);
+        // Deleting reading content must not reset the daily allowance.
+        return Math.Max(count, user.LastReadingAt?.Date == DateTime.UtcNow.Date ? 1 : 0);
     }
 
     public async Task<SubscriptionStatusDto> GetStatusAsync(Guid userId, CancellationToken ct = default)
@@ -67,7 +120,9 @@ public sealed class SubscriptionService
             ?? throw new UnauthorizedException("User not found");
 
         var isActive = IsSubscriptionActive(user);
-        var usedToday = await _readings.CountTodayByUserAsync(userId, ct);
+        var usedToday = await GetReadingsUsedTodayAsync(user, ct);
+        var canCreateIntroReading = !isActive && !user.HasUsedIntroReading
+            && await _readings.CountByUserAsync(userId, ct) == 0;
 
         return new SubscriptionStatusDto
         {
@@ -76,7 +131,8 @@ public sealed class SubscriptionService
             IsActive = isActive,
             FreeReadingsUsedToday = usedToday,
             FreeReadingsDailyLimit = FreeDailyLimit,
-            CanCreateFreeReading = isActive || usedToday < FreeDailyLimit
+            CanCreateFreeReading = isActive || usedToday < FreeDailyLimit,
+            CanCreateIntroReading = canCreateIntroReading
         };
     }
 

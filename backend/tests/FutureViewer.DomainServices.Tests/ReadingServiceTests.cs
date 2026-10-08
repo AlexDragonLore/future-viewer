@@ -13,6 +13,12 @@ namespace FutureViewer.DomainServices.Tests;
 
 public sealed class ReadingServiceTests
 {
+    private sealed class PassThroughUnitOfWork : IUnitOfWork
+    {
+        public Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken ct = default) =>
+            work(ct);
+    }
+
     [Fact]
     public async Task CreateAsync_draws_cards_saves_and_sets_interpretation()
     {
@@ -55,7 +61,7 @@ public sealed class ReadingServiceTests
         var memory = new Mock<IUserMemoryRepository>();
         memory.Setup(m => m.GetByUserAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserMemoryRule>());
-        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
         var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, memory.Object);
         var questionValidator = AcceptedQuestionValidator();
@@ -121,7 +127,7 @@ public sealed class ReadingServiceTests
         var memory = new Mock<IUserMemoryRepository>();
         memory.Setup(m => m.GetByUserAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserMemoryRule>());
-        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
         var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, memory.Object);
         var questionValidator = AcceptedQuestionValidator();
@@ -158,7 +164,7 @@ public sealed class ReadingServiceTests
         var interpret = new InterpretationService(ai.Object);
         var users = CompleteUserRepo();
         var memory = EmptyMemoryRepo();
-        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
         var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, memory.Object);
         var questionValidator = new Mock<IAIQuestionValidator>();
@@ -216,7 +222,7 @@ public sealed class ReadingServiceTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new InterpretationResult { Text = "ok", Model = "stub", GeneratedAt = DateTime.UtcNow });
         var users = CompleteUserRepo();
-        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), Mock.Of<IUnitOfWork>());
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
         var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, EmptyMemoryRepo().Object);
         var questionValidator = new Mock<IAIQuestionValidator>();

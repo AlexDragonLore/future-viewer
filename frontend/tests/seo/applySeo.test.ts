@@ -51,7 +51,9 @@ describe('applyRouteSeo', () => {
 
     expect(document.title).toContain('бесплатно без регистрации')
     expect(meta('meta[name="description"]')?.content).toContain('половина толкования')
-    expect(meta('meta[name="description"]')?.content).toContain('подтвердите email')
+    expect(meta('meta[name="description"]')?.content).toContain('Первый расклад Таро на 3 карты')
+    expect(meta('meta[name="description"]')?.content).toContain('одна карта в день бесплатно')
+    expect(meta('meta[name="description"]')?.content).toContain('Подтвердите email')
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe('https://alex-taro.ru/')
     expect(meta('meta[property="og:url"]')?.content).toBe('https://alex-taro.ru/')
     const structured = JSON.parse(document.head.querySelector<HTMLScriptElement>('#seo-managed-jsonld')!.textContent!)

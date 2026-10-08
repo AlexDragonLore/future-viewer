@@ -34,8 +34,9 @@ describe('generated SEO artifacts', () => {
 
     expect(html).toContain(`<title>${seo.defaultTitle}</title>`)
     expect(html).toContain(`<meta name="description" content="${seo.defaultDescription}" />`)
-    expect(html).toContain('<h1>Одна карта Таро бесплатно — без регистрации</h1>')
+    expect(html).toContain('<h1>Первый расклад Таро на 3 карты бесплатно — без регистрации</h1>')
     expect(html).toContain('первую половину толкования')
+    expect(html).toContain('Затем получайте одну карту в день бесплатно')
     expect(html).toContain('Зарегистрируйтесь и подтвердите email')
     expect(html).toContain('<link rel="canonical" href="https://alex-taro.ru/" />')
     expect(html.match(/<title>/g)).toHaveLength(1)

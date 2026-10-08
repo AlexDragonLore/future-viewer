@@ -1,6 +1,6 @@
 import { httpClient } from './httpClient'
 import { accountSessionVersion, clearAccountSession } from '@/utils/accountSession'
-import type { DeckType, Reading, SpreadType, SpreadInfo } from '@/types'
+import { SpreadType, type DeckType, type Reading, type SpreadInfo } from '@/types'
 import type { GuestContinuation } from '@/utils/guestReading'
 
 export interface GuestReadingResponse extends GuestContinuation {
@@ -37,7 +37,7 @@ type StreamEvent =
 export const readingApi = {
   async createGuest(question: string, deckType: DeckType, signal?: AbortSignal): Promise<GuestReadingResponse> {
     const { data } = await httpClient.post<GuestReadingResponse>('/api/readings/guest', {
-      spreadType: 1, question, deckType,
+      spreadType: SpreadType.ThreeCard, question, deckType,
     }, { signal })
     return data
   },

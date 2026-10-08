@@ -1,17 +1,25 @@
 export const previewReading = {
   id: '11111111-1111-1111-1111-111111111111',
-  spreadType: 1,
-  spreadName: 'Карта дня',
+  spreadType: 3,
+  spreadName: 'Три карты',
   question: 'На что мне сейчас стоит обратить внимание?',
   createdAt: '2026-10-03T12:00:00Z',
   deckType: 0,
   isPreview: true,
   cards: [{
-    position: 0, positionName: 'Карта дня', positionMeaning: 'Взгляд на сегодняшний день',
+    position: 0, positionName: 'Прошлое', positionMeaning: 'Истоки ситуации',
     cardId: 20, cardName: 'Солнце', imagePath: '/cards/major/19.jpg',
     isReversed: false, meaning: 'Ясность, тепло и радость простых вещей.',
+  }, {
+    position: 1, positionName: 'Настоящее', positionMeaning: 'Текущая ситуация',
+    cardId: 18, cardName: 'Звезда', imagePath: '/cards/major/17.jpg',
+    isReversed: false, meaning: 'Надежда, вдохновение и внутренний ориентир.',
+  }, {
+    position: 2, positionName: 'Будущее', positionMeaning: 'Вероятное развитие',
+    cardId: 22, cardName: 'Мир', imagePath: '/cards/major/21.jpg',
+    isReversed: false, meaning: 'Завершение и переход к следующему этапу.',
   }],
-  interpretation: '## Твоя карта — Солнце\n\nЭта карта предлагает заметить то, что уже приносит тебе радость. Возможно, сейчас стоит уделить внимание простым вещам и людям рядом…',
+  interpretation: '## Твой расклад — Солнце, Звезда и Мир\n\nЭти карты предлагают заметить то, что уже приносит тебе радость. Возможно, сейчас стоит уделить внимание простым вещам и людям рядом…',
 }
 
 export const fullReading = {

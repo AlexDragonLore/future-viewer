@@ -73,7 +73,7 @@ describe('AuthView', () => {
       isActive: false,
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
-      canCreateFreeReading: true,
+      canCreateIntroReading: false, canCreateFreeReading: true,
     })
   })
 

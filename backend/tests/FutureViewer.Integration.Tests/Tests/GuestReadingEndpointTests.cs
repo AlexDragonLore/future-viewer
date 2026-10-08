@@ -17,7 +17,7 @@ namespace FutureViewer.Integration.Tests.Tests;
 
 public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : IClassFixture<IntegrationTestFixture>
 {
-    private static CreateReadingRequest Request(SpreadType spread = SpreadType.SingleCard) => new()
+    private static CreateReadingRequest Request(SpreadType spread = SpreadType.ThreeCard) => new()
     {
         SpreadType = spread, Question = "На что мне сейчас стоит обратить внимание?", SaveToHistory = true
     };
@@ -39,10 +39,10 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
     }
 
     [Fact]
-    public async Task Guest_gets_one_card_and_only_half_the_interpretation_then_resumes_same_result()
+    public async Task Guest_gets_three_cards_and_only_half_the_interpretation_then_resumes_same_result()
     {
         var guest = await CreateGuest();
-        guest.Reading.Cards.Should().ContainSingle();
+        guest.Reading.Cards.Should().HaveCount(3);
         guest.Reading.IsPreview.Should().BeTrue();
         guest.ExpiresAt.Should().BeCloseTo(DateTimeOffset.UtcNow.AddHours(24), TimeSpan.FromSeconds(10));
         guest.Ticket.Should().NotContain("Stub interpretation");
@@ -94,6 +94,11 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
         stored.AiInterpretation.Should().Be(full.Interpretation);
         stored.SavedToHistory.Should().BeTrue();
         (await readings.CountByUserAsync(stored.UserId!.Value)).Should().Be(1);
+        var status = (await (await owner.GetAsync("/api/subscription/status")).Content.ReadFromJsonAsync<SubscriptionStatusDto>())!;
+        status.CanCreateIntroReading.Should().BeFalse();
+        status.CanCreateFreeReading.Should().BeFalse();
+        (await owner.PostAsJsonAsync("/api/readings", Request())).StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+        (await owner.PostAsJsonAsync("/api/readings", Request(SpreadType.SingleCard))).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
     }
 
     [Fact]
@@ -134,12 +139,41 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
     public async Task Guest_rejects_other_spreads_and_personal_data()
     {
         var client = fixture.CreateClient();
-        (await client.PostAsJsonAsync("/api/readings/guest", Request(SpreadType.ThreeCard)))
+        (await client.PostAsJsonAsync("/api/readings/guest", Request(SpreadType.CelticCross)))
             .StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
         (await client.PostAsJsonAsync("/api/readings/guest", new CreateReadingRequest
         {
             SpreadType = SpreadType.SingleCard, Question = "Напиши ответ для ivan@example.com"
         })).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
+    public async Task Existing_single_card_guest_tickets_can_still_be_claimed()
+    {
+        var response = await fixture.CreateClient().PostAsJsonAsync("/api/readings/guest", Request(SpreadType.SingleCard));
+        response.EnsureSuccessStatusCode();
+        var guest = (await response.Content.ReadFromJsonAsync<GuestReadingResponse>())!;
+        guest.Reading.Cards.Should().ContainSingle();
+        var owner = await Login();
+
+        (await owner.PostAsJsonAsync("/api/readings/guest/unlock", new GuestReadingTicketRequest(guest.Ticket)))
+            .EnsureSuccessStatusCode();
+        (await owner.PostAsJsonAsync("/api/readings", Request())).StatusCode.Should().Be(HttpStatusCode.PaymentRequired);
+    }
+
+    [Fact]
+    public async Task One_account_cannot_claim_two_intro_readings_even_concurrently()
+    {
+        var first = await CreateGuest();
+        var second = await CreateGuest();
+        var owner = await Login();
+        var responses = await Task.WhenAll(
+            owner.PostAsJsonAsync("/api/readings/guest/unlock", new GuestReadingTicketRequest(first.Ticket)),
+            owner.PostAsJsonAsync("/api/readings/guest/unlock", new GuestReadingTicketRequest(second.Ticket)));
+
+        responses.Select(r => r.StatusCode).Should().BeEquivalentTo([HttpStatusCode.OK, HttpStatusCode.PaymentRequired]);
+        var history = await (await owner.GetAsync("/api/readings/history")).Content.ReadFromJsonAsync<ReadingResult[]>();
+        history.Should().ContainSingle();
     }
 
     [Fact]

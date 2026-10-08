@@ -58,7 +58,7 @@ describe('SiteHeader', () => {
       isActive: false,
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
-      canCreateFreeReading: true,
+      canCreateIntroReading: false, canCreateFreeReading: true,
     })
     unreadAnnouncementsMock.mockResolvedValue([
       {
@@ -132,7 +132,7 @@ describe('SiteHeader', () => {
       isActive: true,
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
-      canCreateFreeReading: true,
+      canCreateIntroReading: false, canCreateFreeReading: true,
     })
     const { wrapper } = await mountHeader()
     const quota = wrapper.find('[data-testid="header-quota"]')

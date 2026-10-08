@@ -2,7 +2,7 @@ import { expect, test, type BrowserContext, type Page } from '@playwright/test'
 import { fullReading, guestResponse, previewReading, verifiedAuth } from './guestReading.fixture'
 import { legalDocumentsResponse } from '../fixtures/legalDocuments'
 
-async function mockApi(context: BrowserContext) {
+async function mockApi(context: BrowserContext, introAvailable = true) {
   const calls = { create: 0, unlock: 0 }
   await context.route('**/api/**', async route => {
     const path = new URL(route.request().url()).pathname
@@ -17,7 +17,7 @@ async function mockApi(context: BrowserContext) {
         return
       case '/api/readings/guest':
         calls.create++
-        expect(route.request().postDataJSON()).toMatchObject({ spreadType: 1, question: previewReading.question })
+        expect(route.request().postDataJSON()).toMatchObject({ spreadType: 3, question: previewReading.question })
         body = guestResponse()
         break
       case '/api/readings/guest/preview': body = previewReading; break
@@ -29,7 +29,11 @@ async function mockApi(context: BrowserContext) {
       case '/api/auth/verify-email':
       case '/api/auth/login': body = verifiedAuth; break
       case '/api/announcements/unread': body = []; break
-      case '/api/subscription/status': body = { isActive: false, canCreateFreeReading: false, freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1 }; break
+      case '/api/subscription/status': {
+        const unused = introAvailable && calls.unlock === 0
+        body = { isActive: false, canCreateIntroReading: unused, canCreateFreeReading: unused, freeReadingsUsedToday: unused ? 0 : 1, freeReadingsDailyLimit: 1 }
+        break
+      }
       default:
         await route.fulfill({ status: 404, json: { message: 'Unexpected test request' } })
         return
@@ -41,11 +45,11 @@ async function mockApi(context: BrowserContext) {
 
 async function openGuestCard(page: Page) {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Открой свою карту' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Открой свой расклад' })).toBeVisible()
   const necessary = page.getByTestId('accept-necessary')
   if (await necessary.isVisible()) await necessary.click()
   await expect(page.getByRole('textbox')).toHaveValue('')
-  await page.getByRole('button', { name: 'Открыть карту бесплатно' }).click()
+  await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page).toHaveURL(/\/result$/, { timeout: 15000 })
   await expect(page.getByTestId('guest-unlock')).toBeVisible({ timeout: 10000 })
 }
@@ -54,7 +58,7 @@ test('one-click guest preview survives reload and email verification in a new ta
   test.setTimeout(60000)
   const calls = await mockApi(context)
   await openGuestCard(page)
-  await expect(page.locator('.card-entry')).toHaveCount(1)
+  await expect(page.locator('.card-entry')).toHaveCount(3)
   await expect(page.getByRole('img', { name: 'Солнце' })).toBeVisible()
   await expect(page.locator('.prose-mystic')).not.toContainText('Следующий шаг')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
@@ -86,7 +90,7 @@ test('one-click guest preview survives reload and email verification in a new ta
   expect(calls.unlock).toBeGreaterThanOrEqual(1)
 })
 
-test('existing account can log in to unlock the same card', async ({ page, context }) => {
+test('an existing account with its first reading unused can log in to unlock the same reading', async ({ page, context }) => {
   const calls = await mockApi(context)
   await openGuestCard(page)
   await page.getByRole('link', { name: 'Уже есть аккаунт? Войти' }).click()
@@ -97,6 +101,27 @@ test('existing account can log in to unlock the same card', async ({ page, conte
   await expect(page.getByRole('heading', { name: 'Следующий шаг' })).toBeVisible({ timeout: 15000 })
   expect(calls.create).toBe(1)
   expect(calls.unlock).toBe(1)
+})
+
+test('an experienced free account keeps the preview when unlock needs paid access', async ({ page, context }) => {
+  await mockApi(context, false)
+  await context.route('**/api/readings/guest/unlock', route => route.fulfill({
+    status: 402, json: { message: 'Первый бесплатный расклад уже использован.' },
+  }))
+  await openGuestCard(page)
+  await page.getByRole('link', { name: 'Уже есть аккаунт? Войти' }).click()
+  await page.getByRole('textbox', { name: 'Электронная почта' }).fill('qa@example.com')
+  await page.getByLabel('Пароль', { exact: true }).fill('test-password123')
+  await page.getByRole('button', { name: 'Войти', exact: true }).click()
+  await expect(page).toHaveURL(/\/result$/)
+  await expect(page.locator('.card-entry')).toHaveCount(3)
+  await expect(page.getByRole('alert')).toContainText('уже использован')
+  await expect(page.getByRole('button', { name: 'Открыть полное толкование' })).toHaveCount(0)
+  await page.reload()
+  await expect(page.locator('.card-entry')).toHaveCount(3)
+  await page.getByRole('button', { name: 'Перейти к карте дня' }).click()
+  await expect(page).toHaveURL(/\/$/)
+  await expect(page.locator('.spread-option').first()).toHaveClass(/active/)
 })
 
 test('registration opens at the top after scrolling down the guest result', async ({ page, context }, testInfo) => {
@@ -128,11 +153,11 @@ test('guest API errors return to a usable home instead of authentication', async
   await mockApi(context)
   await context.route('**/api/readings/guest', route => route.fulfill({ status: 429, json: { message: 'Слишком много запросов. Повторите позже.' } }))
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Открой свою карту' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Открой свой расклад' })).toBeVisible()
   const necessary = page.getByTestId('accept-necessary')
   if (await necessary.isVisible()) await necessary.click()
-  await page.getByRole('button', { name: 'Открыть карту бесплатно' }).click()
+  await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page.getByTestId('question-validation')).toContainText('Слишком много запросов')
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('button', { name: 'Открыть карту бесплатно' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Открыть 3 карты бесплатно' })).toBeEnabled()
 })

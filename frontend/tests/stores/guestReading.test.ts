@@ -18,7 +18,7 @@ import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 
 const preview: Reading = {
-  id: 'guest-1', spreadType: SpreadType.SingleCard, spreadName: 'Карта дня',
+  id: 'guest-1', spreadType: SpreadType.ThreeCard, spreadName: 'Три карты',
   question: 'С чего начать?', createdAt: '2026-10-03T12:00:00Z', cards: [],
   interpretation: 'Первая половина…', deckType: DeckType.RWS, isPreview: true,
 }
@@ -91,6 +91,45 @@ describe('guest reading continuation', () => {
     expect(getGuestContinuation()).not.toBeNull()
     expect(store.error).toBeTruthy()
     expect(store.loading).toBe(false)
+  })
+
+  it.each([402, 429])('restores the preview after unlock is denied with %s after a reload', async (status) => {
+    saveGuestContinuation(continuation())
+    useAuthStore().token = 'verified-session'
+    unlockGuest.mockRejectedValue({ response: { status, data: { error: status === 429 ? 'quota_exceeded' : 'subscription_required', message: 'Бесплатный расклад уже использован.' } } })
+    guestPreview.mockResolvedValue(preview)
+    const store = useReadingStore()
+    expect(await store.restoreGuest()).toBe(false)
+    expect(store.current).toEqual(preview)
+    expect(store.guestUnlockBlocked).toBe(true)
+    expect(store.streamingDone).toBe(true)
+    expect(store.error).toBe('Бесплатный расклад уже использован.')
+    expect(getGuestContinuation()).not.toBeNull()
+    expect(guestPreview).toHaveBeenCalledWith('server-encrypted-ticket')
+  })
+
+  it('keeps a generic rate-limited unlock retryable while retaining the preview', async () => {
+    saveGuestContinuation(continuation())
+    useAuthStore().token = 'verified-session'
+    unlockGuest.mockRejectedValue({ response: { status: 429, data: { message: 'Слишком много запросов. Повторите позже.' } } })
+    guestPreview.mockResolvedValue(preview)
+    const store = useReadingStore()
+    expect(await store.restoreGuest()).toBe(false)
+    expect(store.current).toEqual(preview)
+    expect(store.guestUnlockBlocked).toBe(false)
+    expect(getGuestContinuation()).not.toBeNull()
+  })
+
+  it('opens a previously denied preview when paid access later allows unlocking', async () => {
+    saveGuestContinuation(continuation())
+    useAuthStore().token = 'verified-session'
+    const store = useReadingStore()
+    store.guestUnlockBlocked = true
+    unlockGuest.mockResolvedValue({ ...preview, isPreview: false })
+    expect(await store.restoreGuest()).toBe(true)
+    expect(store.guestUnlockBlocked).toBe(false)
+    expect(store.current?.isPreview).toBe(false)
+    expect(getGuestContinuation()).toBeNull()
   })
 
   it('discards expired or rejected tickets', async () => {

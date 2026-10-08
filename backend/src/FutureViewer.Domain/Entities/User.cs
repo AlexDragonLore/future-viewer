@@ -31,6 +31,8 @@ public sealed class User
     public SubscriptionStatus SubscriptionStatus { get; set; } = SubscriptionStatus.None;
     public DateTime? SubscriptionExpiresAt { get; set; }
     public string? YukassaSubscriptionId { get; set; }
+    public bool HasUsedIntroReading { get; set; }
+    public DateTime? LastReadingAt { get; set; }
 
 
     public ICollection<Reading> Readings { get; init; } = new List<Reading>();

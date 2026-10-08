@@ -206,6 +206,8 @@ public sealed class PrivacyService
                 AccountStatus = user.AccountStatus.ToString(),
                 SubscriptionStatus = user.SubscriptionStatus.ToString(),
                 SubscriptionExpiresAt = user.SubscriptionExpiresAt,
+                HasUsedIntroReading = user.HasUsedIntroReading,
+                LastReadingAt = user.LastReadingAt,
                 IsEmailVerified = user.IsEmailVerified,
                 IsAdmin = user.IsAdmin
             },

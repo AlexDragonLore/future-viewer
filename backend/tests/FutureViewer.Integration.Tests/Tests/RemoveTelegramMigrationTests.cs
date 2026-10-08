@@ -32,7 +32,11 @@ public sealed class RemoveTelegramMigrationTests
             Code = "telegram_linked", NameRu = "На связи", DescriptionRu = "Привязка Telegram",
             IconPath = "/unused.svg", Points = 10
         };
-        db.Users.Add(user);
+        // Seed only columns present before this migration, independent of newer User fields.
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO users (id, privacy_subject_id, email, password_hash, created_at)
+            VALUES ({user.Id}, {user.PrivacySubjectId}, {user.Email}, {user.PasswordHash}, {user.CreatedAt});
+            """);
         db.LegalDocuments.Add(document);
         db.Achievements.Add(retired);
         db.UserAchievements.Add(new UserAchievement { UserId = user.Id, AchievementId = retired.Id });

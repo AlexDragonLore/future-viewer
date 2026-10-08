@@ -17,6 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value)
   const isSubscribed = computed(() => subscription.value?.isActive ?? false)
   const canCreateReading = computed(() => subscription.value?.canCreateFreeReading ?? true)
+  const canCreateIntroReading = computed(() => subscription.value?.canCreateIntroReading ?? false)
 
   function persist(newToken: string | null, newEmail: string | null, newUserId: string | null, newIsAdmin: boolean) {
     clearAccountSession()
@@ -101,6 +102,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     isSubscribed,
     canCreateReading,
+    canCreateIntroReading,
     login,
     register,
     verifyEmail,

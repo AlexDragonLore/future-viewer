@@ -52,7 +52,7 @@ export async function installPaidAccessFixture(context: BrowserContext, options:
       case '/api/public/legal-documents': body = legalDocumentsResponse; break
       case '/api/subscription/status':
         body = { status: subscribed ? 1 : 0, expiresAt: null, isActive: subscribed,
-          canCreateFreeReading: subscribed, freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1 }
+          canCreateIntroReading: false, canCreateFreeReading: subscribed, freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1 }
         break
       case '/api/announcements/unread': body = []; break
       case '/api/privacy/settings': body = { historyEnabled: false }; break

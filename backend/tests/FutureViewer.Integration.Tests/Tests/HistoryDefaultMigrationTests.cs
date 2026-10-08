@@ -111,11 +111,11 @@ public sealed class HistoryDefaultMigrationTests
 
         // A rollback must not overwrite existing preferences or the text just preserved above.
         await migrator.MigrateAsync(PreviousMigration);
-        (await db.Users.AsNoTracking().SingleAsync(x => x.Id == implicitDefault.Id)).HistoryEnabled.Should().BeTrue();
-        (await db.Users.AsNoTracking().SingleAsync(x => x.Id == explicitDisabled.Id)).HistoryEnabled.Should().BeFalse();
+        (await GetHistoryEnabledAsync(db, implicitDefault.Id)).Should().BeTrue();
+        (await GetHistoryEnabledAsync(db, explicitDisabled.Id)).Should().BeFalse();
         var oldDefault = MakeUser("old-default");
         await InsertUsingDatabaseDefaultAsync(db, oldDefault);
-        (await db.Users.AsNoTracking().SingleAsync(x => x.Id == oldDefault.Id)).HistoryEnabled.Should().BeFalse();
+        (await GetHistoryEnabledAsync(db, oldDefault.Id)).Should().BeFalse();
         await migrator.MigrateAsync();
         (await db.Users.AsNoTracking().SingleAsync(x => x.Id == efOptOut.Id)).HistoryEnabled.Should().BeFalse();
         (await db.Readings.AsNoTracking().SingleAsync(x => x.Id == saved.Id)).AiInterpretation.Should().Be(saved.AiInterpretation);
@@ -145,4 +145,7 @@ public sealed class HistoryDefaultMigrationTests
             INSERT INTO users (id, privacy_subject_id, email, password_hash, created_at)
             VALUES ({user.Id}, {user.PrivacySubjectId}, {user.Email}, {user.PasswordHash}, {user.CreatedAt});
             """);
+
+    private static Task<bool> GetHistoryEnabledAsync(AppDbContext db, Guid userId) =>
+        db.Database.SqlQuery<bool>($"SELECT history_enabled AS \"Value\" FROM users WHERE id = {userId}").SingleAsync();
 }

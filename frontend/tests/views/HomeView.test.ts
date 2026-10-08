@@ -85,7 +85,7 @@ describe('HomeView privacy and question safety', () => {
       isActive: false,
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
-      canCreateFreeReading: true,
+      canCreateIntroReading: false, canCreateFreeReading: true,
     })
   })
 
@@ -122,13 +122,13 @@ describe('HomeView privacy and question safety', () => {
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
-  it('starts a guest single-card reading without authentication or validation round trip', async () => {
+  it('starts a guest three-card reading without authentication or validation round trip', async () => {
     const { wrapper, router, store } = await mountHome()
     await wrapper.find('textarea').setValue('Как посмотреть на новую задачу?')
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
 
-    expect(store.pending).toMatchObject({ question: 'Как посмотреть на новую задачу?', validated: true, spreadType: SpreadType.SingleCard })
+    expect(store.pending).toMatchObject({ question: 'Как посмотреть на новую задачу?', validated: true, spreadType: SpreadType.ThreeCard })
     expect(sessionStorage.length).toBe(0)
     expect(router.currentRoute.value.name).toBe('reading')
     expect(validateQuestionMock).not.toHaveBeenCalled()
@@ -142,7 +142,82 @@ describe('HomeView privacy and question safety', () => {
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
     expect(store.pending?.question).toBe('На что мне сейчас стоит обратить внимание?')
+    expect(store.pending?.spreadType).toBe(SpreadType.ThreeCard)
     expect(router.currentRoute.value.name).toBe('reading')
+  })
+
+  it('selects and allows the first three-card reading for a new free account', async () => {
+    authenticate()
+    statusMock.mockResolvedValue({
+      status: SubscriptionStatusValue.None, expiresAt: null, isActive: false,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
+      canCreateFreeReading: true, canCreateIntroReading: true,
+    })
+    const { wrapper, router, store } = await mountHome(enablePayments)
+    expect(wrapper.findAll('.spread-option')[1].classes()).toContain('active')
+    expect(wrapper.get('.subscription-badge').text()).toContain('3 карты бесплатно')
+    expect(wrapper.get('[data-testid="free-reading-policy"]').text()).toContain('одна карта в день')
+    expect(wrapper.find('.subscription-banner').exists()).toBe(false)
+    await wrapper.find('textarea').setValue('Как посмотреть на новую задачу?')
+    await wrapper.get('button.glow-button').trigger('click')
+    await flushPromises()
+    expect(validateQuestionMock.mock.calls[0][0]).toBe(SpreadType.ThreeCard)
+    expect(store.pending?.spreadType).toBe(SpreadType.ThreeCard)
+    expect(router.currentRoute.value.name).toBe('reading')
+  })
+
+  it('still requires paid access for ten cards before the introductory reading', async () => {
+    authenticate()
+    statusMock.mockResolvedValue({
+      status: SubscriptionStatusValue.None, expiresAt: null, isActive: false,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
+      canCreateFreeReading: true, canCreateIntroReading: true,
+    })
+    const { wrapper } = await mountHome(enablePayments)
+    await wrapper.findAll('.spread-option')[2].trigger('click')
+    expect(wrapper.get('.subscription-banner').text()).toContain('Открой все расклады')
+    expect(wrapper.find('button.glow-button').exists()).toBe(false)
+  })
+
+  it('preserves a restored explicit spread instead of replacing it with the first-reading default', async () => {
+    authenticate()
+    statusMock.mockResolvedValue({
+      status: SubscriptionStatusValue.None, expiresAt: null, isActive: false,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
+      canCreateFreeReading: true, canCreateIntroReading: true,
+    })
+    const { wrapper } = await mountHome(() => {
+      useReadingStore().setPending({
+        spreadType: SpreadType.SingleCard, question: 'Мой вопрос',
+        questionWarningAcknowledged: false, validated: false,
+      })
+    })
+    expect(wrapper.findAll('.spread-option')[0].classes()).toContain('active')
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('Мой вопрос')
+  })
+
+  it('preserves a spread selected while the access status is loading', async () => {
+    authenticate()
+    let resolveStatus!: (value: unknown) => void
+    statusMock.mockImplementation(() => new Promise(resolve => { resolveStatus = resolve }))
+    const { wrapper } = await mountHome()
+    await wrapper.findAll('.spread-option')[2].trigger('click')
+    resolveStatus({
+      status: SubscriptionStatusValue.None, expiresAt: null, isActive: false,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
+      canCreateFreeReading: true, canCreateIntroReading: true,
+    })
+    await flushPromises()
+    expect(wrapper.findAll('.spread-option')[2].classes()).toContain('active')
+    expect(wrapper.find('button.glow-button').exists()).toBe(false)
+  })
+
+  it('defaults an experienced free account to the daily single card', async () => {
+    authenticate()
+    const { wrapper } = await mountHome()
+    expect(wrapper.findAll('.spread-option')[0].classes()).toContain('active')
+    expect(wrapper.get('[data-testid="free-reading-policy"]').text()).toContain('Одна карта в день — бесплатно')
+    expect(wrapper.get('.subscription-badge').text()).toContain('Бесплатно сегодня: 1/1')
   })
 
   it('shows the server-priced paid option below the free CTA without adding a guest checkout step', async () => {
@@ -157,7 +232,7 @@ describe('HomeView privacy and question safety', () => {
     expect(offer.text()).toContain('Все 3 расклада безлимитно')
     expect(offer.text()).toContain('Без автосписаний')
     expect(wrapper.find('[data-testid="payment-offer-acceptance"]').exists()).toBe(false)
-    expect(offer.element.previousElementSibling?.textContent).toContain('Открыть карту бесплатно')
+    expect(offer.element.previousElementSibling?.textContent).toContain('Открыть 3 карты бесплатно')
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('reading')
@@ -199,7 +274,7 @@ describe('HomeView privacy and question safety', () => {
       isActive: true,
       freeReadingsUsedToday: 0,
       freeReadingsDailyLimit: 1,
-      canCreateFreeReading: true,
+      canCreateIntroReading: false, canCreateFreeReading: true,
     })
     validateQuestionMock.mockResolvedValue({
       status: 'rejected',
@@ -275,7 +350,7 @@ describe('HomeView privacy and question safety', () => {
     authenticate()
     statusMock.mockResolvedValue({
       status: SubscriptionStatusValue.None, expiresAt: null, isActive: false,
-      freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1, canCreateFreeReading: false,
+      freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1, canCreateIntroReading: false, canCreateFreeReading: false,
     })
     const { wrapper, store } = await mountHome(enablePayments)
     await wrapper.find('textarea').setValue('Какой аспект задачи рассмотреть?')
@@ -292,7 +367,7 @@ describe('HomeView privacy and question safety', () => {
     authenticate()
     statusMock.mockResolvedValue({
       status: SubscriptionStatusValue.Active, expiresAt: '2030-01-01T00:00:00Z', isActive: true,
-      freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1, canCreateFreeReading: false,
+      freeReadingsUsedToday: 1, freeReadingsDailyLimit: 1, canCreateIntroReading: false, canCreateFreeReading: false,
     })
     const { wrapper } = await mountHome(enablePayments)
     await wrapper.findAll('.spread-option')[2].trigger('click')
@@ -317,7 +392,7 @@ describe('HomeView privacy and question safety', () => {
 
     resolveStatus({
       status: SubscriptionStatusValue.Active, expiresAt: '2030-01-01T00:00:00Z', isActive: true,
-      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1, canCreateFreeReading: true,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1, canCreateIntroReading: false, canCreateFreeReading: true,
     })
     await flushPromises()
     expect(wrapper.find('[role="status"]').exists()).toBe(false)

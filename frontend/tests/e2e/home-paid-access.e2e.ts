@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { legalDocumentsResponse } from '../fixtures/legalDocuments'
 
-async function openHome(page: Page, options: { authenticated?: boolean; active?: boolean; exhausted?: boolean } = {}) {
+async function openHome(page: Page, options: { authenticated?: boolean; active?: boolean; exhausted?: boolean; intro?: boolean } = {}) {
   await page.setViewportSize({ width: 393, height: 900 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   const mutations: string[] = []
@@ -20,7 +20,7 @@ async function openHome(page: Page, options: { authenticated?: boolean; active?:
       status: options.active ? 1 : 0, isActive: Boolean(options.active),
       expiresAt: options.active ? '2030-01-01T00:00:00Z' : null,
       freeReadingsUsedToday: options.exhausted ? 1 : 0,
-      freeReadingsDailyLimit: 1, canCreateFreeReading: !options.exhausted,
+      freeReadingsDailyLimit: 1, canCreateIntroReading: Boolean(options.intro), canCreateFreeReading: !options.exhausted,
     },
   }
   await page.route('**/api/**', async route => {
@@ -44,7 +44,7 @@ async function openHome(page: Page, options: { authenticated?: boolean; active?:
   await page.goto('/')
   await page.getByTestId('accept-necessary').click()
   if (options.authenticated) {
-    await expect(page.locator('.subscription-badge')).toContainText(options.active ? 'Доступ активен' : 'Бесплатно сегодня')
+    await expect(page.locator('.subscription-badge')).toContainText(options.active ? 'Доступ активен' : options.intro ? '3 карты бесплатно' : 'Бесплатно сегодня')
     await page.getByRole('textbox', { name: 'Вопрос', exact: true }).fill('Какой следующий шаг мне подходит?')
   }
   await page.evaluate(() => document.fonts.ready)
@@ -83,6 +83,19 @@ test('mobile paid spread shows one payment action and changing back restores Sta
   expect(mutations).toEqual([])
 })
 
+test('a new free account defaults to three cards and still needs paid access for ten', async ({ page }) => {
+  const mutations = await openHome(page, { authenticated: true, intro: true })
+  await expect(page.locator('.spread-option').nth(1)).toHaveClass(/active/)
+  await expect(page.getByRole('button', { name: 'Начать расклад', exact: true })).toBeEnabled()
+  await expect(page.getByTestId('free-reading-policy')).toContainText('одна карта в день')
+  await expect(page.locator('.subscription-banner')).toHaveCount(0)
+  await page.locator('.spread-option').nth(2).click()
+  await expectSinglePaymentAction(page, 'Открой все расклады')
+  await page.locator('.spread-option').nth(1).click()
+  await expect(page.getByRole('button', { name: 'Начать расклад', exact: true })).toBeEnabled()
+  expect(mutations).toEqual([])
+})
+
 test('mobile exhausted daily quota shows only its payment banner', async ({ page }, testInfo) => {
   const mutations = await openHome(page, { authenticated: true, exhausted: true })
   await expectSinglePaymentAction(page, 'Расклады без ограничений')
@@ -104,7 +117,7 @@ test('subscriber can start a multi-card reading without redundant payment text',
 
 test('guest still sees the compact paid option under the free card button', async ({ page }, testInfo) => {
   const mutations = await openHome(page)
-  await expect(page.getByRole('button', { name: 'Открыть карту бесплатно', exact: true })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Открыть 3 карты бесплатно', exact: true })).toBeEnabled()
   await expect(page.getByTestId('guest-paid-offer')).toContainText('Все 3 расклада безлимитно')
   await expect(page.getByTestId('guest-paid-offer')).toContainText(/99\s*₽/)
   await expect(page.getByTestId('guest-paid-offer')).toContainText('7 дней')

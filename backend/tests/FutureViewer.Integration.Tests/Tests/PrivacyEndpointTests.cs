@@ -135,6 +135,8 @@ public sealed class PrivacyEndpointTests : IClassFixture<IntegrationTestFixture>
         var export = await exportResponse.Content.ReadFromJsonAsync<PrivacyExportDto>();
         export!.Profile.Id.Should().Be(auth.UserId);
         export.Profile.Email.Should().Be(email);
+        export.Profile.HasUsedIntroReading.Should().BeFalse();
+        export.Profile.LastReadingAt.Should().BeNull();
         export.Consents.Should().HaveCount(4);
     }
 

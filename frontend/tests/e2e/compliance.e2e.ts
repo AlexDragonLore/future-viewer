@@ -79,7 +79,7 @@ test('question containing an email is blocked locally and never starts the readi
   })
 
   await page.getByPlaceholder('На что мне сейчас стоит обратить внимание?').fill('Напиши мне на ivan.petrov@example.com')
-  await page.getByRole('button', { name: 'Открыть карту бесплатно' }).click()
+  await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
 
   await expect(page.getByTestId('question-validation')).toContainText('персональ')
   expect(readingRequestCount).toBe(0)

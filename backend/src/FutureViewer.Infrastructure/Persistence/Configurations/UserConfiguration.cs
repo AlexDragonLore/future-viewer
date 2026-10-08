@@ -69,6 +69,11 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         b.Property(x => x.YukassaSubscriptionId)
             .HasColumnName("yukassa_subscription_id")
             .HasMaxLength(128);
+        b.Property(x => x.HasUsedIntroReading)
+            .HasColumnName("has_used_intro_reading")
+            .IsRequired()
+            .HasDefaultValue(false);
+        b.Property(x => x.LastReadingAt).HasColumnName("last_reading_at");
 
 
         b.HasMany(x => x.Readings)

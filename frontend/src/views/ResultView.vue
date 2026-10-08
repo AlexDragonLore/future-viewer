@@ -194,7 +194,7 @@ const streaming = computed(() => (hasActiveStream.value && !store.streamingDone)
 const showPaidOffer = computed(() => auth.isAuthenticated && auth.subscription !== null
   && !auth.subscriptionLoading && !auth.isSubscribed
   && publicConfig.paymentsEnabled && publicConfig.paidProducts.length > 0
-  && !locked.value && !streaming.value && !store.loading && !restoring.value
+  && (!locked.value || store.guestUnlockBlocked) && !streaming.value && !store.loading && !restoring.value
   && Boolean(targetText.value.trim()))
 
 watch(displayed, () => {
@@ -242,7 +242,7 @@ function again() {
   <main v-if="reading" class="result-page min-h-screen px-4 sm:px-6 py-12 sm:py-16 flex flex-col items-center">
     <header class="text-center mb-10">
       <div class="result-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ {{ reading.spreadName.toUpperCase() }} ✦</div>
-      <h1 class="font-display text-3xl sm:text-4xl md:text-5xl gold-text">{{ locked ? 'Твоя карта раскрыта' : 'Расклад раскрыт' }}</h1>
+      <h1 class="font-display text-3xl sm:text-4xl md:text-5xl gold-text">Расклад раскрыт</h1>
       <p class="result-question text-mystic-silver/60 mt-2 italic">«{{ reading.question }}»</p>
     </header>
 
@@ -263,8 +263,9 @@ function again() {
       <div class="prose-mystic text-mystic-silver leading-relaxed" v-html="renderedHtml" /><span v-if="streaming" class="caret">▮</span><span ref="streamTail" class="stream-tail" aria-hidden="true"></span>
       <div v-if="locked && !streaming" class="guest-unlock" data-testid="guest-unlock">
         <div class="guest-hidden-lines" aria-hidden="true"><i></i><i></i><i></i></div>
-        <h2 class="font-display text-2xl gold-text">Что карта подсказывает дальше?</h2>
-        <p>Ты прочитал начало. Создай бесплатный аккаунт, чтобы открыть полное толкование этой карты.</p>
+        <h2 class="font-display text-2xl gold-text">Что карты подсказывают дальше?</h2>
+        <p v-if="!auth.isAuthenticated">Ты прочитал начало. Создай бесплатный аккаунт, чтобы открыть полное толкование этого расклада.</p>
+        <p v-else-if="store.guestUnlockBlocked">Этот расклад сейчас недоступен бесплатно. Полное толкование можно открыть с платным доступом или вернуться к карте дня.</p>
         <template v-if="!auth.isAuthenticated">
           <RouterLink :to="{ name: 'auth', query: { mode: 'register', redirect: '/result' } }" class="glow-button guest-register">
             Зарегистрироваться и дочитать
@@ -272,11 +273,11 @@ function again() {
           <RouterLink :to="{ name: 'auth', query: { redirect: '/result' } }" class="guest-login">
             Уже есть аккаунт? Войти
           </RouterLink>
-          <p class="guest-retention">Эта карта ждёт тебя 24 часа. После подтверждения почты продолжим отсюда.</p>
+          <p class="guest-retention">Этот расклад ждёт тебя 24 часа. После подтверждения почты продолжим отсюда. Затем — одна карта в день бесплатно.</p>
         </template>
         <template v-else>
           <p v-if="store.error" role="alert">{{ store.error }}</p>
-          <button class="glow-button" :disabled="restoring" @click="resumeGuest">
+          <button v-if="!store.guestUnlockBlocked" class="glow-button" :disabled="restoring" @click="resumeGuest">
             {{ restoring ? 'Открываю продолжение…' : 'Открыть полное толкование' }}
           </button>
         </template>
@@ -293,16 +294,16 @@ function again() {
 
     <AiDisclaimer class="max-w-2xl w-full mb-8" />
 
-    <button :class="locked ? 'guest-login' : 'glow-button'" @click="again">{{ locked ? 'На главную' : 'Новый расклад' }}</button>
+    <button :class="locked ? 'guest-login' : 'glow-button'" @click="again">{{ store.guestUnlockBlocked ? 'Перейти к карте дня' : locked ? 'На главную' : 'Новый расклад' }}</button>
   </main>
   <main v-else class="min-h-screen px-4 py-16 flex flex-col items-center" aria-live="polite">
     <section class="mystic-card max-w-xl w-full p-8 text-center space-y-5">
-      <h1 class="font-display text-2xl gold-text">Твоя карта</h1>
+      <h1 class="font-display text-2xl gold-text">Твой расклад</h1>
       <p v-if="restoring">Открываю сохранённый расклад…</p>
       <template v-else>
-        <p role="alert">{{ store.error || 'Срок хранения расклада истёк. Можно открыть новую карту.' }}</p>
+        <p role="alert">{{ store.error || 'Срок хранения расклада истёк. Можно открыть новый расклад.' }}</p>
         <button v-if="getGuestContinuation()" class="glow-button" @click="resumeGuest">Попробовать ещё раз</button>
-        <RouterLink to="/" class="guest-login">Открыть новую карту</RouterLink>
+        <RouterLink to="/" class="guest-login">Открыть новый расклад</RouterLink>
       </template>
     </section>
   </main>

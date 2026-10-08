@@ -78,7 +78,7 @@ export const adminFixtureResponses: Record<string, unknown> = {
   '/api/public/legal-documents': legalDocumentsResponse,
   '/api/announcements/unread': [],
   '/api/subscription/status': {
-    isActive: true, canCreateFreeReading: true, freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
+    isActive: true, canCreateIntroReading: false, canCreateFreeReading: true, freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
   },
   '/api/admin/readings': { items: adminReadingFixtures.slice(0, 20), total: adminReadingFixtures.length },
   '/api/admin/users': { items: adminUserFixtures, total: adminUserFixtures.length },

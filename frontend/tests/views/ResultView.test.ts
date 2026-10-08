@@ -69,7 +69,7 @@ function enableFreeAccountCheckout() {
     isActive: false,
     freeReadingsUsedToday: 1,
     freeReadingsDailyLimit: 1,
-    canCreateFreeReading: false,
+    canCreateIntroReading: false, canCreateFreeReading: false,
   }
   const config = usePublicConfigStore()
   config.paymentsEnabled = true
@@ -197,7 +197,7 @@ describe('ResultView', () => {
     const { wrapper } = await mountResult({ ...sample, isPreview: true, interpretation: 'Первая половина…' })
     await vi.advanceTimersByTimeAsync(5000)
     await flushPromises()
-    expect(wrapper.get('[data-testid="guest-unlock"]').text()).toContain('полное толкование этой карты')
+    expect(wrapper.get('[data-testid="guest-unlock"]').text()).toContain('полное толкование этого расклада')
     expect(wrapper.get('a.guest-register').attributes('href')).toBe('/auth?mode=register&redirect=/result')
     expect(wrapper.text()).not.toContain('begin')
   })
@@ -233,6 +233,23 @@ describe('ResultView', () => {
     await flushPromises()
     expect(createPayment).toHaveBeenCalledOnce()
     expect(createPayment).toHaveBeenCalledWith({ offerAccepted: true, offerVersion: 'offer-current', tariffCode: 'pro-45d' })
+  })
+
+  it('shows paid access and a daily-card exit for an authenticated preview whose unlock was denied', async () => {
+    const { wrapper, router } = await mountResult({ ...sample, isPreview: true }, () => {
+      enableFreeAccountCheckout()
+      useReadingStore().guestUnlockBlocked = true
+      useReadingStore().error = 'Бесплатный расклад уже использован.'
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="guest-unlock"]').text()).toContain('сейчас недоступен бесплатно')
+    expect(wrapper.get('[role="alert"]').text()).toContain('Бесплатный расклад уже использован')
+    expect(wrapper.get('[data-testid="result-paid-offer"]').isVisible()).toBe(true)
+    expect(wrapper.findAll('button').some(button => button.text() === 'Открыть полное толкование')).toBe(false)
+    const exit = wrapper.findAll('button').find(button => button.text() === 'Перейти к карте дня')!
+    await exit.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('home')
   })
 
   it.each(['guest', 'preview', 'subscriber', 'disabled', 'missing-product', 'unknown-subscription', 'refreshing-subscription', 'loading'])

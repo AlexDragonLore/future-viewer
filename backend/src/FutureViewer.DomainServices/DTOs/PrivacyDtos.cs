@@ -57,6 +57,8 @@ public sealed class PrivacyProfileExportDto
     public required string AccountStatus { get; init; }
     public required string SubscriptionStatus { get; init; }
     public DateTime? SubscriptionExpiresAt { get; init; }
+    public bool HasUsedIntroReading { get; init; }
+    public DateTime? LastReadingAt { get; init; }
     public bool IsEmailVerified { get; init; }
     public bool IsAdmin { get; init; }
 }

@@ -29,7 +29,8 @@ const question = ref('')
 const validationMessage = ref<string | null>(null)
 const validationSuggestion = ref<string | null>(null)
 const validatingQuestion = ref(false)
-const spreadType = ref<SpreadType>(SpreadType.SingleCard)
+const spreadType = ref<SpreadType>(!auth.isAuthenticated || auth.canCreateIntroReading ? SpreadType.ThreeCard : SpreadType.SingleCard)
+let hasExplicitSpreadSelection = false
 const hasGuestReading = ref(Boolean(getGuestContinuation()))
 
 const currentDeckMeta = computed(() => findDeckMeta(deck.current))
@@ -49,7 +50,12 @@ function ensureSuggestion(suggestedQuestion: string | null | undefined, source =
 function restorePendingPayload(payload: { question?: string; spreadType?: SpreadType } | null) {
   if (!payload) return
   question.value = payload.question ?? ''
-  if (payload.spreadType) spreadType.value = payload.spreadType
+  if (payload.spreadType) selectSpread(payload.spreadType)
+}
+
+function selectSpread(type: SpreadType) {
+  hasExplicitSpreadSelection = true
+  spreadType.value = type
 }
 
 onMounted(async () => {
@@ -64,19 +70,23 @@ onMounted(async () => {
 
   if (auth.isAuthenticated) {
     await auth.refreshSubscription()
+    if (!hasExplicitSpreadSelection) {
+      spreadType.value = auth.canCreateIntroReading ? SpreadType.ThreeCard : SpreadType.SingleCard
+    }
   }
 })
 
 const requiresSubscription = computed(() => {
   if (!auth.isAuthenticated) return false
   if (auth.isSubscribed) return false
+  if (spreadType.value === SpreadType.ThreeCard && auth.canCreateIntroReading) return false
   return spreadType.value !== SpreadType.SingleCard
 })
 
 const freeQuotaExhausted = computed(() => {
   if (!auth.isAuthenticated) return false
   if (auth.isSubscribed) return false
-  if (spreadType.value !== SpreadType.SingleCard) return false
+  if (requiresSubscription.value) return false
   return !auth.canCreateReading
 })
 
@@ -94,6 +104,7 @@ const badgeText = computed(() => {
   if (!auth.isAuthenticated) return null
   if (auth.subscriptionLoading) return '…'
   if (auth.isSubscribed) return 'Доступ активен'
+  if (auth.canCreateIntroReading) return 'Первый расклад: 3 карты бесплатно'
   const s = auth.subscription
   if (!s) return null
   const left = Math.max(0, s.freeReadingsDailyLimit - s.freeReadingsUsedToday)
@@ -120,7 +131,7 @@ async function begin() {
   validationMessage.value = null
   validationSuggestion.value = null
   const pending = {
-    spreadType: auth.isAuthenticated ? spreadType.value : SpreadType.SingleCard,
+    spreadType: auth.isAuthenticated ? spreadType.value : SpreadType.ThreeCard,
     question: question.value.trim() || 'На что мне сейчас стоит обратить внимание?',
     questionWarningAcknowledged: false,
     validated: false,
@@ -171,11 +182,11 @@ async function begin() {
   <main class="home-page min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 py-16">
     <header class="text-center mb-10">
       <div class="home-kicker text-mystic-accent text-xs tracking-[0.4em] mb-3">✦ ВУАЛЬ ГРЯДУЩЕГО ✦</div>
-      <h1 class="home-title font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">{{ auth.isAuthenticated ? 'Загляни за Вуаль' : 'Открой свою карту' }}</h1>
+      <h1 class="home-title font-display text-4xl sm:text-5xl md:text-7xl gold-text mb-4">{{ auth.isAuthenticated ? 'Загляни за Вуаль' : 'Открой свой расклад' }}</h1>
       <p class="text-mystic-silver/70 max-w-xl mx-auto">
         {{ auth.isAuthenticated
           ? 'Задай обезличенный вопрос и получи символическую интерпретацию карт как один из возможных взглядов на ситуацию.'
-          : 'Одна карта и начало толкования — бесплатно, без регистрации. Продолжение откроется после создания аккаунта.' }}
+          : 'Первый расклад на 3 карты и начало толкования — бесплатно, без регистрации. Продолжение откроется после создания аккаунта. Затем — одна карта в день бесплатно.' }}
       </p>
     </header>
 
@@ -186,6 +197,12 @@ async function begin() {
           История
         </RouterLink>
       </div>
+
+      <p v-if="auth.isAuthenticated && !auth.isSubscribed" class="text-xs text-mystic-silver/70" data-testid="free-reading-policy">
+        {{ auth.canCreateIntroReading
+          ? 'Первый расклад на 3 карты — бесплатно. Он считается раскладом на сегодня. Затем — одна карта в день бесплатно.'
+          : 'Одна карта в день — бесплатно. Расклады на 3 и 10 карт доступны с платным доступом.' }}
+      </p>
 
       <div v-if="auth.isAuthenticated && currentDeckMeta" class="deck-blurb" data-testid="home-deck-blurb">
         <div class="deck-blurb-head">
@@ -206,7 +223,7 @@ async function begin() {
             :key="s.type"
             class="spread-option"
             :class="{ active: spreadType === s.type }"
-            @click="spreadType = s.type"
+            @click="selectSpread(s.type)"
           >
             <div class="text-sm font-display">{{ s.label }}</div>
             <div class="text-xs text-mystic-silver/60 mt-1">{{ s.cardCount }} карт(ы)</div>
@@ -224,7 +241,7 @@ async function begin() {
       </div>
 
       <p v-if="!auth.isAuthenticated && hasGuestReading" class="text-center text-mystic-silver/80">
-        Твоя карта уже открыта. Вернись к ней и продолжи с того же места.
+        Твой расклад уже открыт. Вернись к нему и продолжи с того же места.
       </p>
       <div v-if="auth.isAuthenticated || !hasGuestReading">
         <label for="reading-question" class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">{{ auth.isAuthenticated ? 'Вопрос' : 'Твой вопрос · необязательно' }}</label>
@@ -237,7 +254,7 @@ async function begin() {
           maxlength="500"
         />
         <p v-if="!auth.isAuthenticated" class="text-xs text-mystic-silver/60 mt-2">
-          Можно просто открыть карту дня. Если пишешь свой вопрос, не указывай имена и личные данные.
+          Можно просто открыть расклад на 3 карты. Если пишешь свой вопрос, не указывай имена и личные данные.
         </p>
       </div>
 
@@ -268,7 +285,7 @@ async function begin() {
       />
       <div v-else>
         <button class="glow-button w-full" :disabled="!canBegin" @click="begin">
-          {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : hasGuestReading ? 'Продолжить мой расклад' : 'Открыть карту бесплатно' }}
+          {{ validatingQuestion ? 'Сверяю вопрос…' : auth.isAuthenticated ? 'Начать расклад' : hasGuestReading ? 'Продолжить мой расклад' : 'Открыть 3 карты бесплатно' }}
         </button>
         <p v-if="showGuestPaidOffer" class="guest-paid-offer" data-testid="guest-paid-offer">
           Все 3 расклада безлимитно — {{ tariffSummary }}. Без автосписаний.

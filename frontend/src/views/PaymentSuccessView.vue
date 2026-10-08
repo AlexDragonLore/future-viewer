@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/useAuthStore'
 import { paymentApi } from '@/api/paymentApi'
 import { getPendingPayment, clearPendingPayment } from '@/utils/pendingPayment'
 import { trackGoalOnce } from '@/analytics/metrika'
+import { getGuestContinuation } from '@/utils/guestReading'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -31,9 +32,10 @@ onMounted(async () => {
 })
 
 const activated = computed(() => orderPaid.value ?? auth.isSubscribed)
+const continueGuestReading = computed(() => activated.value && Boolean(getGuestContinuation()))
 
 function goHome() {
-  router.replace('/')
+  router.replace(continueGuestReading.value ? '/result' : '/')
 }
 </script>
 
@@ -52,7 +54,7 @@ function goHome() {
         <p class="text-mystic-silver/70 mb-6">
           Спасибо! Теперь тебе доступны все расклады без ограничений.
         </p>
-        <button class="glow-button w-full" @click="goHome">К раскладам</button>
+        <button class="glow-button w-full" @click="goHome">{{ continueGuestReading ? 'Продолжить мой расклад' : 'К раскладам' }}</button>
       </template>
 
       <template v-else>

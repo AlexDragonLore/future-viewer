@@ -13,7 +13,7 @@ vi.mock('@/api/authApi', () => ({
 
 vi.mock('@/api/subscriptionApi', () => ({
   subscriptionApi: {
-    status: vi.fn(async () => ({ isActive: false, canCreateFreeReading: true })),
+    status: vi.fn(async () => ({ isActive: false, canCreateIntroReading: false, canCreateFreeReading: true })),
   },
 }))
 

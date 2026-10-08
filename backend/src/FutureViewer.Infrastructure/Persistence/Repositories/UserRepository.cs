@@ -19,6 +19,18 @@ public sealed class UserRepository : IUserRepository
     public Task<User?> GetByIdAsync(Guid id, CancellationToken ct = default) =>
         _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
 
+    public async Task LockAsync(Guid id, CancellationToken ct = default)
+    {
+        if (_db.Database.CurrentTransaction is null)
+            throw new InvalidOperationException("User locks require an active transaction.");
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT id FROM users WHERE id = {id} FOR UPDATE", ct);
+        // Earlier prompt/access lookups may already track an outdated user.
+        var tracked = _db.ChangeTracker.Entries<User>().FirstOrDefault(entry => entry.Entity.Id == id);
+        if (tracked is not null)
+            await tracked.ReloadAsync(ct);
+    }
+
     public Task<User?> GetByEmailVerificationTokenAsync(string token, CancellationToken ct = default) =>
         _db.Users.FirstOrDefaultAsync(u => u.EmailVerificationToken == token, ct);
 

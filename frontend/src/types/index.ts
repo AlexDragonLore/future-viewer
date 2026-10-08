@@ -128,6 +128,7 @@ export interface SubscriptionStatus {
   freeReadingsUsedToday: number
   freeReadingsDailyLimit: number
   canCreateFreeReading: boolean
+  canCreateIntroReading: boolean
 }
 
 export interface CardGlossary {

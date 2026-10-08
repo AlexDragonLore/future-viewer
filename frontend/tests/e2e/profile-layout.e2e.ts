@@ -24,7 +24,7 @@ async function openProfile(page: Page, email: string, active: boolean) {
     '/api/public/legal-documents': legalDocumentsResponse,
     '/api/subscription/status': {
       status: active ? 1 : 0, isActive: active, expiresAt: active ? '2030-01-01T00:00:00Z' : null,
-      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1, canCreateFreeReading: true,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1, canCreateIntroReading: false, canCreateFreeReading: true,
     },
     '/api/announcements/unread': [],
     '/api/leaderboard/me': {

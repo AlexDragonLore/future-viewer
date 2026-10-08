@@ -19,11 +19,13 @@ public sealed class SubscriptionServiceTests
         return users;
     }
 
-    private static Mock<IReadingRepository> ReadingRepoWithCount(int count)
+    private static Mock<IReadingRepository> ReadingRepoWithCount(int count, int? total = null)
     {
         var readings = new Mock<IReadingRepository>();
         readings.Setup(r => r.CountTodayByUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(count);
+        readings.Setup(r => r.CountByUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(total ?? count);
         return readings;
     }
 
@@ -86,12 +88,66 @@ public sealed class SubscriptionServiceTests
     }
 
     [Fact]
-    public async Task EnsureReadingAllowed_throws_subscription_required_for_non_single_card_free_user()
+    public async Task EnsureReadingAllowed_allows_first_three_card_reading_for_free()
     {
         var user = NewUser();
         var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.ThreeCard))
+            .Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task EnsureReadingAllowed_rejects_three_cards_after_any_previous_reading()
+    {
+        var user = NewUser();
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0, total: 1).Object,
+            StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
+
+        await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.ThreeCard))
+            .Should().ThrowAsync<SubscriptionRequiredException>();
+        await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.SingleCard))
+            .Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task EnsureReadingAllowed_does_not_restore_intro_after_all_readings_are_erased()
+    {
+        var user = NewUser();
+        user.HasUsedIntroReading = true;
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object,
+            StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
+
+        await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.ThreeCard))
+            .Should().ThrowAsync<SubscriptionRequiredException>();
+        (await sut.GetStatusAsync(user.Id)).CanCreateIntroReading.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(-1, true)]
+    public async Task Erased_reading_usage_preserves_quota_until_the_next_utc_day(int dayOffset, bool allowed)
+    {
+        var user = NewUser();
+        user.HasUsedIntroReading = true;
+        user.LastReadingAt = DateTime.UtcNow.Date.AddDays(dayOffset);
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object,
+            StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
+
+        (await sut.GetStatusAsync(user.Id)).CanCreateFreeReading.Should().Be(allowed);
+        var act = () => sut.EnsureReadingAllowedAsync(user.Id, SpreadType.SingleCard);
+        if (allowed) await act.Should().NotThrowAsync();
+        else await act.Should().ThrowAsync<QuotaExceededException>();
+    }
+
+    [Fact]
+    public async Task EnsureReadingAllowed_rejects_celtic_cross_even_for_a_new_free_user()
+    {
+        var user = NewUser();
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object,
+            StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
+
+        await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.CelticCross))
             .Should().ThrowAsync<SubscriptionRequiredException>();
     }
 
@@ -99,7 +155,7 @@ public sealed class SubscriptionServiceTests
     public async Task EnsureReadingAllowed_treats_expired_subscription_as_inactive()
     {
         var user = NewUser(SubscriptionStatus.Active, DateTime.UtcNow.AddDays(-1));
-        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0, total: 1).Object, StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
 
         await sut.Invoking(s => s.EnsureReadingAllowedAsync(user.Id, SpreadType.ThreeCard))
             .Should().ThrowAsync<SubscriptionRequiredException>();
@@ -133,6 +189,7 @@ public sealed class SubscriptionServiceTests
         status.FreeReadingsUsedToday.Should().Be(5);
         status.FreeReadingsDailyLimit.Should().Be(SubscriptionService.FreeDailyLimit);
         status.CanCreateFreeReading.Should().BeTrue();
+        status.CanCreateIntroReading.Should().BeFalse();
     }
 
     [Fact]
@@ -146,6 +203,37 @@ public sealed class SubscriptionServiceTests
         status.IsActive.Should().BeFalse();
         status.CanCreateFreeReading.Should().BeFalse();
         status.FreeReadingsUsedToday.Should().Be(1);
+        status.CanCreateIntroReading.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task GetStatus_reports_intro_reading_for_a_new_free_user()
+    {
+        var user = NewUser();
+        var sut = new SubscriptionService(UserRepoFor(user).Object, ReadingRepoWithCount(0).Object,
+            StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
+
+        var status = await sut.GetStatusAsync(user.Id);
+
+        status.CanCreateIntroReading.Should().BeTrue();
+        status.CanCreateFreeReading.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task AddReading_locks_the_user_and_persists_consumed_intro_entitlement()
+    {
+        var user = NewUser();
+        var users = UserRepoFor(user);
+        var readings = ReadingRepoWithCount(0);
+        var reading = new Reading { UserId = user.Id, SpreadType = SpreadType.ThreeCard, Question = "q" };
+        readings.Setup(r => r.AddAsync(reading, It.IsAny<CancellationToken>())).ReturnsAsync(reading);
+        var sut = new SubscriptionService(users.Object, readings.Object,
+            StubPayments(), ProcessedPaymentsAcceptAll().Object, Uow());
+
+        (await sut.AddReadingAsync(reading)).Should().BeSameAs(reading);
+
+        users.Verify(r => r.LockAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
+        users.Verify(r => r.UpdateAsync(It.Is<User>(u => u.HasUsedIntroReading), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static CreatePaymentRequest AcceptedOffer(string tariffCode = "pro-30d") => new()

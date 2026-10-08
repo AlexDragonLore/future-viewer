@@ -142,7 +142,7 @@ async function resendVerification() {
       </h1>
 
       <p v-if="continuesReading" class="text-center text-sm text-mystic-silver/70 mb-6" data-testid="auth-continue-reading">
-        Твоя карта уже открыта. {{ mode === 'register' ? 'Зарегистрируйся и подтверди почту' : 'Войди' }}, чтобы дочитать толкование бесплатно.
+        Твой расклад уже открыт. {{ mode === 'register' ? 'Зарегистрируйся и подтверди почту' : 'Войди' }}, чтобы дочитать толкование бесплатно.
       </p>
 
       <form class="space-y-4" @submit.prevent="submit">

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import type { RegisterPayload } from '@/types'
+import { SubscriptionStatusValue, type RegisterPayload } from '@/types'
 
 vi.mock('@/api/authApi', () => ({
   authApi: {
@@ -37,7 +37,7 @@ vi.mock('@/api/authApi', () => ({
 
 vi.mock('@/api/subscriptionApi', () => ({
   subscriptionApi: {
-    status: vi.fn(async () => ({ isActive: false, canCreateFreeReading: true })),
+    status: vi.fn(async () => ({ isActive: false, canCreateIntroReading: false, canCreateFreeReading: true })),
   },
 }))
 
@@ -54,6 +54,19 @@ describe('useAuthStore', () => {
     expect(auth.token).toBeNull()
     expect(auth.isAuthenticated).toBe(false)
     expect(auth.email).toBeNull()
+    expect(auth.canCreateIntroReading).toBe(false)
+  })
+
+  it('uses the server entitlement for the first reading and clears it on logout', () => {
+    const auth = useAuthStore()
+    auth.subscription = {
+      status: SubscriptionStatusValue.None, expiresAt: null, isActive: false,
+      freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
+      canCreateIntroReading: true, canCreateFreeReading: true,
+    }
+    expect(auth.canCreateIntroReading).toBe(true)
+    auth.logout()
+    expect(auth.canCreateIntroReading).toBe(false)
   })
 
   it('hydrates from localStorage on creation', () => {

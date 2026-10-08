@@ -6,9 +6,11 @@ import { DeckType, SpreadType, type Reading, type ReadingCard } from '@/types'
 import { useReadingStore } from '@/stores/useReadingStore'
 
 const createStreamMock = vi.fn()
+const createGuestMock = vi.fn()
 vi.mock('@/api/readingApi', () => ({
   readingApi: {
     createStream: (...args: unknown[]) => createStreamMock(...args),
+    createGuest: (...args: unknown[]) => createGuestMock(...args),
   },
 }))
 
@@ -81,6 +83,7 @@ describe('ReadingView', () => {
     localStorage.setItem('fv_token', 'test-token')
     sessionStorage.clear()
     createStreamMock.mockReset()
+    createGuestMock.mockReset()
   })
 
   afterEach(() => {
@@ -102,6 +105,26 @@ describe('ReadingView', () => {
 
     expect(store.current?.spreadType).toBe(SpreadType.SingleCard)
     expect(store.current?.cards).toHaveLength(1)
+    expect(router.currentRoute.value.name).toBe('result')
+  })
+
+  it('reveals all three cards of the first guest reading', async () => {
+    localStorage.clear()
+    createGuestMock.mockResolvedValue({
+      reading: { ...buildReading(3), spreadType: SpreadType.ThreeCard, spreadName: 'Три карты', isPreview: true },
+      ticket: 'opaque-ticket', expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+    })
+    const { wrapper, router, store } = await mountReading({
+      spreadType: SpreadType.ThreeCard, question: 'Question?',
+      questionWarningAcknowledged: false, validated: true,
+    })
+    await vi.runAllTimersAsync()
+    await flushPromises()
+    expect(createGuestMock).toHaveBeenCalledOnce()
+    expect(createStreamMock).not.toHaveBeenCalled()
+    expect(store.current?.spreadType).toBe(SpreadType.ThreeCard)
+    expect(store.current?.cards).toHaveLength(3)
+    expect(wrapper.findAll('.card-slot')).toHaveLength(3)
     expect(router.currentRoute.value.name).toBe('result')
   })
 
