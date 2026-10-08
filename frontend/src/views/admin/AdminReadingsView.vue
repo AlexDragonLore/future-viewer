@@ -72,20 +72,20 @@ function changePage(page: number) {
 
 <style scoped>
 .readings-view { min-width: 0; }
-.view-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; }
+.view-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
 .view-heading p { color: rgba(224, 212, 186, 0.6); font-size: 0.85rem; margin-top: 0.4rem; }
-.search-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 0.75rem; padding: 1rem; margin-bottom: 1.25rem; }
+.search-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem; margin-bottom: 1rem; }
 label { flex: 1 1 15rem; display: flex; flex-direction: column; gap: 0.5rem; color: rgba(224, 212, 186, 0.7); font-size: 0.8rem; }
 input { background: rgba(20, 16, 32, 0.7); border: 1px solid rgba(245, 194, 107, 0.3); border-radius: 8px; padding: 0.65rem 0.85rem; color: #f8f4eb; width: 100%; min-height: 44px; font-size: 1rem; }
 .admin-button { min-height: 44px; padding: 0.6rem 0.9rem; border: 1px solid rgba(245, 194, 107, 0.3); border-radius: 8px; color: #e0d4ba; font-size: 0.85rem; }
 .admin-button:hover:not(:disabled), .admin-button.primary { background: rgba(245, 194, 107, 0.1); color: #f5c26b; }
 .admin-button:disabled { opacity: 0.4; cursor: not-allowed; }
 .admin-button:focus-visible, input:focus-visible, .user-link:focus-visible { outline: 2px solid #f5c26b; outline-offset: 3px; }
-.reading-list { display: flex; flex-direction: column; gap: 1rem; }
-.reading-card { padding: 1.25rem; }
-.user-link { display: block; min-height: 44px; margin-bottom: 0.25rem; text-align: left; color: #f5c26b; overflow-wrap: anywhere; }
+.reading-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.reading-card { padding: 1rem; }
+.user-link { display: block; min-height: 44px; margin-bottom: 0.125rem; text-align: left; color: #f5c26b; font-size: 0.875rem; line-height: 1.4; overflow-wrap: anywhere; }
 .user-link span { opacity: 0.5; }
-.guest-label { margin-bottom: 0.75rem; color: #e0d4ba; font-size: 0.9rem; }
+.guest-label { margin-bottom: 0.25rem; color: #e0d4ba; font-size: 0.8125rem; line-height: 1.4; }
 .reading-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; color: rgba(224, 212, 186, 0.65); font-size: 0.8rem; }
 .reading-pager > div { display: flex; align-items: center; gap: 0.75rem; }
 .empty { text-align: center; padding: 2rem 0.5rem; color: rgba(224, 212, 186, 0.6); }
@@ -93,7 +93,7 @@ input { background: rgba(20, 16, 32, 0.7); border: 1px solid rgba(245, 194, 107,
 @media (max-width: 640px) {
   .view-heading { align-items: flex-start; }
   .view-heading .admin-button { flex-shrink: 0; }
-  .reading-card { padding: 1rem; }
+  .reading-card { padding: 0.75rem; }
   .search-toolbar .admin-button { flex: 1; }
   .reading-pager { justify-content: center; }
   .reading-pager > div { width: 100%; justify-content: space-between; gap: 0.35rem; }

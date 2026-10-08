@@ -32,24 +32,24 @@ const interpretationHtml = computed(() => safeMarkdown(props.reading.interpretat
 
 <style scoped>
 .reading-message { min-width: 0; overflow-wrap: anywhere; }
-.message-meta { display: flex; flex-wrap: wrap; gap: 0.4rem 0.85rem; color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; }
+.message-meta { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; line-height: 1.4; }
 .message-meta time { margin-left: auto; }
-.message-retention { margin-top: 0.7rem; color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; }
-.message-label { margin: 1rem 0 0.35rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f5c26b; }
-.message-question { white-space: pre-wrap; line-height: 1.6; color: #eee0cf; }
-.message-answer { margin-top: 1rem; border-top: 1px solid rgba(245, 194, 107, 0.15); }
-summary { padding: 0.85rem 0; color: #f5c26b; cursor: pointer; min-height: 44px; }
+.message-retention { margin-top: 0.25rem; color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; line-height: 1.4; }
+.message-label { margin: 0.5rem 0 0.125rem; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: #f5c26b; }
+.message-question { white-space: pre-wrap; font-size: 0.875rem; line-height: 1.45; color: #eee0cf; }
+.message-answer { margin-top: 0.5rem; border-top: 1px solid rgba(245, 194, 107, 0.15); }
+summary { padding: 0.5rem 0; color: #f5c26b; cursor: pointer; min-height: 44px; font-size: 0.875rem; }
 summary:focus-visible { outline: 2px solid #f5c26b; outline-offset: 3px; border-radius: 4px; }
-.hidden-badge { display: inline-block; margin-top: 0.7rem; padding: 0.25rem 0.6rem; border: 1px solid rgba(245, 194, 107, 0.25); border-radius: 6px; color: #e0c49c; font-size: 0.72rem; }
-.message-empty { margin-top: 0.8rem; color: rgba(224, 212, 186, 0.5); font-size: 0.8rem; }
-.interpretation { line-height: 1.7; color: rgba(232, 213, 242, 0.9); }
-.interpretation :deep(p), .interpretation :deep(ul), .interpretation :deep(ol) { margin-bottom: 0.75rem; }
+.hidden-badge { display: inline-block; margin-top: 0.35rem; padding: 0.2rem 0.5rem; border: 1px solid rgba(245, 194, 107, 0.25); border-radius: 6px; color: #e0c49c; font-size: 0.72rem; }
+.message-empty { margin-top: 0.5rem; color: rgba(224, 212, 186, 0.5); font-size: 0.8rem; }
+.interpretation { font-size: 0.875rem; line-height: 1.55; color: rgba(232, 213, 242, 0.9); }
+.interpretation :deep(p), .interpretation :deep(ul), .interpretation :deep(ol) { margin-bottom: 0.5rem; }
 .interpretation :deep(h2), .interpretation :deep(h3) { margin: 0.75rem 0 0.4rem; color: #f5c26b; font-size: 1rem; letter-spacing: 0.02em; }
 .interpretation :deep(ul) { list-style: disc; padding-left: 1.3rem; }
 .interpretation :deep(ol) { list-style: decimal; padding-left: 1.3rem; }
 .interpretation :deep(a) { color: #f5c26b; text-decoration: underline; }
 .interpretation :deep(pre) { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 640px) {
-  .message-meta time { margin-left: 0; flex-basis: 100%; }
+  .message-meta time { margin-left: 0; }
 }
 </style>
