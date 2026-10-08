@@ -49,6 +49,12 @@ public static partial class QuestionValidationHeuristics
                 "Лучше не требовать точного факта о мыслях или действиях другого человека.",
                 "На что мне обратить внимание в этих отношениях и как бережно прояснить ситуацию?");
 
+        var timingRequest = NegatedDatePrecisionRegex().Replace(normalized, "");
+        if (ExactDateRegex().IsMatch(timingRequest) || WhenExactlyRegex().IsMatch(timingRequest))
+            return NeedsRewrite(
+                "По картам можно дать ориентировочный срок, без точной даты и гарантий.",
+                BuildApproximateTimingSuggestion(trimmed));
+
         if (TooVagueRegex().IsMatch(normalized))
             return NeedsRewrite(
                 "Вопрос слишком общий, без темы или ситуации.",
@@ -60,6 +66,17 @@ public static partial class QuestionValidationHeuristics
                 $"Что мне важно понять про тему \"{trimmed}\"?");
 
         return null;
+    }
+
+    private static string BuildApproximateTimingSuggestion(string question)
+    {
+        // Preserve the subject of the privacy-checked question while removing
+        // its demand for precision. Unrelated exact facts are handled above.
+        var approximate = ExactDateRegex().Replace(question, match =>
+            $"примерн{match.Groups["ending"].Value.ToLowerInvariant()} {match.Groups["date"].Value.ToLowerInvariant()}");
+        approximate = ExactTimingWordRegex().Replace(approximate, "примерно");
+        approximate = WhitespaceRegex().Replace(approximate, " ").Trim().TrimEnd('?', '.', '!');
+        return $"{approximate}? Укажи ориентировочный диапазон в днях, неделях или месяцах как символический ориентир.";
     }
 
     private static bool LooksLikeGibberish(string text)
@@ -115,8 +132,20 @@ public static partial class QuestionValidationHeuristics
     [GeneratedRegex(@"(рак|диагноз|болезн|беремен|лечени|таблет|операци|суд|иск|адвокат|законно|посадят|вложить все|инвестировать все|кредит на все|финансов(ая|ую) гаранти|убить|самоуб|суицид|навредить)", RegexOptions.Compiled)]
     private static partial Regex DangerousRegex();
 
-    [GeneratedRegex(@"(точн(ая|ую|ый|ое)? дат|когда .*точно|какой номер|номер выигра|лотере|выиграю ли|гарантирован|100%|сто процентов)", RegexOptions.Compiled)]
+    [GeneratedRegex(@"(какой номер|номер выигра|лотере|выиграю ли|гарантирован|100%|сто процентов)", RegexOptions.Compiled)]
     private static partial Regex ExactFactRegex();
+
+    [GeneratedRegex(@"\bточн(?<ending>ая|ую|ой|ою|ые|ых|ым|ыми)\s+(?<date>дат(?:а|у|е|ы|ой|ою|ам|ами|ах)?)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ExactDateRegex();
+
+    [GeneratedRegex(@"\b(?:без(?:\s+указания)?|не)\s+точн\p{L}*\s+дат\p{L}*\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex NegatedDatePrecisionRegex();
+
+    [GeneratedRegex(@"\bкогда\b[^?!.\n]*\b(?:точно|именно)\b|\b(?:точно|именно)\s+когда\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex WhenExactlyRegex();
+
+    [GeneratedRegex(@"\b(?:точно|именно)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ExactTimingWordRegex();
 
     [GeneratedRegex(@"(как заставить|как вынудить|как принудить|как вернуть любой ценой|приворот|манипулир)", RegexOptions.Compiled)]
     private static partial Regex ControlRegex();
