@@ -54,12 +54,14 @@ async function openGuestCard(page: Page) {
   const necessary = page.getByTestId('accept-necessary')
   if (await necessary.isVisible()) await necessary.click()
   await expect(page.getByRole('textbox')).toHaveValue('')
+  await expect(page.getByRole('button', { name: 'Открыть 3 карты бесплатно' })).toBeDisabled()
+  await page.getByRole('textbox', { name: 'Твой вопрос', exact: true }).fill(previewReading.question)
   await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page).toHaveURL(/\/result$/, { timeout: 15000 })
   await expect(page.getByTestId('guest-unlock')).toBeVisible({ timeout: 10000 })
 }
 
-test('one-click guest preview survives reload and email verification in a new tab', async ({ page, context }, testInfo) => {
+test('guest preview with their own question survives reload and email verification in a new tab', async ({ page, context }, testInfo) => {
   test.setTimeout(60000)
   const calls = await mockApi(context)
   await openGuestCard(page)
@@ -219,6 +221,7 @@ test('guest API errors return to a usable home instead of authentication', async
   await expect(page.getByRole('heading', { name: 'Открой свой расклад' })).toBeVisible()
   const necessary = page.getByTestId('accept-necessary')
   if (await necessary.isVisible()) await necessary.click()
+  await page.getByRole('textbox', { name: 'Твой вопрос', exact: true }).fill(previewReading.question)
   await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page.getByTestId('question-validation')).toContainText('Слишком много запросов')
   await expect(page).toHaveURL(/\/$/)

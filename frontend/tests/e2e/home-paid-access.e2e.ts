@@ -117,6 +117,8 @@ test('subscriber can start a multi-card reading without redundant payment text',
 
 test('guest still sees the compact paid option under the free card button', async ({ page }, testInfo) => {
   const mutations = await openHome(page)
+  await expect(page.getByRole('button', { name: 'Открыть 3 карты бесплатно', exact: true })).toBeDisabled()
+  await page.getByRole('textbox', { name: 'Твой вопрос', exact: true }).fill('Какой следующий шаг мне подходит?')
   await expect(page.getByRole('button', { name: 'Открыть 3 карты бесплатно', exact: true })).toBeEnabled()
   await expect(page.getByTestId('guest-paid-offer')).toContainText('Все 3 расклада безлимитно')
   await expect(page.getByTestId('guest-paid-offer')).toContainText(/99\s*₽/)

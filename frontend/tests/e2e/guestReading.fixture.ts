@@ -2,7 +2,7 @@ export const previewReading = {
   id: '11111111-1111-1111-1111-111111111111',
   spreadType: 3,
   spreadName: 'Три карты',
-  question: 'На что мне сейчас стоит обратить внимание?',
+  question: 'Как подготовиться к смене работы?',
   createdAt: '2026-10-03T12:00:00Z',
   deckType: 0,
   isPreview: true,

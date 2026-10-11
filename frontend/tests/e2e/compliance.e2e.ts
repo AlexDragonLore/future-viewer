@@ -78,7 +78,7 @@ test('question containing an email is blocked locally and never starts the readi
     if (/\/api\/readings(?:\/(?:stream|guest))?$/.test(new URL(request.url()).pathname)) readingRequestCount++
   })
 
-  await page.getByPlaceholder('На что мне сейчас стоит обратить внимание?').fill('Напиши мне на ivan.petrov@example.com')
+  await page.getByRole('textbox', { name: 'Твой вопрос', exact: true }).fill('Напиши мне на ivan.petrov@example.com')
   await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
 
   await expect(page.getByTestId('question-validation')).toContainText('персональ')

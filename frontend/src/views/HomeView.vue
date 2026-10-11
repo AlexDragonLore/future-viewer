@@ -96,7 +96,7 @@ const canBegin = computed(() => {
   if (validatingQuestion.value) return false
   if (auth.isAuthenticated && auth.subscriptionLoading) return false
   if (auth.isAuthenticated && !question.value.trim()) return false
-  if (!auth.isAuthenticated) return true
+  if (!auth.isAuthenticated) return hasGuestReading.value || Boolean(question.value.trim())
   return !blocked.value
 })
 
@@ -128,11 +128,12 @@ async function begin() {
     return
   }
   hasGuestReading.value = false
+  if (!question.value.trim()) return
   validationMessage.value = null
   validationSuggestion.value = null
   const pending = {
     spreadType: auth.isAuthenticated ? spreadType.value : SpreadType.ThreeCard,
-    question: question.value.trim() || 'На что мне сейчас стоит обратить внимание?',
+    question: question.value.trim(),
     questionWarningAcknowledged: false,
     validated: false,
   }
@@ -244,17 +245,19 @@ async function begin() {
         Твой расклад уже открыт. Вернись к нему и продолжи с того же места.
       </p>
       <div v-if="auth.isAuthenticated || !hasGuestReading">
-        <label for="reading-question" class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">{{ auth.isAuthenticated ? 'Вопрос' : 'Твой вопрос · необязательно' }}</label>
+        <label for="reading-question" class="block text-xs uppercase tracking-widest text-mystic-accent/80 mb-2">{{ auth.isAuthenticated ? 'Вопрос' : 'Твой вопрос' }}</label>
         <textarea
           id="reading-question"
           v-model="question"
           rows="3"
-          placeholder="На что мне сейчас стоит обратить внимание?"
+          placeholder="Напиши свой вопрос — об отношениях, работе, планах или о том, что тебя волнует"
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 text-mystic-silver placeholder:text-mystic-silver/30 focus:outline-none focus:border-mystic-accent transition"
           maxlength="500"
+          required
+          aria-describedby="reading-question-help"
         />
-        <p v-if="!auth.isAuthenticated" class="text-xs text-mystic-silver/60 mt-2">
-          Можно просто открыть расклад на 3 карты. Если пишешь свой вопрос, не указывай имена и личные данные.
+        <p id="reading-question-help" class="text-xs text-mystic-silver/60 mt-2">
+          Задай свой вопрос на любую тему. Не указывай имена и личные данные.
         </p>
       </div>
 

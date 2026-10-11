@@ -34,6 +34,7 @@ async function mountHome(setup?: () => void) {
     routes: [
       { path: '/', name: 'home', component: HomeView },
       { path: '/reading', name: 'reading', component: { template: '<div>reading</div>' } },
+      { path: '/result', name: 'result', component: { template: '<div>result</div>' } },
       { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
       { path: '/history', name: 'history', component: { template: '<div>history</div>' } },
       { path: '/faq', name: 'faq', component: { template: '<div>faq</div>' } },
@@ -122,9 +123,9 @@ describe('HomeView privacy and question safety', () => {
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
-  it('starts a guest three-card reading without authentication or validation round trip', async () => {
+  it('starts a guest three-card reading with their trimmed question without a validation round trip', async () => {
     const { wrapper, router, store } = await mountHome()
-    await wrapper.find('textarea').setValue('Как посмотреть на новую задачу?')
+    await wrapper.find('textarea').setValue('  Как посмотреть на новую задачу?  ')
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
 
@@ -134,16 +135,55 @@ describe('HomeView privacy and question safety', () => {
     expect(validateQuestionMock).not.toHaveBeenCalled()
   })
 
-  it('lets a guest start with one click and a default question', async () => {
+  it.each(['', '   \n  '])('requires a guest question instead of submitting blank input %j', async (question) => {
     const { wrapper, router, store } = await mountHome()
     expect(wrapper.find('.spread-option').exists()).toBe(false)
     expect(wrapper.find('[data-testid="save-to-history"]').exists()).toBe(false)
+    await wrapper.get('textarea').setValue(question)
+    expect(wrapper.get('textarea').attributes('required')).toBeDefined()
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeDefined()
+    await wrapper.get('button.glow-button').trigger('click')
+    await flushPromises()
+    expect(store.pending).toBeNull()
+    expect(router.currentRoute.value.name).toBe('home')
+    expect(validateQuestionMock).not.toHaveBeenCalled()
+  })
+
+  it('continues an existing guest reading without requiring another question', async () => {
+    localStorage.setItem('fv_guest_reading_v1', JSON.stringify({
+      ticket: 'existing-guest-ticket', expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    }))
+    const { wrapper, router, store } = await mountHome()
+    expect(wrapper.find('textarea').exists()).toBe(false)
+    expect(wrapper.get('button.glow-button').text()).toBe('Продолжить мой расклад')
     expect(wrapper.get('button.glow-button').attributes('disabled')).toBeUndefined()
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
-    expect(store.pending?.question).toBe('На что мне сейчас стоит обратить внимание?')
-    expect(store.pending?.spreadType).toBe(SpreadType.ThreeCard)
-    expect(router.currentRoute.value.name).toBe('reading')
+    expect(router.currentRoute.value.name).toBe('result')
+    expect(store.pending).toBeNull()
+    expect(validateQuestionMock).not.toHaveBeenCalled()
+  })
+
+  it('requires a new question when the guest continuation expires while home is open', async () => {
+    const expiresAt = Date.now() + 60_000
+    localStorage.setItem('fv_guest_reading_v1', JSON.stringify({
+      ticket: 'expiring-guest-ticket', expiresAt: new Date(expiresAt).toISOString(),
+    }))
+    const { wrapper, router, store } = await mountHome()
+    expect(wrapper.get('button.glow-button').text()).toBe('Продолжить мой расклад')
+    const now = vi.spyOn(Date, 'now').mockReturnValue(expiresAt + 1)
+    try {
+      await wrapper.get('button.glow-button').trigger('click')
+      await flushPromises()
+      expect(router.currentRoute.value.name).toBe('home')
+      expect(store.pending).toBeNull()
+      expect(validateQuestionMock).not.toHaveBeenCalled()
+      expect(wrapper.get('textarea').element).toHaveProperty('value', '')
+      expect(wrapper.get('button.glow-button').attributes('disabled')).toBeDefined()
+      expect(localStorage.getItem('fv_guest_reading_v1')).toBeNull()
+    } finally {
+      now.mockRestore()
+    }
   })
 
   it('selects and allows the first three-card reading for a new free account', async () => {
@@ -233,10 +273,11 @@ describe('HomeView privacy and question safety', () => {
     expect(offer.text()).toContain('Без автосписаний')
     expect(wrapper.find('[data-testid="payment-offer-acceptance"]').exists()).toBe(false)
     expect(offer.element.previousElementSibling?.textContent).toContain('Открыть 3 карты бесплатно')
+    await wrapper.get('textarea').setValue('Как решиться на новый проект?')
     await wrapper.get('button.glow-button').trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('reading')
-    expect(store.pending?.question).toBe('На что мне сейчас стоит обратить внимание?')
+    expect(store.pending?.question).toBe('Как решиться на новый проект?')
   })
 
   it.each(['disabled', 'missing-product', 'authenticated'])('hides the guest paid offer for %s', async (reason) => {
