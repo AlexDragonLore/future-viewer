@@ -3,6 +3,7 @@
 ## Implementation
 
 - Publish the frontend change from `69fa58e`: require the visitor's own question, remove the default question, and clarify the field prompt. Preserve continuation of existing guest readings.
+- Align the generated homepage's static SEO instructions with the required question; remove the previous claim that visitors can leave it empty.
 - Build the exact pushed release from a clean Git archive for Linux amd64, preserving the current production public frontend build arguments.
 - Update only the frontend container; this release changes neither backend code nor the database schema.
 

@@ -35,6 +35,8 @@ describe('generated SEO artifacts', () => {
     expect(html).toContain(`<title>${seo.defaultTitle}</title>`)
     expect(html).toContain(`<meta name="description" content="${seo.defaultDescription}" />`)
     expect(html).toContain('<h1>Первый расклад Таро на 3 карты бесплатно — без регистрации</h1>')
+    expect(html).toContain('Задайте свой вопрос на любую тему')
+    expect(html).not.toContain('Вопрос можно оставить пустым')
     expect(html).toContain('первую половину толкования')
     expect(html).toContain('Затем получайте одну карту в день бесплатно')
     expect(html).toContain('Зарегистрируйтесь и подтвердите email')
