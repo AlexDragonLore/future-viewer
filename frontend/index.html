@@ -26,9 +26,165 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20260516" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=20260516" />
     <!-- seo:managed:end -->
+    <!-- Critical startup styles stay inline: the deck is visible before app assets load. -->
+    <style>
+      html { background: #0b0618; }
+      body.startup-pending { margin: 0; overflow: hidden; }
+      .startup-splash {
+        position: fixed; inset: 0; z-index: 10000; box-sizing: border-box;
+        display: grid; place-items: center; overflow: auto;
+        padding: 32px 20px; min-height: 100%; color: #e8d5f2;
+        background: radial-gradient(ellipse at 50% 43%, #211334 0, #100a1e 43%, #0b0618 75%);
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        text-align: center; isolation: isolate;
+        transition: opacity 440ms ease, visibility 440ms;
+      }
+      .startup-splash::before {
+        content: ''; position: absolute; inset: 18px; pointer-events: none;
+        border: 1px solid rgba(216, 181, 121, .09); border-radius: 3px;
+      }
+      .startup-content { width: min(100%, 400px); margin: auto; }
+      .startup-scene {
+        position: relative; width: 320px; max-width: 100%; height: 280px; margin: 0 auto 28px;
+        perspective: 900px;
+      }
+      .startup-orbit {
+        position: absolute; inset: 5px 25px; border: 1px solid rgba(216, 181, 121, .12);
+        border-radius: 50%; transform: rotate(-25deg);
+      }
+      .startup-orbit::before {
+        content: ''; position: absolute; inset: 14px; border-radius: 50%;
+        border: 1px dashed rgba(216, 181, 121, .09);
+      }
+      .startup-orbit::after {
+        content: ''; position: absolute; width: 5px; height: 5px; top: 37px; left: 37px;
+        border-radius: 50%; background: #d8b579;
+        box-shadow: 0 0 14px rgba(216, 181, 121, .5), 186px 181px 0 -1px #d8b579;
+      }
+      .startup-shadow {
+        position: absolute; left: 50%; bottom: 10px; width: 150px; height: 22px;
+        transform: translateX(-50%); border-radius: 50%;
+        background: radial-gradient(ellipse, rgba(0, 0, 0, .55), transparent 70%);
+      }
+      .startup-deck { position: absolute; inset: 46px 0 0; }
+      .startup-card {
+        --direction: 1; position: absolute; left: calc(50% - 55px); top: 0;
+        box-sizing: border-box; width: 110px; height: 182px; border-radius: 9px;
+        border: 1px solid #b89a65; overflow: hidden;
+        color: #d8b579;
+        background: radial-gradient(ellipse at 30% 20%, #3d2b50, #20152f 60%, #150d23);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, .35), inset 0 0 0 3px #21172f, inset 0 0 0 4px rgba(216, 181, 121, .2);
+        transform: translate(calc(var(--i) * 1px), calc(var(--i) * -1px)) rotate(-7deg);
+        animation: startup-shuffle 1820ms cubic-bezier(.45, 0, .2, 1) infinite;
+        animation-delay: calc(var(--i) * -260ms); will-change: transform;
+      }
+      .startup-card:nth-child(even) { --direction: -1; }
+      .startup-card svg { display: block; width: 100%; height: 100%; }
+      .startup-card::after {
+        content: ''; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(115deg, transparent 25%, rgba(255, 230, 185, .1) 46%, transparent 68%);
+      }
+      .startup-brand {
+        margin: 0; color: #ead4ad; font: 400 clamp(25px, 5vw, 33px)/1.35 Georgia, 'Times New Roman', serif;
+        letter-spacing: .055em;
+      }
+      .startup-divider {
+        display: flex; align-items: center; justify-content: center; gap: 12px;
+        margin: 20px auto 17px; color: #bfa06d; font-size: 10px;
+      }
+      .startup-divider::before, .startup-divider::after {
+        content: ''; width: 46px; height: 1px; background: linear-gradient(90deg, transparent, #8c704a);
+      }
+      .startup-divider::after { transform: rotate(180deg); }
+      .startup-status { margin: 0; color: #b9abc8; font-size: 12px; line-height: 1.7; letter-spacing: .17em; }
+      .startup-retry {
+        display: inline-block; margin-top: 20px; padding: 10px 20px; border: 1px solid #8c704a;
+        border-radius: 999px; color: #ead4ad; text-decoration: none; font-size: 13px;
+      }
+      .startup-retry[hidden] { display: none; }
+      .startup-retry:hover { background: rgba(216, 181, 121, .1); }
+      .startup-retry:focus-visible { outline: 2px solid #ead4ad; outline-offset: 4px; }
+      .startup-leaving { opacity: 0; visibility: hidden; }
+      .startup-failed .startup-card { animation-play-state: paused; }
+      @keyframes startup-shuffle {
+        0%, 8% {
+          z-index: 8;
+          transform: translate(calc(var(--i) * 1px), calc(var(--i) * -1px)) rotate(-7deg);
+        }
+        28% {
+          z-index: 8;
+          transform: translate(calc(var(--direction) * 82px), -22px) rotate(calc(var(--direction) * 18deg));
+        }
+        40% {
+          z-index: 0;
+          transform: translate(calc(var(--direction) * 88px), -15px) rotate(calc(var(--direction) * 16deg));
+        }
+        65%, 100% {
+          z-index: 0;
+          transform: translate(calc(var(--i) * 1px), calc(var(--i) * -1px)) rotate(-7deg);
+        }
+      }
+      @media (max-width: 380px) {
+        .startup-scene { transform: scale(.86); margin-bottom: 8px; }
+        .startup-status { letter-spacing: .1em; }
+      }
+      @media (max-height: 540px) {
+        .startup-splash { padding-block: 20px; }
+        .startup-scene { height: 215px; margin-bottom: 4px; }
+        .startup-orbit { inset: 0 54px; }
+        .startup-deck { top: 18px; transform: scale(.85); }
+        .startup-divider { margin-block: 12px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .startup-card { animation: none; will-change: auto; }
+        .startup-splash { transition: none; }
+      }
+    </style>
+    <noscript><style>.startup-splash { display: none; }</style></noscript>
   </head>
   <body>
+    <div id="startup-splash" class="startup-splash" aria-label="Загрузка сайта">
+      <div class="startup-content">
+        <div class="startup-scene" aria-hidden="true">
+          <svg width="0" height="0" style="position: absolute" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <symbol id="startup-card-back" viewBox="0 0 110 182">
+                <rect x="10" y="10" width="90" height="162" rx="4" fill="none" stroke="currentColor" stroke-opacity=".5" stroke-width=".6" />
+                <path d="M15 34V15h19M76 15h19v19M95 148v19H76M34 167H15v-19" fill="none" stroke="currentColor" stroke-opacity=".8" stroke-width=".8" />
+                <path d="M55 25 90 91 55 157 20 91Z M55 38 83 91 55 144 27 91Z" fill="none" stroke="currentColor" stroke-opacity=".3" stroke-width=".7" />
+                <circle cx="55" cy="91" r="26" fill="none" stroke="currentColor" stroke-opacity=".65" stroke-width=".7" />
+                <circle cx="55" cy="91" r="21" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width=".6" />
+                <path d="m55 72 4.5 14.5L74 91l-14.5 4.5L55 110l-4.5-14.5L36 91l14.5-4.5Z" fill="currentColor" fill-opacity=".85" />
+                <circle cx="55" cy="91" r="4" fill="#21162f" stroke="currentColor" stroke-width=".7" />
+                <path d="M55 17v6m-3-3h6M55 159v6m-3-3h6" stroke="currentColor" stroke-opacity=".8" stroke-width=".7" />
+                <g fill="currentColor" fill-opacity=".5">
+                  <circle cx="22" cy="45" r="1" /><circle cx="88" cy="45" r="1" />
+                  <circle cx="22" cy="137" r="1" /><circle cx="88" cy="137" r="1" />
+                  <circle cx="55" cy="51" r="1" /><circle cx="55" cy="131" r="1" />
+                </g>
+              </symbol>
+            </defs>
+          </svg>
+          <div class="startup-orbit"></div>
+          <div class="startup-shadow"></div>
+          <div class="startup-deck">
+            <div class="startup-card" style="--i: 0"><svg><use href="#startup-card-back" /></svg></div>
+            <div class="startup-card" style="--i: 1"><svg><use href="#startup-card-back" /></svg></div>
+            <div class="startup-card" style="--i: 2"><svg><use href="#startup-card-back" /></svg></div>
+            <div class="startup-card" style="--i: 3"><svg><use href="#startup-card-back" /></svg></div>
+            <div class="startup-card" style="--i: 4"><svg><use href="#startup-card-back" /></svg></div>
+            <div class="startup-card" style="--i: 5"><svg><use href="#startup-card-back" /></svg></div>
+            <div class="startup-card" style="--i: 6"><svg><use href="#startup-card-back" /></svg></div>
+          </div>
+        </div>
+        <p class="startup-brand">Вуаль Грядущего</p>
+        <div class="startup-divider" aria-hidden="true">✦</div>
+        <p id="startup-status" class="startup-status" role="status" aria-live="polite">Тасуем колоду…</p>
+        <a id="startup-retry" class="startup-retry" href="" hidden>Обновить страницу</a>
+      </div>
+    </div>
     <div id="app"></div>
+    <script src="/startup.js?v=20261014"></script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

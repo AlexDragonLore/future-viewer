@@ -65,6 +65,21 @@ describe('generated SEO artifacts', () => {
     }
   })
 
+  it('preserves the startup deck outside the app on public and private generated pages', async () => {
+    for (const page of ['index.html', 'tarot/cards/shut/index.html', 'auth/index.html', 'noindex.html']) {
+      const document = new DOMParser().parseFromString(await artifact(page), 'text/html')
+      const splash = document.querySelector('#startup-splash')
+      expect(splash).not.toBeNull()
+      expect(splash?.closest('#app')).toBeNull()
+      expect(document.querySelectorAll('#app')).toHaveLength(1)
+      expect(splash?.querySelectorAll('.startup-card')).toHaveLength(7)
+      expect(document.querySelector('#startup-retry')).not.toBeNull()
+      const controller = document.querySelector('script[src^="/startup.js"]')
+      expect(controller?.getAttribute('src')).toMatch(/^\/startup\.js\?v=\d+$/)
+      expect(document.querySelectorAll('script:not([src]):not([type="application/ld+json"])')).toHaveLength(0)
+    }
+  })
+
   it('publishes the sitemap without blocking crawlers from seeing private-page noindex', async () => {
     const robots = await artifact('robots.txt')
     expect(robots).toContain('Sitemap: https://alex-taro.ru/sitemap.xml')
