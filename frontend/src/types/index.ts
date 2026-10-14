@@ -170,28 +170,6 @@ export interface FeedbackInfo {
   answeredAt: string | null
 }
 
-export interface LeaderboardEntry {
-  entryId: string
-  displayName: string
-  totalScore: number
-  feedbackScore: number
-  achievementScore: number
-  feedbackCount: number
-  averageScore: number
-  rank: number
-}
-
-export interface UserScoreSummary {
-  totalScore: number
-  feedbackScore: number
-  achievementScore: number
-  monthlyScore: number
-  rank: number | null
-  monthlyRank: number | null
-  feedbackCount: number
-  averageScore: number
-}
-
 export interface AchievementInfo {
   id: string
   code: string

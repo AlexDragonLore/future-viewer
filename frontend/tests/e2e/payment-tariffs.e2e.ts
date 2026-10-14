@@ -27,7 +27,6 @@ async function openTariffs(page: Page, scenario: typeof scenarios[number]) {
       freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1, canCreateIntroReading: false, canCreateFreeReading: true,
     },
     '/api/announcements/unread': [],
-    '/api/leaderboard/me': null,
     '/api/feedbacks/my': [],
     '/api/profile/personalization': { firstName: null, lastName: null, birthYear: null, isComplete: false, memoryRules: [] },
     '/api/privacy/settings': {

@@ -136,39 +136,6 @@ async function clearMemory() {
         />
       </section>
 
-      <section class="mystic-card p-6 mb-6" data-testid="profile-summary">
-        <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Рейтинг</div>
-        <div v-if="store.summary" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="stat">
-            <div class="stat-label">Сумма</div>
-            <div class="stat-value">{{ store.summary.totalScore }}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">В этом месяце</div>
-            <div class="stat-value">{{ store.summary.monthlyScore }}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Место (всё время)</div>
-            <div class="stat-value">{{ store.summary.rank ?? '—' }}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Место (месяц)</div>
-            <div class="stat-value">{{ store.summary.monthlyRank ?? '—' }}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Откликов</div>
-            <div class="stat-value">{{ store.summary.feedbackCount }}</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Средний балл</div>
-            <div class="stat-value">{{ store.summary.averageScore.toFixed(1) }}</div>
-          </div>
-        </div>
-        <div v-else class="text-mystic-silver/60 text-sm">
-          Пока нет оценок — сделай расклад и поделись отзывом.
-        </div>
-      </section>
-
       <section class="mystic-card p-6 mb-6" data-testid="profile-personalization">
         <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Знакомство и память</div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -252,26 +219,6 @@ async function clearMemory() {
 <style scoped>
 .profile-title {
   overflow-wrap: anywhere;
-}
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  padding: 0.6rem 0.75rem;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(245, 194, 107, 0.15);
-  border-radius: 10px;
-}
-.stat-label {
-  font-size: 0.65rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(224, 212, 186, 0.65);
-}
-.stat-value {
-  font-family: 'Cinzel', serif;
-  font-size: 1.35rem;
-  color: #f5c26b;
 }
 .feedback-row {
   display: flex;

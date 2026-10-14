@@ -38,7 +38,7 @@ export const router = createRouter({
     { path: '/legal/data-request', name: 'legal-data-request', component: () => import('@/views/LegalDocumentView.vue'), props: { documentType: 'data-request' } },
     { path: '/legal/processors', name: 'legal-processors', component: () => import('@/views/LegalDocumentView.vue'), props: { documentType: 'processors' } },
     { path: '/feedback/:token', name: 'feedback', component: () => import('@/views/FeedbackView.vue'), meta: { noindex: true } },
-    { path: '/leaderboard', name: 'leaderboard', component: () => import('@/views/LeaderboardView.vue'), meta: { noindex: true } },
+    { path: '/leaderboard', redirect: '/' },
     { path: '/achievements', name: 'achievements', component: () => import('@/views/AchievementsView.vue'), meta: { requiresAuth: true, noindex: true } },
     { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { requiresAuth: true, noindex: true } },
     {

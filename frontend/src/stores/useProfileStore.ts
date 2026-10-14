@@ -1,28 +1,18 @@
 import { resetOnAccountChange } from '@/utils/accountSession'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { leaderboardApi } from '@/api/leaderboardApi'
 import { feedbackApi } from '@/api/feedbackApi'
 import { profileApi } from '@/api/profileApi'
 import { extractApiError } from '@/api/httpClient'
-import type { FeedbackInfo, Personalization, UpdatePersonalizationPayload, UserScoreSummary } from '@/types'
+import type { FeedbackInfo, Personalization, UpdatePersonalizationPayload } from '@/types'
 
 export const useProfileStore = defineStore('profile', () => {
-  const summary = ref<UserScoreSummary | null>(null)
   const feedbacks = ref<FeedbackInfo[]>([])
   const personalization = ref<Personalization | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  resetOnAccountChange({ summary, feedbacks, personalization, loading, error })
-
-  async function loadSummary() {
-    try {
-      summary.value = await leaderboardApi.me()
-    } catch (e) {
-      error.value = extractApiError(e, 'Не удалось загрузить рейтинг')
-    }
-  }
+  resetOnAccountChange({ feedbacks, personalization, loading, error })
 
   async function loadFeedbacks() {
     try {
@@ -65,19 +55,17 @@ export const useProfileStore = defineStore('profile', () => {
     loading.value = true
     error.value = null
     try {
-      await Promise.all([loadSummary(), loadFeedbacks(), loadPersonalization()])
+      await Promise.all([loadFeedbacks(), loadPersonalization()])
     } finally {
       loading.value = false
     }
   }
 
   return {
-    summary,
     feedbacks,
     personalization,
     loading,
     error,
-    loadSummary,
     loadFeedbacks,
     loadPersonalization,
     savePersonalization,

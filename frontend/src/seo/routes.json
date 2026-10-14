@@ -42,7 +42,6 @@
     { "name": "verify-email", "path": "/verify-email", "title": "Подтверждение email | Вуаль Грядущего" },
     { "name": "reset-password", "path": "/reset-password", "title": "Смена пароля | Вуаль Грядущего" },
     { "name": "payment-success", "path": "/payment/success", "title": "Проверка оплаты | Вуаль Грядущего" },
-    { "name": "leaderboard", "path": "/leaderboard", "title": "Лидерборд | Вуаль Грядущего" },
     { "name": "glossary-card", "path": "/glossary/:id", "title": "Карта Таро | Вуаль Грядущего" },
     { "name": "reading", "path": "/reading", "title": "Расклад | Вуаль Грядущего" },
     { "name": "result", "path": "/result", "title": "Результат расклада | Вуаль Грядущего" },

@@ -102,7 +102,6 @@ function toggleAnnouncementsFromMenu() {
 
       <nav class="links">
         <RouterLink to="/glossary" class="nav-link" data-testid="nav-glossary">Глоссарий</RouterLink>
-        <RouterLink to="/leaderboard" class="nav-link" data-testid="nav-leaderboard">Лидерборд</RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/history" class="nav-link" data-testid="nav-history">
           История
         </RouterLink>
@@ -228,9 +227,6 @@ function toggleAnnouncementsFromMenu() {
         </div>
         <RouterLink to="/glossary" class="burger-link" data-testid="burger-glossary" @click="burgerOpen = false">
           Глоссарий
-        </RouterLink>
-        <RouterLink to="/leaderboard" class="burger-link" data-testid="burger-leaderboard" @click="burgerOpen = false">
-          Лидерборд
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/history" class="burger-link" data-testid="burger-history" @click="burgerOpen = false">
           История

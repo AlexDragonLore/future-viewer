@@ -28,7 +28,6 @@ function buildRouter(): Router {
       { path: '/', name: 'home', component: { template: '<div>home</div>' } },
       { path: '/glossary', name: 'glossary', component: { template: '<div>glossary</div>' } },
       { path: '/history', name: 'history', component: { template: '<div>history</div>' } },
-      { path: '/leaderboard', name: 'leaderboard', component: { template: '<div>leaderboard</div>' } },
       { path: '/achievements', name: 'achievements', component: { template: '<div>achievements</div>' } },
       { path: '/profile', name: 'profile', component: { template: '<div>profile</div>' } },
       { path: '/auth', name: 'auth', component: { template: '<div>auth</div>' } },
@@ -76,6 +75,7 @@ describe('SiteHeader', () => {
     const { wrapper } = await mountHeader()
     expect(wrapper.find('[data-testid="site-logo"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="nav-glossary"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/leaderboard"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Глоссарий')
   })
 
@@ -92,6 +92,8 @@ describe('SiteHeader', () => {
     const { wrapper } = await mountHeader()
     expect(wrapper.find('[data-testid="user-button"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="nav-history"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="nav-achievements"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/leaderboard"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('someone@example.com')
   })
 
@@ -162,7 +164,7 @@ describe('SiteHeader', () => {
     await burger.trigger('click')
     expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="burger-glossary"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="burger-leaderboard"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/leaderboard"]').exists()).toBe(false)
     await burger.trigger('click')
     expect(wrapper.find('[data-testid="burger-panel"]').exists()).toBe(false)
   })
@@ -174,6 +176,7 @@ describe('SiteHeader', () => {
     await wrapper.find('[data-testid="burger-button"]').trigger('click')
     expect(wrapper.find('[data-testid="burger-history"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="burger-achievements"]').exists()).toBe(true)
+    expect(wrapper.find('a[href="/leaderboard"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="burger-profile"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="burger-logout"]').exists()).toBe(true)
     await wrapper.find('[data-testid="burger-history"]').trigger('click')

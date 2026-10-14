@@ -45,7 +45,6 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IPaymentOrderRepository, PaymentOrderRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IAchievementRepository, AchievementRepository>();
-        services.AddScoped<ILeaderboardRepository, LeaderboardRepository>();
         services.AddScoped<IUserMemoryRepository, UserMemoryRepository>();
         services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
         services.AddScoped<IPrivacyRepository, PrivacyRepository>();

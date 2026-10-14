@@ -17,6 +17,9 @@ public sealed class RetiredIntegrationEndpointTests : IClassFixture<IntegrationT
     [InlineData("PUT", "/api/admin/users/11111111-1111-1111-1111-111111111111/telegram")]
     [InlineData("DELETE", "/api/admin/users/11111111-1111-1111-1111-111111111111/telegram")]
     [InlineData("POST", "/api/admin/feedbacks/run-notifications")]
+    [InlineData("GET", "/api/leaderboard/monthly")]
+    [InlineData("GET", "/api/leaderboard/alltime")]
+    [InlineData("GET", "/api/leaderboard/me")]
     public async Task Removed_integration_routes_are_unavailable(string method, string path)
     {
         using var client = _fixture.CreateClient();

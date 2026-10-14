@@ -27,10 +27,18 @@ async function openProfile(page: Page, email: string, active: boolean) {
       freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1, canCreateIntroReading: false, canCreateFreeReading: true,
     },
     '/api/announcements/unread': [],
-    '/api/leaderboard/me': {
-      totalScore: 30, feedbackScore: 20, achievementScore: 10, monthlyScore: 30,
-      rank: 123, monthlyRank: 45, feedbackCount: 2, averageScore: 10,
-    },
+    '/api/achievements/me': [
+      {
+        id: 'first-reading', code: 'first_reading', name: 'Первый расклад',
+        description: 'Сделай первый расклад.', iconPath: '', sortOrder: 1,
+        unlockedAt: '2026-10-01T10:00:00Z',
+      },
+      {
+        id: 'first-feedback', code: 'first_feedback', name: 'Первый отклик',
+        description: 'Поделись первым откликом.', iconPath: '', sortOrder: 2,
+        unlockedAt: null,
+      },
+    ],
     '/api/feedbacks/my': [{
       id: 'layout-feedback', readingId: 'layout-reading', question: feedbackQuestion,
       status: 3, aiScore: 10, createdAt: '2026-10-01T10:00:00Z',
@@ -69,7 +77,7 @@ async function openProfile(page: Page, email: string, active: boolean) {
   await expect(page.getByTestId('profile-feedbacks')).toContainText(feedbackQuestion)
   await expect(page.getByTestId('save-personalization')).toBeEnabled()
   await expect(page.getByTestId('profile-access')).toContainText(
-    active ? 'Платный доступ активен' : 'Сейчас включён бесплатный режим',
+    active ? 'Платный доступ активен' : 'Первый расклад на 3 карты — бесплатно, затем — одна карта в день.',
   )
   await page.evaluate(() => document.fonts.ready)
   return unexpectedRequests
@@ -82,6 +90,8 @@ for (const width of [320, 393, 640, 768, 1280]) {
       await page.emulateMedia({ reducedMotion: 'reduce' })
       const unexpectedRequests = await openProfile(page, scenario.email, scenario.active)
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(scenario.email)
+      await expect(page.getByTestId('profile-summary')).toHaveCount(0)
+      await expect(page.locator('a[href="/leaderboard"]')).toHaveCount(0)
       await expect(page.locator('.memory-row')).toContainText(memoryText)
 
       // App clips horizontal overflow, so document.scrollWidth alone can hide the regression.
@@ -109,10 +119,25 @@ for (const width of [320, 393, 640, 768, 1280]) {
       await expect(paymentButton).toBeDisabled()
       await acceptance.check()
       await expect(acceptance).toBeChecked()
-      await paymentButton.scrollIntoViewIfNeeded()
+      await paymentButton.evaluate(button => button.scrollIntoView({ block: 'center', behavior: 'instant' }))
       await expect(paymentButton).toBeInViewport({ ratio: 1 })
       await expect(paymentButton).toBeEnabled()
       await paymentButton.click({ trial: true })
+
+      if (scenario.active && (width === 320 || width === 1280)) {
+        if (width === 320) {
+          await page.getByTestId('burger-button').click()
+          await expect(page.locator('a[href="/leaderboard"]')).toHaveCount(0)
+          await page.getByTestId('burger-achievements').click()
+        } else {
+          await page.getByTestId('nav-achievements').click()
+        }
+        await expect(page).toHaveURL(/\/achievements$/)
+        await expect(page.getByTestId('achievements-counter')).toHaveText('Открыто 1 из 2')
+        await expect(page.getByTestId('achievements-grid').getByTestId('achievement-card')).toHaveCount(2)
+        await expect(page.locator('.achievement-card.unlocked')).toContainText('Первый расклад')
+        await expect(page.locator('.achievement-card.locked')).toContainText('Первый отклик')
+      }
       expect(unexpectedRequests).toEqual([])
     })
   }

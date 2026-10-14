@@ -18,7 +18,6 @@ public static class DomainServicesExtensions
         services.AddScoped<SubscriptionService>();
         services.AddScoped<FeedbackService>();
         services.AddScoped<AchievementService>();
-        services.AddScoped<LeaderboardService>();
         services.AddScoped<AdminService>();
         services.AddScoped<PersonalizationService>();
         services.AddScoped<AnnouncementService>();

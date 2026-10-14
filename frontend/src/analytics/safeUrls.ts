@@ -1,6 +1,6 @@
 const SAFE_PATHS = new Set([
   '/', '/reading', '/result', '/history', '/auth', '/verify-email', '/forgot-password',
-  '/reset-password', '/glossary', '/faq', '/about', '/payment/success', '/leaderboard',
+  '/reset-password', '/glossary', '/faq', '/about', '/payment/success',
   '/achievements', '/profile', '/admin', '/admin/users', '/admin/feedbacks', '/admin/stats',
   '/legal/privacy', '/legal/personal-data-consent', '/legal/cookies', '/legal/offer',
   '/legal/marketing-consent', '/legal/ai-disclaimer', '/legal/data-request', '/legal/processors',

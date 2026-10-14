@@ -237,7 +237,6 @@ app.MapPayments();
 app.MapPrivacy();
 app.MapFeedbacks();
 app.MapProfile();
-app.MapLeaderboard();
 app.MapAchievements();
 app.MapAdmin();
 app.MapAnnouncements();
