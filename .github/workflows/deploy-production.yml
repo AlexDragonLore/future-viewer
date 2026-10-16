@@ -1,4 +1,4 @@
-name: admin-compact-frontend-delivery
+name: site-performance-release-delivery
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  RELEASE_SHA: af445d9646fe6fb75e6728c6525dea666a2f0578
+  RELEASE_SHA: c8e7de36d18ea1e2f277450af900d0e298dbd3ee
 
 jobs:
   deploy:
@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: af445d9646fe6fb75e6728c6525dea666a2f0578
+          ref: c8e7de36d18ea1e2f277450af900d0e298dbd3ee
           path: release
           persist-credentials: false
       - name: Configure existing deployment identity
@@ -60,11 +60,12 @@ jobs:
           sudo -n env FV_SHARED_EDGE_PORT=18080 docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer config --format json | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["services"]["frontend"]["build"]["args"]; assert all(k.startswith("VITE_") for k in a); json.dump(a,sys.stdout)'
           REMOTE_ARGS
           python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("Preserved",len(d),"public frontend build arguments")' "$RUNNER_TEMP/frontend-build-args.json"
-      - name: Build exact tested frontend
+      - name: Build exact tested backend and frontend
         working-directory: release
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          docker build --platform linux/amd64 -t "future-viewer-backend:$RELEASE_SHA" backend
           python3 - <<'PYBUILD'
           import json,os,re,subprocess
           from pathlib import Path
@@ -79,14 +80,14 @@ jobs:
         run: |
           set -euo pipefail
           install -d "$RUNNER_TEMP/fv-delivery"
-          docker save "future-viewer-frontend:$RELEASE_SHA" | gzip -1 > "$RUNNER_TEMP/fv-delivery/images.tar.gz"
+          docker save "future-viewer-backend:$RELEASE_SHA" "future-viewer-frontend:$RELEASE_SHA" | gzip -1 > "$RUNNER_TEMP/fv-delivery/images.tar.gz"
           python3 - <<'IMAGE_IDS'
           import hashlib,json,os,tarfile
           path=os.environ['RUNNER_TEMP']+'/fv-delivery/images.tar.gz'
           with tarfile.open(path,'r:gz') as archive:
               manifest=json.load(archive.extractfile('manifest.json'))
               with open(os.environ['GITHUB_ENV'],'a') as output:
-                  for role in ('frontend',):
+                  for role in ('backend','frontend'):
                       tag='future-viewer-'+role+':'+os.environ['RELEASE_SHA']
                       matches=[item for item in manifest if tag in (item.get('RepoTags') or [])]
                       assert len(matches)==1, 'Expected one archived image per service'
@@ -97,7 +98,7 @@ jobs:
                       output.write('ARCHIVE_'+role.upper()+'_CONFIG_ID='+digest+'\n')
                       print(role+' archived configuration: '+digest)
           IMAGE_IDS
-          cp delivery/scripts/deploy-admin-compact-frontend.sh "$RUNNER_TEMP/fv-delivery/deploy.sh"
+          cp delivery/scripts/deploy-guest-history-release.sh "$RUNNER_TEMP/fv-delivery/deploy.sh"
           cp delivery/scripts/verify-staged-retention-images.py "$RUNNER_TEMP/fv-delivery/verify-images.py"
           cd "$RUNNER_TEMP/fv-delivery"
           sha256sum images.tar.gz deploy.sh verify-images.py > SHA256SUMS
@@ -106,28 +107,30 @@ jobs:
           printf 'REMOTE_RELEASE_DIR=%s\n' "$remote_dir" >> "$GITHUB_ENV"
           scp images.tar.gz deploy.sh verify-images.py SHA256SUMS "fv-retention-release:$remote_dir/"
           ssh fv-retention-release "cd '$remote_dir' && sha256sum -c SHA256SUMS && sudo -n docker load -i images.tar.gz"
-          ssh fv-retention-release "sudo -n docker image inspect --format '{{.Id}}' 'future-viewer-frontend:$RELEASE_SHA'"
+          ssh fv-retention-release "sudo -n docker image inspect --format '{{.Id}}' 'future-viewer-backend:$RELEASE_SHA' 'future-viewer-frontend:$RELEASE_SHA'"
       - name: Verify loaded image content and resolve server IDs
         run: |
           set -euo pipefail
+          [[ "$ARCHIVE_BACKEND_CONFIG_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
           [[ "$ARCHIVE_FRONTEND_CONFIG_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
-          ssh fv-retention-release "sudo -n python3 '$REMOTE_RELEASE_DIR/verify-images.py' '$RELEASE_SHA' '$ARCHIVE_FRONTEND_CONFIG_ID'" > "$RUNNER_TEMP/verified-image-ids.json"
+          ssh fv-retention-release "sudo -n python3 '$REMOTE_RELEASE_DIR/verify-images.py' '$RELEASE_SHA' '$ARCHIVE_BACKEND_CONFIG_ID' '$ARCHIVE_FRONTEND_CONFIG_ID'" > "$RUNNER_TEMP/verified-image-ids.json"
           python3 - <<'SERVER_IDS'
           import json,os,re
           values=json.load(open(os.environ['RUNNER_TEMP']+'/verified-image-ids.json'))
-          assert set(values)=={'frontend'}
+          assert set(values)=={'backend','frontend'}
           with open(os.environ['GITHUB_ENV'],'a') as output:
               for role,value in values.items():
                   assert re.fullmatch(r'sha256:[a-f0-9]{64}',value)
                   output.write('NEW_'+role.upper()+'_IMAGE_ID='+value+'\n')
                   print(role+' verified server ID: '+value)
           SERVER_IDS
-      - name: Replace frontend and verify unchanged backend
+      - name: Backup, verify restore and replace application services
         run: |
           set -euo pipefail
           [[ "$REMOTE_RELEASE_DIR" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]
+          [[ "$NEW_BACKEND_IMAGE_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
           [[ "$NEW_FRONTEND_IMAGE_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
-          ssh fv-retention-release "sudo -n bash '$REMOTE_RELEASE_DIR/deploy.sh' 'sha256:91c96c78363c1a5b8581a0a4e4619b74c26df7f69877429a7be9e1fd56ba1b92' '$NEW_FRONTEND_IMAGE_ID'"
+          ssh fv-retention-release "sudo -n bash '$REMOTE_RELEASE_DIR/deploy.sh' '$NEW_BACKEND_IMAGE_ID' '$NEW_FRONTEND_IMAGE_ID'"
       - name: Public production smoke
         run: |
           set -euo pipefail

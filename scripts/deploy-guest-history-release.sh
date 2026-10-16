@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# One-shot server-side delivery of the reviewed retention release. Run as root
+# One-shot server-side delivery of the reviewed performance release. Run as root
 # after loading its images: bash this-script NEW_BACKEND_IMAGE_ID NEW_FRONTEND_IMAGE_ID
 set -Eeuo pipefail
 umask 077
 
-readonly RELEASE=9128c51c5ed9abdb5432301fa09790058b2138fd
-readonly OLD_REV=b6f262f213262ca7b906086dc72ff4ee4bcedb97
-readonly OLD_BACKEND=future-viewer-backend:b6f262f213262ca7b906086dc72ff4ee4bcedb97
-readonly OLD_FRONTEND=future-viewer-frontend:b6f262f213262ca7b906086dc72ff4ee4bcedb97
-readonly OLD_BACKEND_ID=sha256:4aa52975d4c7e2b5cce64c963875f171a469b539fc2d74d99a7cbdebc4ff78bb
-readonly OLD_FRONTEND_ID=sha256:504a6680937aee60abe310bb9dab7eec2b9486205bbdff266ed7e514e9b7d189
+readonly RELEASE=c8e7de36d18ea1e2f277450af900d0e298dbd3ee
+readonly OLD_REV=af445d9646fe6fb75e6728c6525dea666a2f0578
+readonly OLD_BACKEND=future-viewer-backend:9128c51c5ed9abdb5432301fa09790058b2138fd
+readonly OLD_FRONTEND=future-viewer-frontend:af445d9646fe6fb75e6728c6525dea666a2f0578
+readonly OLD_BACKEND_ID=sha256:91c96c78363c1a5b8581a0a4e4619b74c26df7f69877429a7be9e1fd56ba1b92
+readonly OLD_FRONTEND_ID=sha256:062f8dd7c2772236aa49e1e6f6547fb5f07f19d8706559cf4f3378f45e188112
 readonly OLD_CADDY_ID=sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 readonly CHECKOUT=/opt/future-viewer
 readonly ENV_FILE=/opt/fv-app/.env.production
@@ -154,7 +154,7 @@ finish() {
   if [[ -n "$STATE_DIR" ]]; then
     printf 'release=%s\nstatus=%s\nphase=%s\nexit_code=%s\n' "$RELEASE" "$result" "$failed_phase" "$code" >"$STATE_DIR/status"
   fi
-  printf 'Admin release delivery: %s (phase=%s).\n' "$result" "$failed_phase"
+  printf 'Performance release delivery: %s (phase=%s).\n' "$result" "$failed_phase"
   [[ -z "$STATE_DIR" ]] || printf 'Protected release record: %s\n' "$STATE_DIR"
   exit "$code"
 }
@@ -196,7 +196,7 @@ health || fail 'pre-deployment health failed'
 
 PHASE=capture
 install -d -m 700 -o root -g root /opt/fv-app/releases
-STATE_DIR=$(mktemp -d "/opt/fv-app/releases/admin-messages-$RELEASE-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
+STATE_DIR=$(mktemp -d "/opt/fv-app/releases/site-performance-$RELEASE-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
 chmod 700 "$STATE_DIR"
 cp -p "$ENV_FILE" "$STATE_DIR/env.before"
 snapshot "$STATE_DIR/before-state.json"
@@ -318,12 +318,14 @@ compose up -d --no-deps --no-build --pull never backend frontend >/dev/null 2>&1
 PHASE=verification
 health || fail 'production health did not recover'
 verify_snapshot "$NEW_BACKEND_ID" "$NEW_FRONTEND_ID" >/dev/null 2>&1 || fail 'image, persistence, or neighbor verification failed'
-docker exec "$(service_id frontend)" sh -ec 'grep -rq "Хранится 30 дней" /usr/share/nginx/html/assets' >/dev/null 2>&1 \
-  || fail 'frontend retention label was not found'
+docker exec "$(service_id frontend)" sh -ec 'grep -rq "/api/readings/history/summary" /usr/share/nginx/html/assets' >/dev/null 2>&1 \
+  || fail 'frontend compact history endpoint marker was not found'
 docker exec "$(service_id frontend)" sh -ec 'grep -rq "Куплено:" /usr/share/nginx/html/assets' >/dev/null 2>&1 \
   || fail 'frontend purchased subscription label was not found'
 [[ $(curl --silent --max-time 15 --output /dev/null --write-out '%{http_code}' https://alex-taro.ru/api/admin/readings/00000000-0000-0000-0000-000000000000/interpretation) == 401 ]] \
   || fail 'new admin answer endpoint is not available with authorization'
+[[ $(curl --silent --max-time 15 --output /dev/null --write-out '%{http_code}' https://alex-taro.ru/api/readings/history/summary) == 401 ]] \
+  || fail 'new compact history endpoint is not available with authorization'
 migrations >"$STATE_DIR/migrations.after"
 cmp -s "$STATE_DIR/migrations.before" "$STATE_DIR/migrations.after" || fail 'database migrations changed'
 docker cp "$CADDY_ID:/etc/caddy/Caddyfile" "$STATE_DIR/Caddyfile.after" >/dev/null 2>&1
