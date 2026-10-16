@@ -251,17 +251,17 @@ AVAILABLE_BYTES=$(awk '/^MemAvailable:/ {printf "%.0f\n", $2 * 1024}' /proc/memi
 RESTORE_ID=$(docker create --name "$RESTORE_NAME" --pull never --network none --read-only \
   --label "com.alex-taro.restore-run=$RESTORE_NAME" \
   --memory "$MEMORY_BYTES" --memory-swap "$MEMORY_BYTES" \
-  --tmpfs "/var/lib/postgresql/data:rw,nosuid,nodev,size=$TMPFS_BYTES,mode=0700" \
+  --tmpfs "/var/lib/postgresql/data:rw,nosuid,nodev,size=$TMPFS_BYTES,mode=0755" \
   --tmpfs /var/run/postgresql:rw,nosuid,nodev,size=16777216,mode=0777 \
   --tmpfs /tmp:rw,nosuid,nodev,size=16777216,mode=1777 \
   -e PGDATA=/var/lib/postgresql/data/pgdata -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=restore_verify \
   "$PG_IMAGE" 2>/dev/null)
 docker start "$RESTORE_ID" >/dev/null 2>&1
 for attempt in $(seq 1 40); do
-  if docker exec "$RESTORE_ID" sh -ec 'test "$(cat /proc/1/comm)" = postgres; pg_isready -U postgres -d restore_verify' >/dev/null 2>&1; then break; fi
+  if docker exec "$RESTORE_ID" pg_isready -h 127.0.0.1 -U postgres -d restore_verify >/dev/null 2>&1; then break; fi
   sleep 1
 done
-docker exec "$RESTORE_ID" sh -ec 'test "$(cat /proc/1/comm)" = postgres; pg_isready -U postgres -d restore_verify' >/dev/null 2>&1 || fail 'isolated PostgreSQL did not become ready'
+docker exec "$RESTORE_ID" pg_isready -h 127.0.0.1 -U postgres -d restore_verify >/dev/null 2>&1 || fail 'isolated PostgreSQL did not become ready'
 openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass "file:$STATE_DIR/backup.pass" \
   -in "$STATE_DIR/database.dump.enc" 2>/dev/null \
   | docker exec -i "$RESTORE_ID" pg_restore --exit-on-error --no-owner --no-acl -U postgres -d restore_verify >/dev/null 2>&1
