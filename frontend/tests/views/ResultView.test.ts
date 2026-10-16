@@ -7,6 +7,11 @@ import { useReadingStore } from '@/stores/useReadingStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { usePublicConfigStore } from '@/stores/usePublicConfigStore'
 import { readingApi } from '@/api/readingApi'
+import { safeMarkdown } from '@/utils/safeMarkdown'
+vi.mock('@/utils/safeMarkdown', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/utils/safeMarkdown')>()
+  return { ...actual, safeMarkdown: vi.fn(actual.safeMarkdown) }
+})
 import { clearUnlockedGuestReading, getUnlockedGuestReading, saveUnlockedGuestReading } from '@/utils/guestReading'
 
 const createPayment = vi.fn()
@@ -87,6 +92,7 @@ describe('ResultView', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     localStorage.clear()
+    vi.mocked(safeMarkdown).mockClear()
     clearUnlockedGuestReading()
     createPayment.mockReset().mockResolvedValue({ paymentId: 'qa-order', confirmationUrl: '', status: 'pending' })
   })
@@ -133,13 +139,38 @@ describe('ResultView', () => {
     expect(rendered).not.toContain('javascript:')
   })
 
-  it('typewriter reveals interpretation over time', async () => {
-    const { wrapper } = await mountResult(sample)
+  it('shows an already-complete long interpretation immediately without animation frames', async () => {
+    const interpretation = 'Готовый ответ. '.repeat(2000) + 'Последняя строка.'
+    const { wrapper } = await mountResult({ ...sample, interpretation })
+    expect(wrapper.get('.prose-mystic').text()).toBe(interpretation)
+    expect(wrapper.find('.caret').exists()).toBe(false)
+    expect(safeMarkdown).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(500)
+    expect(safeMarkdown).toHaveBeenCalledTimes(1)
+  })
+
+  it('bounds parsing during dense SSE updates and flushes the final text immediately', async () => {
+    const { wrapper } = await mountResult({ ...sample, interpretation: null }, () => {
+      useReadingStore().cardsReady = true
+    })
+    const store = useReadingStore()
+    for (let index = 0; index < 100; index++) {
+      store.streamingText += `Фрагмент ${index}. `
+      await vi.advanceTimersByTimeAsync(10)
+    }
+    expect(vi.mocked(safeMarkdown).mock.calls.length).toBeLessThanOrEqual(9)
+    expect(vi.mocked(safeMarkdown).mock.calls.length).toBeGreaterThan(0)
+    expect(wrapper.get('.prose-mystic').text()).toContain('Фрагмент 0.')
+    expect(wrapper.find('.caret').exists()).toBe(true)
+    store.streamingText += 'ФИНАЛЬНЫЙ ФРАГМЕНТ <img src=x onerror=alert(1)> [bad](javascript:alert(1))'
+    store.streamingDone = true
     await flushPromises()
-    expect(wrapper.text()).not.toContain('The stars align.')
-    await vi.advanceTimersByTimeAsync(18 * sample.interpretation!.length + 20)
-    await flushPromises()
-    expect(wrapper.text()).toContain('The stars align.')
+    expect(wrapper.get('.prose-mystic').text()).toContain('ФИНАЛЬНЫЙ ФРАГМЕНТ')
+    expect(wrapper.find('.caret').exists()).toBe(false)
+    expect(wrapper.get('.prose-mystic').html()).not.toMatch(/<img|onerror|javascript:/)
+    const completedParses = vi.mocked(safeMarkdown).mock.calls.length
+    await vi.advanceTimersByTimeAsync(500)
+    expect(safeMarkdown).toHaveBeenCalledTimes(completedParses)
   })
 
   it('keeps following streamed interpretation while new text is typed', async () => {
@@ -199,6 +230,21 @@ describe('ResultView', () => {
     expect(scrollTo).not.toHaveBeenCalled()
   })
 
+  it('cancels pending Markdown and auto-scroll work when the result view is closed', async () => {
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const { wrapper } = await mountResult({ ...sample, interpretation: null }, () => {
+      useReadingStore().cardsReady = true
+    })
+    useReadingStore().streamingText = 'Pending stream text'
+    await flushPromises()
+    wrapper.unmount()
+    vi.mocked(safeMarkdown).mockClear()
+    scrollIntoView.mockClear()
+    await vi.advanceTimersByTimeAsync(500)
+    expect(safeMarkdown).not.toHaveBeenCalled()
+    expect(scrollIntoView).not.toHaveBeenCalled()
+  })
+
   it('clicking "новый расклад" resets store and navigates home', async () => {
     const { wrapper, router } = await mountResult(sample, () => {
       saveUnlockedGuestReading({ readingId: sample.id, ownerUserId: 'qa-user', expiresAt: new Date(Date.now() + 86_400_000).toISOString() })
@@ -225,7 +271,7 @@ describe('ResultView', () => {
       enableFreeAccountCheckout()
       saveUnlockedGuestReading({ readingId: sample.id, ownerUserId: 'qa-user', expiresAt: new Date(Date.now() + 86_400_000).toISOString() })
     })
-    await finishTyping()
+    await flushPromises()
     expect(getReading).toHaveBeenCalledWith(sample.id)
     expect(router.currentRoute.value.path).toBe('/result')
     expect(wrapper.get('.prose-mystic').text()).toContain(sample.interpretation)
@@ -271,8 +317,7 @@ describe('ResultView', () => {
 
   it('offers the current server product only after the full text is visible and uses the existing consent-aware checkout', async () => {
     const { wrapper } = await mountResult(sample, enableFreeAccountCheckout)
-    expect(wrapper.find('[data-testid="result-paid-offer"]').exists()).toBe(false)
-    await finishTyping()
+    expect(wrapper.get('.prose-mystic').text()).toContain(sample.interpretation)
     const offer = wrapper.get('[data-testid="result-paid-offer"]')
     expect(offer.text()).toContain('640')
     expect(offer.text()).toContain('45 дней')

@@ -39,65 +39,66 @@ public sealed class AchievementService
         _users = users;
     }
 
-    public async Task<IReadOnlyList<AchievementDto>> CheckAndGrantAsync(Guid userId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<AchievementDto>> CheckAndGrantAsync(Guid userId, CancellationToken ct = default) =>
+        (await CheckAsync(userId, includeStatus: false, ct)).NewlyGranted;
+
+    public async Task<IReadOnlyList<AchievementDto>> CheckAndGetAllAsync(Guid userId, CancellationToken ct = default)
+    {
+        var result = await CheckAsync(userId, includeStatus: true, ct);
+        var unlocked = result.Owned.ToDictionary(x => x.AchievementId, x => x.UnlockedAt);
+        return result.Catalog.OrderBy(a => a.SortOrder)
+            .Select(a => MapAchievement(a, unlocked.TryGetValue(a.Id, out var at) ? at : null)).ToList();
+    }
+
+    private async Task<AchievementCheck> CheckAsync(Guid userId, bool includeStatus, CancellationToken ct)
     {
         _ = await _users.GetByIdAsync(userId, ct)
             ?? throw new NotFoundException("User not found");
-
         var readingCount = await _readings.CountByUserAsync(userId, ct);
-        var scoredFeedbacks = await _feedbacks.GetScoredByUserAsync(userId, ct);
-        var scoredCount = scoredFeedbacks.Count;
-        var perfect10Count = scoredFeedbacks.Count(f => f.AiScore == 10);
-        var averageScore = scoredCount > 0 ? scoredFeedbacks.Average(f => f.AiScore ?? 0) : 0d;
-
+        var scores = await _feedbacks.GetScoreStatsAsync(userId, ct);
         var maxStreak = 0;
         if (readingCount > 0)
         {
-            var fromUtc = DateTime.UtcNow.Date.AddDays(-40);
-            var dates = await _readings.GetDistinctReadingDatesAsync(userId, fromUtc, ct);
+            var dates = await _readings.GetDistinctReadingDatesAsync(userId, DateTime.UtcNow.Date.AddDays(-40), ct);
             maxStreak = ComputeCurrentStreak(dates);
         }
-
-        var candidateCodes = new List<string>();
-        if (readingCount >= 1) candidateCodes.Add(Codes.FirstReading);
-        if (readingCount >= 10) candidateCodes.Add(Codes.Total10);
-        if (readingCount >= 50) candidateCodes.Add(Codes.Total50);
-        if (readingCount >= 100) candidateCodes.Add(Codes.Total100);
-        if (scoredCount >= 1) candidateCodes.Add(Codes.FirstFeedback);
-        if (maxStreak >= 3) candidateCodes.Add(Codes.Streak3);
-        if (maxStreak >= 7) candidateCodes.Add(Codes.Streak7);
-        if (maxStreak >= 30) candidateCodes.Add(Codes.Streak30);
-        if (perfect10Count >= 1) candidateCodes.Add(Codes.Perfect10);
-        if (perfect10Count >= 5) candidateCodes.Add(Codes.HighFive);
-        if (scoredCount >= 10 && averageScore >= 8d) candidateCodes.Add(Codes.ScoreMaster);
-
-        if (candidateCodes.Count == 0)
-            return Array.Empty<AchievementDto>();
+        var codes = new List<string>();
+        if (readingCount >= 1) codes.Add(Codes.FirstReading);
+        if (readingCount >= 10) codes.Add(Codes.Total10);
+        if (readingCount >= 50) codes.Add(Codes.Total50);
+        if (readingCount >= 100) codes.Add(Codes.Total100);
+        if (scores.ScoredCount >= 1) codes.Add(Codes.FirstFeedback);
+        if (maxStreak >= 3) codes.Add(Codes.Streak3);
+        if (maxStreak >= 7) codes.Add(Codes.Streak7);
+        if (maxStreak >= 30) codes.Add(Codes.Streak30);
+        if (scores.Perfect10Count >= 1) codes.Add(Codes.Perfect10);
+        if (scores.Perfect10Count >= 5) codes.Add(Codes.HighFive);
+        if (scores.ScoredCount >= 10 && scores.AverageScore >= 8d) codes.Add(Codes.ScoreMaster);
+        if (codes.Count == 0 && !includeStatus) return new([], [], []);
 
         var all = await _achievements.GetAllAsync(ct);
-        var byCode = all.ToDictionary(a => a.Code, a => a);
         var existing = await _achievements.GetByUserAsync(userId, ct);
-        var existingAchievementIds = existing.Select(ua => ua.AchievementId).ToHashSet();
-
-        var newlyGranted = new List<AchievementDto>();
-        foreach (var code in candidateCodes.Distinct())
-        {
-            if (!byCode.TryGetValue(code, out var achievement)) continue;
-            if (existingAchievementIds.Contains(achievement.Id)) continue;
-
-            var ua = await _achievements.GrantAsync(new UserAchievement
-            {
-                UserId = userId,
-                AchievementId = achievement.Id,
-                UnlockedAt = DateTime.UtcNow
-            }, ct);
-
-            if (ua is null) continue;
-            newlyGranted.Add(MapAchievement(achievement, ua.UnlockedAt));
-        }
-
-        return newlyGranted;
+        var existingIds = existing.Select(x => x.AchievementId).ToHashSet();
+        var byCode = all.ToDictionary(a => a.Code);
+        var now = DateTime.UtcNow;
+        var pending = codes.Where(byCode.ContainsKey).Select(code => byCode[code])
+            .Where(a => !existingIds.Contains(a.Id))
+            .Select(a => new UserAchievement { UserId = userId, AchievementId = a.Id, UnlockedAt = now }).ToArray();
+        if (pending.Length == 0) return new(all, existing, []);
+        var granted = await _achievements.GrantManyAsync(pending, ct);
+        // If another check won a unique-key race, use its actual persisted timestamp.
+        var owned = includeStatus && granted.Count < pending.Length
+            ? await _achievements.GetByUserAsync(userId, ct)
+            : existing.Concat(granted).ToArray();
+        var byId = all.ToDictionary(a => a.Id);
+        var newlyGranted = granted.Select(x => MapAchievement(byId[x.AchievementId], x.UnlockedAt)).ToArray();
+        return new(all, owned, newlyGranted);
     }
+
+    private sealed record AchievementCheck(
+        IReadOnlyList<Achievement> Catalog,
+        IReadOnlyList<UserAchievement> Owned,
+        IReadOnlyList<AchievementDto> NewlyGranted);
 
     public async Task<IReadOnlyList<AchievementDto>> GetAllWithUserStatusAsync(Guid userId, CancellationToken ct = default)
     {

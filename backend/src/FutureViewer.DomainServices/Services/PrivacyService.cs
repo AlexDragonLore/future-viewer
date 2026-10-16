@@ -184,6 +184,8 @@ public sealed class PrivacyService
         var payments = await _privacy.GetPaymentsAsync(user.PrivacySubjectId, ct);
         var paymentOrders = await _privacy.GetPaymentOrdersAsync(user.PrivacySubjectId, ct) ?? [];
         var requests = await _privacy.GetDataSubjectRequestsAsync(userId, ct);
+        var orderPaymentIds = paymentOrders.Where(x => x.ProviderPaymentId is not null)
+            .Select(x => x.ProviderPaymentId!).ToHashSet(StringComparer.Ordinal);
 
         CompleteRequest(request, DateTime.UtcNow, request.Id.ToString("N"));
         await _privacy.UpdateDataSubjectRequestAsync(request, ct);
@@ -276,7 +278,7 @@ public sealed class PrivacyService
                     CreatedAt = x.CreatedAt
                 })
                 .Concat(payments
-                    .Where(x => paymentOrders.All(o => o.ProviderPaymentId != x.PaymentId))
+                    .Where(x => !orderPaymentIds.Contains(x.PaymentId))
                     .Select(x => new PrivacyPaymentExportDto
                     {
                         OrderId = x.PaymentId,

@@ -1,7 +1,5 @@
-import { buildStructuredDataForRoute } from '../data/tarotSeoCatalog.js'
-
 // Shared by the static HTML generator and SPA navigation so metadata stays consistent.
-export function buildSeoStructuredData(route, context) {
+export function buildSeoStructuredData(route, context, contentData) {
   if (!route) return []
 
   const siteUrl = context.siteUrl.replace(/\/+$/, '')
@@ -14,7 +12,8 @@ export function buildSeoStructuredData(route, context) {
   }
 
   if (route.contentKind) {
-    return [website, ...buildStructuredDataForRoute(route, context)]
+    if (!contentData) throw new Error('Content structured data must be supplied for a content route')
+    return [website, ...contentData]
   }
 
   return [website, {

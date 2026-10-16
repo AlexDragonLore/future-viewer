@@ -28,7 +28,7 @@ public sealed class GuestReadingCleanupJob : BackgroundService
             {
                 using var scope = _scopes.CreateScope();
                 var repository = scope.ServiceProvider.GetRequiredService<IPrivacyRepository>();
-                var deleted = await repository.PurgeGuestReadingsBeforeAsync(
+                var deleted = await RetentionCleanupBatch.RunAsync(repository.PurgeGuestReadingsBeforeAsync,
                     DateTime.UtcNow - GuestReadingRetention.ContentDuration,
                     stoppingToken);
                 if (deleted > 0)

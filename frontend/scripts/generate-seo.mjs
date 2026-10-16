@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   FAQ_ITEMS,
+  buildStructuredDataForRoute,
   SEO_CONTENT_ROUTES,
   findTarotSeoCardBySlug,
   findTarotSeoDeckBySlug,
@@ -57,12 +58,10 @@ function managedHead(route, { index, canonicalPath = route?.path }) {
     : 'noindex, nofollow'
   const googleVerification = process.env.VITE_GOOGLE_SITE_VERIFICATION?.trim() || seo.googleSiteVerification?.trim()
   const yandexVerification = process.env.VITE_YANDEX_VERIFICATION?.trim() || seo.yandexVerification?.trim()
+  const structuredContext = { siteUrl, siteName: seo.siteName, defaultImage: seo.defaultImage }
   const routeStructuredData = index
-    ? buildSeoStructuredData(route, {
-        siteUrl,
-        siteName: seo.siteName,
-        defaultImage: seo.defaultImage,
-      })
+    ? buildSeoStructuredData(route, structuredContext,
+        route?.contentKind ? buildStructuredDataForRoute(route, structuredContext) : undefined)
     : []
   const jsonLd = index ? JSON.stringify(routeStructuredData) : null
 

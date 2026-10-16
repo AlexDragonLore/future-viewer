@@ -1,5 +1,6 @@
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
+using FutureViewer.DomainServices.DTOs;
 
 namespace FutureViewer.DomainServices.Interfaces;
 
@@ -10,6 +11,7 @@ public interface IFeedbackRepository
     Task<ReadingFeedback?> GetByTokenAsync(string token, CancellationToken ct = default);
     Task<ReadingFeedback?> GetByReadingIdAsync(Guid readingId, CancellationToken ct = default);
     Task<IReadOnlyList<ReadingFeedback>> GetScoredByUserAsync(Guid userId, CancellationToken ct = default);
+    Task<FeedbackScoreStats> GetScoreStatsAsync(Guid userId, CancellationToken ct = default);
     Task<IReadOnlyList<ReadingFeedback>> GetByUserAsync(Guid userId, int take = 50, CancellationToken ct = default);
     Task<IReadOnlyList<ReadingFeedback>> SearchAsync(Guid? userId, FeedbackStatus? status, int skip, int take, CancellationToken ct = default);
     Task<int> CountAsync(Guid? userId, FeedbackStatus? status, CancellationToken ct = default);

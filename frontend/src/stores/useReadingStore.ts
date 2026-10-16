@@ -136,7 +136,7 @@ export const useReadingStore = defineStore('reading', () => {
           saveUnlockedGuestReading({ readingId: result.id, ownerUserId: auth.userId, expiresAt: continuation.expiresAt })
         }
         clearGuestContinuation()
-        void useAuthStore().refreshSubscription()
+        void useAuthStore().refreshSubscription({ force: true })
       }
       return true
     } catch (e) {
@@ -156,7 +156,7 @@ export const useReadingStore = defineStore('reading', () => {
           } catch {
             // Keep the unlock error and ticket so the preview can be restored later.
           }
-          if (session === accountSessionVersion()) void useAuthStore().refreshSubscription()
+          if (session === accountSessionVersion()) void useAuthStore().refreshSubscription({ force: true })
         }
       }
       return false
@@ -167,21 +167,27 @@ export const useReadingStore = defineStore('reading', () => {
 
   async function create(spreadType: SpreadType, question: string, questionWarningAcknowledged = false) {
     clearUnlockedGuestReading()
+    reset()
     loading.value = true
-    error.value = null
+    const session = accountSessionVersion()
     try {
-      current.value = await readingApi.create(
+      const result = await readingApi.create(
         spreadType,
         question,
         useDeckStore().current,
         questionWarningAcknowledged,
       )
-      void useAuthStore().refreshSubscription()
+      if (session !== accountSessionVersion()) throw new DOMException('Сеанс изменён', 'AbortError')
+      current.value = result
+      streamingText.value = result.interpretation ?? ''
+      streamingDone.value = true
+      cardsReady.value = true
+      void useAuthStore().refreshSubscription({ force: true })
     } catch (e) {
-      error.value = extractApiError(e, 'Не удалось создать расклад')
+      if (session === accountSessionVersion()) error.value = extractApiError(e, 'Не удалось создать расклад')
       throw e
     } finally {
-      loading.value = false
+      if (session === accountSessionVersion()) loading.value = false
     }
   }
 
@@ -229,7 +235,7 @@ export const useReadingStore = defineStore('reading', () => {
           if (current.value) {
             current.value = { ...current.value, interpretation: streamingText.value }
           }
-          void useAuthStore().refreshSubscription()
+          void useAuthStore().refreshSubscription({ force: true })
         },
       }, signal, questionWarningAcknowledged)
       .catch((e) => {

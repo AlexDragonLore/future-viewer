@@ -1,5 +1,6 @@
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -59,6 +60,17 @@ public sealed class FeedbackRepository : IFeedbackRepository
             .Take(take)
             .ToListAsync(ct);
     }
+
+    public async Task<FeedbackScoreStats> GetScoreStatsAsync(Guid userId, CancellationToken ct = default) =>
+        await _db.ReadingFeedbacks.AsNoTracking()
+            .Where(f => f.UserId == userId && f.Status == FeedbackStatus.Scored && f.AiScore != null)
+            .GroupBy(f => f.UserId)
+            .Select(group => new FeedbackScoreStats
+            {
+                ScoredCount = group.Count(),
+                Perfect10Count = group.Count(f => f.AiScore == 10),
+                AverageScore = group.Average(f => (double)f.AiScore!.Value)
+            }).SingleOrDefaultAsync(ct) ?? new FeedbackScoreStats();
 
     public async Task UpdateAsync(ReadingFeedback feedback, CancellationToken ct = default)
     {

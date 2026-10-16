@@ -1,4 +1,4 @@
-import { clearAccountSession, accountSessionVersion } from '@/utils/accountSession'
+import { clearAccountSession, accountSessionVersion, resetOnAccountChange } from '@/utils/accountSession'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '@/api/authApi'
@@ -13,6 +13,12 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = ref<boolean>(localStorage.getItem('fv_is_admin') === 'true')
   const subscription = ref<SubscriptionStatus | null>(null)
   const subscriptionLoading = ref(false)
+  let subscriptionGeneration = 0
+  let subscriptionRequest: { session: number; token: string; promise: Promise<void> } | null = null
+  resetOnAccountChange({ subscription, subscriptionLoading }, () => {
+    subscriptionGeneration++
+    subscriptionRequest = null
+  })
 
   const isAuthenticated = computed(() => !!token.value)
   const isSubscribed = computed(() => subscription.value?.isActive ?? false)
@@ -76,21 +82,34 @@ export const useAuthStore = defineStore('auth', () => {
     subscription.value = null
   }
 
-  async function refreshSubscription() {
-    if (!token.value) {
+  function refreshSubscription({ force = false }: { force?: boolean } = {}): Promise<void> {
+    const activeToken = token.value
+    if (!activeToken) {
+      subscriptionGeneration++
+      subscriptionRequest = null
       subscription.value = null
-      return
+      subscriptionLoading.value = false
+      return Promise.resolve()
     }
     const session = accountSessionVersion()
-    subscriptionLoading.value = true
-    try {
-      const value = await subscriptionApi.status()
-      if (session === accountSessionVersion()) subscription.value = value
-    } catch {
-      if (session === accountSessionVersion()) subscription.value = null
-    } finally {
-      if (session === accountSessionVersion()) subscriptionLoading.value = false
+    if (!force && subscriptionRequest?.session === session && subscriptionRequest.token === activeToken) {
+      return subscriptionRequest.promise
     }
+    // A mutation must observe status after that mutation, even if a page refresh is in flight.
+    const generation = ++subscriptionGeneration
+    const isCurrent = () => generation === subscriptionGeneration
+      && session === accountSessionVersion() && token.value === activeToken
+    subscriptionLoading.value = true
+    const promise = subscriptionApi.status()
+      .then(value => { if (isCurrent()) subscription.value = value })
+      .catch(() => { if (isCurrent()) subscription.value = null })
+      .finally(() => {
+        if (!isCurrent()) return
+        subscriptionRequest = null
+        subscriptionLoading.value = false
+      })
+    subscriptionRequest = { session, token: activeToken, promise }
+    return promise
   }
 
   return {

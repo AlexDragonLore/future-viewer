@@ -25,7 +25,6 @@ const performanceMode = computed(() => {
 
 const ambientEffectsActive = computed(() => !performanceMode.value && !prefersReducedMotion.value)
 const showFooter = computed(() => route.name !== 'reading')
-const useRouteTransition = computed(() => route.name !== 'reading' && route.name !== 'result')
 
 function syncSession(event: StorageEvent) {
   // Reload account-bound views if another tab changes or clears the credentials.
@@ -59,12 +58,7 @@ onBeforeUnmount(() => {
     <MistLayer :active="ambientEffectsActive" />
     <SiteHeader />
     <div class="relative z-10 flex flex-col min-h-screen pt-16">
-      <RouterView v-slot="{ Component }">
-        <Transition v-if="useRouteTransition" name="fade" mode="out-in">
-          <component :is="Component" />
-        </Transition>
-        <component v-else :is="Component" />
-      </RouterView>
+      <RouterView />
       <SiteFooter v-if="showFooter" />
     </div>
     <div class="screen-vignette pointer-events-none fixed inset-0 z-[5]"></div>
@@ -81,25 +75,10 @@ onBeforeUnmount(() => {
   box-shadow: inset 0 0 52px 10px rgba(0, 0, 0, 0.2);
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.5s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
 @media (max-width: 640px) {
   .screen-vignette {
     box-shadow: inset 0 0 36px 6px rgba(0, 0, 0, 0.12);
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .fade-enter-active,
-  .fade-leave-active {
-    transition: none;
-  }
-}
 </style>

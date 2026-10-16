@@ -1,20 +1,25 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { readingApi } from '@/api/readingApi'
 import { extractApiError } from '@/api/httpClient'
-import type { Reading } from '@/types'
+import type { ReadingHistorySummary } from '@/types/history'
 import { Trash2 } from 'lucide-vue-next'
 import { useReadingStore } from '@/stores/useReadingStore'
 
-const readings = ref<Reading[]>([])
+const readings = ref<ReadingHistorySummary[]>([])
+const pageSize = 20
+const page = ref(1)
+const total = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
+const heading = ref<HTMLElement | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const deletingIds = ref<Set<string>>(new Set())
-const pendingDeletion = ref<Reading | null>(null)
+const pendingDeletion = ref<ReadingHistorySummary | null>(null)
 const confirmDeleteButton = ref<HTMLButtonElement | null>(null)
 let initiatingDeleteButton: HTMLButtonElement | null = null
 
-async function confirmDeletion(reading: Reading, event: MouseEvent) {
+async function confirmDeletion(reading: ReadingHistorySummary, event: MouseEvent) {
   initiatingDeleteButton = event.currentTarget as HTMLButtonElement
   pendingDeletion.value = reading
   error.value = null
@@ -29,15 +34,31 @@ async function cancelDeletion() {
   initiatingDeleteButton = null
 }
 
-onMounted(async () => {
+async function loadPage(requestedPage = page.value, scroll = false) {
+  loading.value = true
+  error.value = null
   try {
-    readings.value = await readingApi.history()
+    let result = await readingApi.historySummary(requestedPage, pageSize)
+    const lastPage = Math.max(1, Math.ceil(result.total / pageSize))
+    if (result.items.length === 0 && requestedPage > lastPage) {
+      result = await readingApi.historySummary(lastPage, pageSize)
+    }
+    readings.value = result.items
+    total.value = result.total
+    page.value = result.page
+    if (scroll) {
+      await nextTick()
+      heading.value?.focus({ preventScroll: true })
+      heading.value?.scrollIntoView({ block: 'start', behavior: 'auto' })
+    }
   } catch (e) {
     error.value = extractApiError(e, 'Не удалось загрузить историю')
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(() => loadPage())
 
 async function deleteReading() {
   const reading = pendingDeletion.value
@@ -49,8 +70,11 @@ async function deleteReading() {
     const activeReading = useReadingStore()
     if (activeReading.current?.id === reading.id) activeReading.reset()
     readings.value = readings.value.filter((item) => item.id !== reading.id)
+    total.value = Math.max(0, total.value - 1)
+    page.value = Math.min(page.value, totalPages.value)
     pendingDeletion.value = null
     initiatingDeleteButton = null
+    await loadPage(page.value)
   } catch (e) {
     error.value = extractApiError(e, 'Не удалось удалить расклад')
   } finally {
@@ -63,13 +87,17 @@ async function deleteReading() {
 
 <template>
   <main class="history-page w-full min-h-screen px-4 sm:px-6 py-12 sm:py-16 max-w-3xl mx-auto">
-    <header class="mb-8 text-center">
+    <header ref="heading" tabindex="-1" class="history-heading mb-8 text-center">
       <div class="history-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АРХИВ ✦</div>
       <h1 class="font-display text-4xl gold-text">История</h1>
+      <p v-if="total" class="text-xs text-mystic-silver/60 mt-2">Сохранено раскладов: {{ total }}</p>
     </header>
 
     <div v-if="loading" class="text-center text-mystic-silver/60">загружаю…</div>
-    <div v-if="error" role="alert" class="text-center text-red-300 mb-4">{{ error }}</div>
+    <div v-if="error" role="alert" class="text-center text-red-300 mb-4">
+      {{ error }}
+      <button v-if="!pendingDeletion" type="button" class="history-page-button ml-2" :disabled="loading" @click="loadPage()">Повторить</button>
+    </div>
     <div v-if="!loading && !error && readings.length === 0" class="text-center text-mystic-silver/60">
       Пока что пусто. Сделай первый расклад.
     </div>
@@ -84,8 +112,8 @@ async function deleteReading() {
             <div class="font-display text-mystic-accent">{{ r.spreadName }}</div>
             <div class="text-xs text-mystic-silver/50">{{ new Date(r.createdAt).toLocaleString() }}</div>
           </div>
-          <p class="italic text-mystic-silver/70 mb-2">«{{ r.question }}»</p>
-          <p class="text-sm text-mystic-silver/90 line-clamp-3">{{ r.interpretation }}</p>
+          <p class="history-question italic text-mystic-silver/70 mb-2">«{{ r.question }}»</p>
+          <p class="text-sm text-mystic-silver/90 line-clamp-3">{{ r.interpretationPreview }}</p>
         </RouterLink>
         <div class="history-actions">
           <button
@@ -112,6 +140,16 @@ async function deleteReading() {
       </div>
     </form>
 
+    <nav v-if="totalPages > 1" class="history-pagination mt-6" aria-label="Страницы истории">
+      <button type="button" class="history-page-button" data-testid="history-previous"
+        :disabled="loading || page <= 1 || pendingDeletion !== null || deletingIds.size > 0"
+        @click="loadPage(page - 1, true)">Назад</button>
+      <span aria-live="polite">Страница {{ page }} из {{ totalPages }}</span>
+      <button type="button" class="history-page-button" data-testid="history-next"
+        :disabled="loading || page >= totalPages || pendingDeletion !== null || deletingIds.size > 0"
+        @click="loadPage(page + 1, true)">Далее</button>
+    </nav>
+
     <div class="text-center mt-8">
       <RouterLink to="/" class="glow-button inline-block">Новый расклад</RouterLink>
     </div>
@@ -119,6 +157,32 @@ async function deleteReading() {
 </template>
 
 <style scoped>
+.history-heading {
+  scroll-margin-top: 6rem;
+}
+.history-question {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: rgba(224, 212, 186, 0.75);
+}
+.history-page-button {
+  min-height: 44px;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid rgba(245, 194, 107, 0.3);
+  border-radius: 8px;
+  color: #f5c26b;
+}
+.history-page-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .history-item {
   position: relative;
   overflow: hidden;

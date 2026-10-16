@@ -1,5 +1,4 @@
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import { SEO_CONTENT_ROUTES } from '@/data/tarotSeoCatalog.js'
 import { buildSeoStructuredData } from './structuredData.js'
 import seoData from './routes.json'
 
@@ -27,7 +26,8 @@ interface SeoData {
 }
 
 const config = seoData as SeoData
-const indexableRoutes = [...config.indexableRoutes, ...SEO_CONTENT_ROUTES]
+const indexableRoutes = config.indexableRoutes
+let seoNavigation = 0
 
 function cleanSiteUrl(value: string | undefined): string {
   const fallback = config.siteUrl
@@ -110,7 +110,7 @@ function setVerificationTags() {
   setMetaName('yandex-verification', typeof yandex === 'string' && yandex.trim() ? yandex.trim() : null)
 }
 
-function setStructuredData(route: SeoRoute | undefined, index: boolean) {
+function setStructuredData(route: SeoRoute | undefined, index: boolean, contentData?: object[]) {
   const id = 'seo-managed-jsonld'
   let el = document.head.querySelector<HTMLScriptElement>(`script#${id}`)
   if (!route || !index) {
@@ -122,7 +122,7 @@ function setStructuredData(route: SeoRoute | undefined, index: boolean) {
     siteUrl: cleanSiteUrl(import.meta.env.VITE_SITE_URL),
     siteName: config.siteName,
     defaultImage: config.defaultImage,
-  })
+  }, contentData)
 
   if (data.length === 0) {
     el?.remove()
@@ -138,10 +138,7 @@ function setStructuredData(route: SeoRoute | undefined, index: boolean) {
   el.textContent = JSON.stringify(data)
 }
 
-export function applyRouteSeo(route: RouteLocationNormalizedLoaded) {
-  if (typeof document === 'undefined') return
-
-  const indexRoute = routeByName(indexableRoutes, route.name) ?? routeByPath(indexableRoutes, route.path)
+function applyMetadata(route: RouteLocationNormalizedLoaded, indexRoute?: SeoRoute, contentData?: object[]) {
   const noindexRoute = routeByName(config.noindexRoutes, route.name)
   const shouldIndex = !!indexRoute && route.meta.noindex !== true
   const seoRoute = indexRoute ?? noindexRoute
@@ -171,5 +168,36 @@ export function applyRouteSeo(route: RouteLocationNormalizedLoaded) {
   setMetaName('twitter:description', description)
   setMetaName('twitter:image', image)
   setVerificationTags()
-  setStructuredData(seoRoute, shouldIndex)
+  setStructuredData(seoRoute, shouldIndex, contentData)
+}
+
+// Public shell/private routes never import the full tarot catalog.
+export async function applyRouteSeo(route: RouteLocationNormalizedLoaded): Promise<void> {
+  if (typeof document === 'undefined') return
+  const navigation = ++seoNavigation
+  const path = normalizePath(route.path)
+  const contentRoute = route.meta.noindex !== true
+    && /^\/(?:faq|tarot\/(?:cards|spreads|decks)\/[^/]+)$/.test(path)
+  if (!contentRoute) {
+    applyMetadata(route, routeByName(indexableRoutes, route.name) ?? routeByPath(indexableRoutes, route.path))
+    return
+  }
+
+  // Do not retain the previous page's structured data while content metadata loads.
+  setStructuredData(undefined, false)
+  setMetaName('robots', 'noindex, nofollow')
+  try {
+    const catalog = await import('@/data/tarotSeoCatalog.js')
+    if (navigation !== seoNavigation) return
+    const content = catalog.findSeoContentRouteByPath(path)
+    const data = content ? catalog.buildStructuredDataForRoute(content, {
+      siteUrl: cleanSiteUrl(import.meta.env.VITE_SITE_URL),
+      siteName: config.siteName,
+      defaultImage: config.defaultImage,
+    }) : undefined
+    applyMetadata(route, content, data)
+  } catch {
+    // Optional metadata loading cannot block navigation or restore stale public metadata.
+    if (navigation === seoNavigation) applyMetadata(route)
+  }
 }

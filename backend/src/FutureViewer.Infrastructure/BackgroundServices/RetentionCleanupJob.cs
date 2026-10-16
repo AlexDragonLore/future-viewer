@@ -32,10 +32,10 @@ public sealed class RetentionCleanupJob : BackgroundService
                 using var scope = _scopes.CreateScope();
                 var repository = scope.ServiceProvider.GetRequiredService<IPrivacyRepository>();
                 var now = DateTime.UtcNow;
-                var transientDeleted = await repository.PurgeUnsavedReadingsBeforeAsync(
+                var transientDeleted = await RetentionCleanupBatch.RunAsync(repository.PurgeUnsavedReadingsBeforeAsync,
                     now.AddHours(-Math.Max(24, _options.UnsavedReadingRetentionHours)),
                     stoppingToken);
-                var auditDeleted = await repository.PurgeAuditEventsBeforeAsync(
+                var auditDeleted = await RetentionCleanupBatch.RunAsync(repository.PurgeAuditEventsBeforeAsync,
                     now.AddDays(-Math.Max(30, _options.AuditEventRetentionDays)),
                     stoppingToken);
                 if (transientDeleted > 0 || auditDeleted > 0)

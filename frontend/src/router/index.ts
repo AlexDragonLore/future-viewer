@@ -65,6 +65,6 @@ router.beforeEach((to) => {
   }
 })
 
-router.afterEach((to) => {
-  applyRouteSeo(to)
+router.afterEach((to, _from, failure) => {
+  if (!failure) void applyRouteSeo(to)
 })

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
-import { SubscriptionStatusValue, type RegisterPayload } from '@/types'
+import { SubscriptionStatusValue, type RegisterPayload, type SubscriptionStatus } from '@/types'
 
 vi.mock('@/api/authApi', () => ({
   authApi: {
@@ -42,6 +42,7 @@ vi.mock('@/api/subscriptionApi', () => ({
 }))
 
 import { useAuthStore } from '@/stores/useAuthStore'
+import { subscriptionApi } from '@/api/subscriptionApi'
 
 describe('useAuthStore', () => {
   beforeEach(() => {
@@ -216,5 +217,96 @@ describe('account data isolation', () => {
     expect(reading.pending).toBeNull()
     expect(reading.streamingText).toBe('')
     expect(admin.userSearch).toBeNull()
+  })
+})
+
+
+describe('subscription refresh concurrency', () => {
+  const value = (isActive: boolean): SubscriptionStatus => ({
+    status: isActive ? SubscriptionStatusValue.Active : SubscriptionStatusValue.None,
+    expiresAt: null, isActive, freeReadingsUsedToday: 0, freeReadingsDailyLimit: 1,
+    canCreateIntroReading: !isActive, canCreateFreeReading: true,
+  })
+  beforeEach(() => {
+    localStorage.clear()
+    setActivePinia(createPinia())
+    vi.mocked(subscriptionApi.status).mockReset()
+  })
+  it('shares one in-flight request for concurrent header and page refreshes', async () => {
+    let finish!: (status: SubscriptionStatus) => void
+    vi.mocked(subscriptionApi.status).mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const auth = useAuthStore()
+    auth.token = 'same-session'
+    const first = auth.refreshSubscription()
+    const second = auth.refreshSubscription()
+    expect(subscriptionApi.status).toHaveBeenCalledTimes(1)
+    expect(auth.subscriptionLoading).toBe(true)
+    finish(value(true))
+    await Promise.all([first, second])
+    expect(auth.isSubscribed).toBe(true)
+    expect(auth.subscriptionLoading).toBe(false)
+  })
+  it('a post-mutation refresh supersedes older status and subsequent calls join the fresh request', async () => {
+    let finishOld!: (status: SubscriptionStatus) => void
+    let finishFresh!: (status: SubscriptionStatus) => void
+    vi.mocked(subscriptionApi.status)
+      .mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+      .mockImplementationOnce(() => new Promise(resolve => { finishFresh = resolve }))
+    const auth = useAuthStore()
+    auth.token = 'same-session'
+    const old = auth.refreshSubscription()
+    const fresh = auth.refreshSubscription({ force: true })
+    const joined = auth.refreshSubscription()
+    expect(subscriptionApi.status).toHaveBeenCalledTimes(2)
+    finishFresh(value(true))
+    await Promise.all([fresh, joined])
+    finishOld(value(false))
+    await old
+    expect(auth.isSubscribed).toBe(true)
+    expect(auth.subscriptionLoading).toBe(false)
+  })
+  it('allows retry after failure and does not cache completed status indefinitely', async () => {
+    vi.mocked(subscriptionApi.status).mockRejectedValueOnce(new Error('network')).mockResolvedValue(value(true))
+    const auth = useAuthStore()
+    auth.token = 'session'
+    await auth.refreshSubscription()
+    expect(auth.subscription).toBeNull()
+    expect(auth.subscriptionLoading).toBe(false)
+    await auth.refreshSubscription()
+    expect(auth.isSubscribed).toBe(true)
+    await auth.refreshSubscription()
+    expect(subscriptionApi.status).toHaveBeenCalledTimes(3)
+  })
+  it('ignores an old response after logout and a new token', async () => {
+    let finishOld!: (status: SubscriptionStatus) => void
+    vi.mocked(subscriptionApi.status)
+      .mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+      .mockResolvedValueOnce(value(false))
+    const auth = useAuthStore()
+    auth.token = 'old-token'
+    const old = auth.refreshSubscription()
+    auth.logout()
+    auth.token = 'new-token'
+    await auth.refreshSubscription()
+    finishOld(value(true))
+    await old
+    expect(auth.isSubscribed).toBe(false)
+    expect(auth.subscriptionLoading).toBe(false)
+    expect(subscriptionApi.status).toHaveBeenCalledTimes(2)
+  })
+  it('does not share a pending request with a different token in the same session', async () => {
+    let finishOld!: (status: SubscriptionStatus) => void
+    vi.mocked(subscriptionApi.status)
+      .mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve }))
+      .mockResolvedValueOnce(value(false))
+    const auth = useAuthStore()
+    auth.token = 'old-token'
+    const old = auth.refreshSubscription()
+    auth.token = 'replacement-token'
+    await auth.refreshSubscription()
+    finishOld(value(true))
+    await old
+    expect(auth.isSubscribed).toBe(false)
+    expect(subscriptionApi.status).toHaveBeenCalledTimes(2)
   })
 })

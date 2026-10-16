@@ -9,15 +9,14 @@ const reading = { ...adminReadingFixtures[0], interpretation: undefined, hasInte
 
 describe('AdminReadingMessage', () => {
   beforeEach(() => { fetchAnswer.mockReset() })
-  it('fetches and renders an answer only when opened, reuses it, and expands the full question', async () => {
+  it('fetches and renders an answer only when opened, reuses it, and shows the full question immediately', async () => {
     fetchAnswer.mockResolvedValue({ id: reading.id, interpretation: '**Полный ответ**' })
     const wrapper = mount(AdminReadingMessage, { props: { reading } })
     expect(fetchAnswer).not.toHaveBeenCalled()
     expect(wrapper.get('[data-testid="admin-reading-expand"]').attributes('aria-label')).toBe('Показать ответ ИИ')
     expect(wrapper.find('[data-testid="admin-reading-answer"]').exists()).toBe(false)
-    expect(wrapper.get('[data-testid="admin-question-expand"]').attributes('aria-label')).toBe('Показать весь вопрос')
-    expect(wrapper.get('[data-testid="admin-question-expand"]').text()).toBe('')
-    await wrapper.get('[data-testid="admin-question-expand"]').trigger('click')
+    expect(wrapper.find('[data-testid="admin-question-expand"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="admin-reading-question"]').text()).toBe(reading.question)
     expect(wrapper.get('[data-testid="admin-reading-question"]').classes()).not.toContain('collapsed')
     await wrapper.get('[data-testid="admin-reading-expand"]').trigger('click')
     await flushPromises()

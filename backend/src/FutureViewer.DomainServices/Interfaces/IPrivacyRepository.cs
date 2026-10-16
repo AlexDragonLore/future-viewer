@@ -38,7 +38,7 @@ public interface IPrivacyRepository
     Task MarkDeletionJobFailedAsync(Guid jobId, string reasonCode, CancellationToken ct = default);
 
     Task AddAuditEventAsync(AuditEvent auditEvent, CancellationToken ct = default);
-    Task<int> PurgeGuestReadingsBeforeAsync(DateTime cutoff, CancellationToken ct = default);
-    Task<int> PurgeUnsavedReadingsBeforeAsync(DateTime cutoff, CancellationToken ct = default);
-    Task<int> PurgeAuditEventsBeforeAsync(DateTime cutoff, CancellationToken ct = default);
+    Task<int> PurgeGuestReadingsBeforeAsync(DateTime cutoff, CancellationToken ct = default, int batchSize = 500);
+    Task<int> PurgeUnsavedReadingsBeforeAsync(DateTime cutoff, CancellationToken ct = default, int batchSize = 500);
+    Task<int> PurgeAuditEventsBeforeAsync(DateTime cutoff, CancellationToken ct = default, int batchSize = 500);
 }

@@ -163,6 +163,15 @@ public static class ReadingEndpoints
             return Results.Ok(history);
         }).RequireAuthorization();
 
+        group.MapGet("/history/summary", async (
+            int? page, int? pageSize, ReadingService service, HttpContext ctx, CancellationToken ct) =>
+        {
+            var userId = GetUserId(ctx.User)
+                ?? throw new DomainServices.Exceptions.UnauthorizedException("Authentication required");
+            ctx.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(await service.GetHistorySummaryAsync(userId, page ?? 1, pageSize ?? 20, ct));
+        }).RequireAuthorization();
+
         group.MapDelete("/{id:guid}", async (
             Guid id,
             ReadingService service,

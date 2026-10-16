@@ -277,24 +277,48 @@ public sealed class PrivacyRepository : IPrivacyRepository
     }
 
     public Task<int> PurgeGuestReadingsBeforeAsync(
-        DateTime cutoff,
-        CancellationToken ct = default) =>
-        _db.Readings
-            .Where(x => x.UserId == null && x.CreatedAt <= cutoff)
-            .ExecuteDeleteAsync(ct);
+        DateTime cutoff, CancellationToken ct = default, int batchSize = 500)
+    {
+        var take = Math.Clamp(batchSize, 1, 1000);
+        // Lock only the selected batch. Concurrent claims/cleanup skip each other's
+        // rows; recheck ownership in DELETE as well as in the candidate selection.
+        return _db.Database.ExecuteSqlInterpolatedAsync($"""
+            WITH batch AS (
+                SELECT id FROM readings WHERE user_id IS NULL AND created_at <= {cutoff}
+                ORDER BY created_at, id LIMIT {take} FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM readings AS reading USING batch
+            WHERE reading.id = batch.id AND reading.user_id IS NULL AND reading.created_at <= {cutoff}
+            """, ct);
+    }
 
     public Task<int> PurgeUnsavedReadingsBeforeAsync(
-        DateTime cutoff,
-        CancellationToken ct = default) =>
-        _db.Readings
-            // Guest content has its own longer retention policy and cleanup job.
-            .Where(x => x.UserId != null && !x.SavedToHistory && x.CreatedAt < cutoff)
-            .ExecuteDeleteAsync(ct);
+        DateTime cutoff, CancellationToken ct = default, int batchSize = 500)
+    {
+        var take = Math.Clamp(batchSize, 1, 1000);
+        return _db.Database.ExecuteSqlInterpolatedAsync($"""
+            WITH batch AS (
+                SELECT id FROM readings
+                WHERE user_id IS NOT NULL AND NOT saved_to_history AND created_at < {cutoff}
+                ORDER BY created_at, id LIMIT {take} FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM readings AS reading USING batch
+            WHERE reading.id = batch.id AND reading.user_id IS NOT NULL
+                AND NOT reading.saved_to_history AND reading.created_at < {cutoff}
+            """, ct);
+    }
 
     public Task<int> PurgeAuditEventsBeforeAsync(
-        DateTime cutoff,
-        CancellationToken ct = default) =>
-        _db.AuditEvents
-            .Where(x => x.OccurredAt < cutoff)
-            .ExecuteDeleteAsync(ct);
+        DateTime cutoff, CancellationToken ct = default, int batchSize = 500)
+    {
+        var take = Math.Clamp(batchSize, 1, 1000);
+        return _db.Database.ExecuteSqlInterpolatedAsync($"""
+            WITH batch AS (
+                SELECT id FROM audit_events WHERE occurred_at < {cutoff}
+                ORDER BY occurred_at, id LIMIT {take} FOR UPDATE SKIP LOCKED
+            )
+            DELETE FROM audit_events AS audit USING batch
+            WHERE audit.id = batch.id AND audit.occurred_at < {cutoff}
+            """, ct);
+    }
 }

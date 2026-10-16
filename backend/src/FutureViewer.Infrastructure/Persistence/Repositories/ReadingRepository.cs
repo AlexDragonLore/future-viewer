@@ -1,6 +1,7 @@
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.DTOs.Admin;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,25 @@ public sealed class ReadingRepository : IReadingRepository
             .Take(take)
             .ToListAsync(ct);
     }
+
+    private IQueryable<Reading> VisibleHistory(Guid userId) => _db.Readings.AsNoTracking()
+        .Where(r => r.UserId == userId && r.SavedToHistory && r.DeletedFromHistoryAt == null);
+
+    public async Task<IReadOnlyList<ReadingHistorySummaryDto>> GetHistorySummaryAsync(
+        Guid userId, int skip, int take, CancellationToken ct = default) =>
+        await VisibleHistory(userId).OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+            .Skip(skip).Take(take)
+            .Select(r => new ReadingHistorySummaryDto
+            {
+                Id = r.Id, SpreadType = r.SpreadType, Question = r.Question,
+                CreatedAt = r.CreatedAt, DeckType = r.DeckType,
+                // Substring is evaluated by PostgreSQL; the full body never leaves the database for this list.
+                InterpretationPreview = r.AiInterpretation == null
+                    ? null : r.AiInterpretation.Substring(0, ReadingHistorySummaryDto.PreviewLength)
+            }).ToListAsync(ct);
+
+    public Task<int> CountHistoryAsync(Guid userId, CancellationToken ct = default) =>
+        VisibleHistory(userId).CountAsync(ct);
 
     public async Task UpdateAsync(Reading reading, CancellationToken ct = default)
     {

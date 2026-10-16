@@ -179,11 +179,27 @@ public sealed class PrivacyServiceTests
                 {
                     PaymentId = "payment-1",
                     SubjectReference = fixture.User.PrivacySubjectId
-                }
+                },
+                new ProcessedPayment { PaymentId = "legacy-only", SubjectReference = fixture.User.PrivacySubjectId },
+                new ProcessedPayment { PaymentId = "PAYMENT-1", SubjectReference = fixture.User.PrivacySubjectId }
             });
         fixture.Privacy.Setup(x => x.GetPaymentOrdersAsync(
                 fixture.User.PrivacySubjectId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<PaymentOrder>());
+            .ReturnsAsync(new[]
+            {
+                new PaymentOrder
+                {
+                    SubjectReference = fixture.User.PrivacySubjectId, ProviderPaymentId = "payment-1",
+                    Provider = "test", IdempotencyKey = "paid", TariffCode = "pro-7d", AccessDays = 7,
+                    Amount = 99, Currency = "RUB", Status = PaymentOrderStatus.Paid
+                },
+                new PaymentOrder
+                {
+                    SubjectReference = fixture.User.PrivacySubjectId, ProviderPaymentId = null,
+                    Provider = "test", IdempotencyKey = "pending", TariffCode = "pro-30d", AccessDays = 30,
+                    Amount = 299, Currency = "RUB", Status = PaymentOrderStatus.Pending
+                }
+            });
         fixture.Privacy.Setup(x => x.GetDataSubjectRequestsAsync(fixture.User.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<DataSubjectRequest>());
 
@@ -191,7 +207,12 @@ public sealed class PrivacyServiceTests
             fixture.User.Id, "correct", "correlation", CancellationToken.None);
 
         export.Profile.Email.Should().Be(fixture.User.Email);
-        export.Payments.Should().ContainSingle(x => x.OrderId == "payment-1");
+        export.Payments.Should().HaveCount(4);
+        export.Payments.Should().ContainSingle(x => x.ProviderPaymentId == "payment-1" && x.Status == "Paid" && x.Amount == 99);
+        export.Payments.Should().ContainSingle(x => x.ProviderPaymentId == null && x.Status == "Pending");
+        export.Payments.Where(x => x.Status == "LegacyProcessed").Select(x => x.ProviderPaymentId)
+            .Should().BeEquivalentTo("legacy-only", "PAYMENT-1");
+        export.Payments.Should().BeInDescendingOrder(x => x.CreatedAt);
         fixture.Privacy.Verify(x => x.GetPaymentsAsync(
             fixture.User.PrivacySubjectId, It.IsAny<CancellationToken>()), Times.Once);
     }

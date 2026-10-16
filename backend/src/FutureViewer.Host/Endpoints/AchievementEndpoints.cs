@@ -36,8 +36,7 @@ public static class AchievementEndpoints
         {
             var userId = ctx.User.GetUserId()
                 ?? throw new UnauthorizedException("Authentication required");
-            await service.CheckAndGrantAsync(userId, ct);
-            var list = await service.GetAllWithUserStatusAsync(userId, ct);
+            var list = await service.CheckAndGetAllAsync(userId, ct);
             return Results.Ok(list);
         }).RequireAuthorization();
 

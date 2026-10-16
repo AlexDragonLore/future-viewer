@@ -41,16 +41,16 @@ const cardWidth = computed(() => {
 const displayed = ref('')
 const renderedHtml = ref('')
 const streamTail = ref<HTMLElement | null>(null)
-let rafId: number | null = null
-let markdownRafId: number | null = null
+let markdownTimer: ReturnType<typeof setTimeout> | null = null
+let disposed = false
 let scrollRafId: number | null = null
-let lastTick = 0
 let shouldFollowStream = true
 let userScrollIntent = false
 let userScrollIntentTimer: ReturnType<typeof setTimeout> | null = null
 
 const hasActiveStream = computed(() => store.streamingText.length > 0 || store.loading || store.cardsReady)
 const targetText = computed(() => store.streamingText || reading.value?.interpretation || '')
+const streaming = computed(() => !locked.value && hasActiveStream.value && !store.streamingDone)
 
 function distanceFromBottom() {
   const scroller = document.scrollingElement ?? document.documentElement
@@ -84,69 +84,34 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-function tick(now: number) {
-  rafId = null
-  const target = targetText.value
-  if (displayed.value.length >= target.length) {
-    lastTick = now
-    if (hasActiveStream.value && !store.streamingDone) scheduleTick()
-    return
-  }
-
-  const dt = lastTick === 0 ? 16 : Math.min(now - lastTick, 80)
-  lastTick = now
-
-  const behind = target.length - displayed.value.length
-  const baseRate = 55
-  const catchUp = behind * 0.12
-  const charsPerSec = baseRate + catchUp
-  const step = hasActiveStream.value ? Math.max(1, Math.round((charsPerSec * dt) / 1000)) : Math.max(1, Math.ceil(target.length / 3))
-  const next = Math.min(target.length, displayed.value.length + step)
-  displayed.value = target.slice(0, next)
-
-  if (displayed.value.length < target.length || !store.streamingDone) {
-    scheduleTick()
-  }
-}
-
-function scheduleTick() {
-  if (rafId !== null) return
-  rafId = requestAnimationFrame(tick)
-}
-
-function cancelTick() {
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId)
-    rafId = null
-  }
-}
-
-function renderMarkdown() {
-  markdownRafId = null
-  renderedHtml.value = safeMarkdown(displayed.value)
+function renderMarkdown(followStream = false) {
+  markdownTimer = null
+  if (disposed) return
+  const text = targetText.value
+  if (displayed.value === text) return
+  displayed.value = text
+  renderedHtml.value = safeMarkdown(text)
+  if (followStream) void nextTick(() => scheduleAutoScroll())
 }
 
 function scheduleMarkdownRender() {
-  if (markdownRafId !== null) return
-  if (typeof requestAnimationFrame === 'undefined') {
-    renderMarkdown()
-    return
-  }
-  markdownRafId = requestAnimationFrame(renderMarkdown)
+  if (markdownTimer !== null) return
+  // Render received SSE snapshots, without a second per-character playback loop.
+  // Long responses use a slower cadence so full Markdown parsing stays bounded.
+  markdownTimer = setTimeout(() => renderMarkdown(true), targetText.value.length > 10_000 ? 240 : 120)
 }
 
 function cancelMarkdownRender() {
-  if (markdownRafId !== null && typeof cancelAnimationFrame !== 'undefined') {
-    cancelAnimationFrame(markdownRafId)
-  }
-  markdownRafId = null
+  if (markdownTimer !== null) clearTimeout(markdownTimer)
+  markdownTimer = null
 }
 
 function scheduleAutoScroll() {
-  if (!streaming.value || scrollRafId !== null || !shouldFollowStream) return
+  if (disposed || scrollRafId !== null || !shouldFollowStream) return
   if (typeof requestAnimationFrame === 'undefined') return
   scrollRafId = requestAnimationFrame(() => {
     scrollRafId = null
+    if (disposed || !shouldFollowStream) return
     const tail = streamTail.value
     if (tail && typeof tail.scrollIntoView === 'function') {
       tail.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'auto' })
@@ -165,44 +130,31 @@ function cancelAutoScroll() {
 }
 
 watch(
-  [targetText, locked],
-  ([text, isPreview]) => {
-    // Guest previews arrive as complete responses, so no simulated stream is needed.
-    if (isPreview) {
-      cancelTick()
+  [targetText, streaming, () => reading.value?.id],
+  ([text, isStreaming, id], previous) => {
+    const sameReading = previous?.[2] === id
+    if (!sameReading || !text.startsWith(displayed.value)) {
       cancelMarkdownRender()
-      displayed.value = text
-      lastTick = 0
-      renderMarkdown()
+      cancelAutoScroll()
+      displayed.value = ''
+      renderedHtml.value = ''
+    }
+    if (!isStreaming) {
+      // Restored/completed responses and the final SSE flush are visible immediately.
+      cancelMarkdownRender()
+      renderMarkdown(Boolean(previous?.[1]) && sameReading)
       return
     }
-    if (text.length < displayed.value.length) {
-      displayed.value = ''
-      lastTick = 0
-    }
-    scheduleTick()
+    if (text !== displayed.value) scheduleMarkdownRender()
   },
   { immediate: true },
 )
 
-watch(
-  () => store.streamingDone,
-  (done) => {
-    if (done && displayed.value.length >= store.streamingText.length) cancelTick()
-  },
-)
-
-const streaming = computed(() => (hasActiveStream.value && !store.streamingDone) || displayed.value.length < targetText.value.length)
 const showPaidOffer = computed(() => auth.isAuthenticated && auth.subscription !== null
   && !auth.subscriptionLoading && !auth.isSubscribed
   && publicConfig.paymentsEnabled && publicConfig.paidProducts.length > 0
   && (!locked.value || store.guestUnlockBlocked) && !streaming.value && !store.loading && !restoring.value
   && Boolean(targetText.value.trim()))
-
-watch(displayed, () => {
-  scheduleMarkdownRender()
-  nextTick(() => scheduleAutoScroll())
-}, { immediate: true })
 
 onMounted(async () => {
   shouldFollowStream = true
@@ -225,12 +177,12 @@ async function resumeGuest() {
 }
 
 onBeforeUnmount(() => {
+  disposed = true
   window.removeEventListener('scroll', onScroll)
   window.removeEventListener('wheel', markUserScrollIntent)
   window.removeEventListener('touchmove', markUserScrollIntent)
   window.removeEventListener('keydown', onKeydown)
   if (userScrollIntentTimer) clearTimeout(userScrollIntentTimer)
-  cancelTick()
   cancelMarkdownRender()
   cancelAutoScroll()
 })
@@ -376,6 +328,7 @@ function again() {
   color: #f5c26b;
   margin-left: 2px;
 }
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
 @keyframes blink {
   to {
     visibility: hidden;

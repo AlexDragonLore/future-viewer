@@ -82,10 +82,10 @@ describe('applyRouteSeo', () => {
     expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).not.toContain('?')
   })
 
-  it('updates the prerendered managed JSON-LD rather than leaving stale homepage markup', () => {
+  it('updates the prerendered managed JSON-LD rather than leaving stale homepage markup', async () => {
     document.head.innerHTML = '<script id="seo-managed-jsonld" type="application/ld+json">[{"@type":"WebSite"}]</script>'
 
-    applyRouteSeo(route('tarot-card-seo', '/tarot/cards/shut'))
+    await applyRouteSeo(route('tarot-card-seo', '/tarot/cards/shut'))
 
     expect(document.head.querySelectorAll('script[type="application/ld+json"]')).toHaveLength(1)
     expect(document.head.querySelector('#seo-managed-jsonld')?.textContent).toContain('Шут')
@@ -109,8 +109,8 @@ describe('applyRouteSeo', () => {
     )
   })
 
-  it('applies indexable metadata for generated tarot content routes', () => {
-    applyRouteSeo(route('tarot-card-seo', '/tarot/cards/shut'))
+  it('applies indexable metadata for generated tarot content routes', async () => {
+    await applyRouteSeo(route('tarot-card-seo', '/tarot/cards/shut'))
 
     expect(document.title).toContain('Шут')
     expect(meta('meta[name="robots"]')?.content).toContain('index, follow')
@@ -122,4 +122,31 @@ describe('applyRouteSeo', () => {
       'BreadcrumbList',
     )
   })
+
+  it('ignores delayed content metadata after navigation to a private route', async () => {
+    const content = applyRouteSeo(route('tarot-card-seo', '/tarot/cards/shut'))
+    await applyRouteSeo(route('profile', '/profile', true))
+    await content
+    expect(document.title).toContain('Профиль')
+    expect(meta('meta[name="robots"]')?.content).toBe('noindex, nofollow')
+    expect(document.head.querySelector('#seo-managed-jsonld')).toBeNull()
+    expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe('https://alex-taro.ru/profile')
+  })
+
+  it('keeps only the most recent content navigation metadata', async () => {
+    const first = applyRouteSeo(route('tarot-card-seo', '/tarot/cards/shut'))
+    const second = applyRouteSeo(route('faq', '/faq'))
+    await Promise.all([first, second])
+    expect(document.title).toContain('Вопросы и ответы')
+    expect(document.head.querySelector('#seo-managed-jsonld')?.textContent).toContain('FAQPage')
+    expect(document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]')?.href).toBe('https://alex-taro.ru/faq')
+  })
+
+  it('does not index missing catalog content or leave another page structured data', async () => {
+    await applyRouteSeo(route('faq', '/faq'))
+    await applyRouteSeo(route('tarot-card-seo', '/tarot/cards/missing-card'))
+    expect(meta('meta[name="robots"]')?.content).toBe('noindex, nofollow')
+    expect(document.head.querySelector('#seo-managed-jsonld')).toBeNull()
+  })
+
 })

@@ -9,4 +9,4 @@ interface StructuredDataRoute {
   slug?: string
 }
 
-export function buildSeoStructuredData(route: StructuredDataRoute | undefined, context: StructuredDataContext): object[]
+export function buildSeoStructuredData(route: StructuredDataRoute | undefined, context: StructuredDataContext, contentData?: object[]): object[]

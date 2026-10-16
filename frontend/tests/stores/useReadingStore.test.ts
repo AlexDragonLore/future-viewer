@@ -18,6 +18,8 @@ vi.mock('@/api/readingApi', () => ({
 
 import { useReadingStore } from '@/stores/useReadingStore'
 import { useDeckStore } from '@/stores/useDeckStore'
+import { useAuthStore } from '@/stores/useAuthStore'
+import { clearAccountSession } from '@/utils/accountSession'
 
 const sampleReading: Reading = {
   id: 'r1',
@@ -57,6 +59,30 @@ describe('useReadingStore', () => {
     expect(store.current).toEqual(sampleReading)
     expect(store.loading).toBe(false)
     expect(store.error).toBeNull()
+  })
+
+  it('marks a non-streamed result complete and refreshes status after creation', async () => {
+    createMock.mockResolvedValue(sampleReading)
+    const refresh = vi.spyOn(useAuthStore(), 'refreshSubscription').mockResolvedValue()
+    const store = useReadingStore()
+    store.streamingText = 'Old result text'
+    await store.create(SpreadType.ThreeCard, 'what?')
+    expect(store.streamingDone).toBe(true)
+    expect(store.streamingText).toBe(sampleReading.interpretation)
+    expect(refresh).toHaveBeenCalledWith({ force: true })
+  })
+
+  it('does not restore a completed result after the account session changes', async () => {
+    let finish!: (value: Reading) => void
+    createMock.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const store = useReadingStore()
+    const pending = store.create(SpreadType.ThreeCard, 'private question')
+    clearAccountSession()
+    finish(sampleReading)
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    expect(store.current).toBeNull()
+    expect(store.streamingText).toBe('')
+    expect(store.loading).toBe(false)
   })
 
   it('create passes selected deck from deck store', async () => {

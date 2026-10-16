@@ -2,9 +2,12 @@ import { expect, test, type Page } from '@playwright/test'
 import { fullReading } from './guestReading.fixture'
 import { legalDocumentsResponse } from '../fixtures/legalDocuments'
 
-async function openHistory(page: Page) {
+async function openHistory(page: Page, count = 1) {
   const reading = { ...fullReading, question: `Как лучше подготовиться к переменам? ${'длинныйвопрос'.repeat(12)}` }
-  const state = { deleted: false, attempts: 0, unexpectedRequests: [] as string[] }
+  const readings = Array.from({ length: count }, (_, index) => ({
+    ...reading, id: index === 0 ? reading.id : `history-${index}`, question: `${reading.question}${index === 0 ? '' : ` №${index}`}`,
+  }))
+  const state = { deleted: false, attempts: 0, unexpectedRequests: [] as string[], historyPages: [] as number[] }
   const responses: Record<string, unknown> = {
     '/api/public/config': { supportEmail: '', paymentsEnabled: false },
     '/api/public/legal-documents': legalDocumentsResponse,
@@ -20,8 +23,19 @@ async function openHistory(page: Page) {
     if (path.startsWith('/api/readings/')) {
       expect(request.headers().authorization).toBe('Bearer local-history-fixture')
     }
-    if (request.method() === 'GET' && path === '/api/readings/history') {
-      return route.fulfill({ json: state.deleted ? [] : [reading] })
+    if (request.method() === 'GET' && path === '/api/readings/history/summary') {
+      const pageNumber = Number(new URL(request.url()).searchParams.get('page'))
+      const pageSize = Number(new URL(request.url()).searchParams.get('pageSize'))
+      expect(pageSize).toBe(20)
+      state.historyPages.push(pageNumber)
+      const retained = state.deleted ? readings.filter(item => item.id !== reading.id) : readings
+      return route.fulfill({ json: {
+        items: retained.slice((pageNumber - 1) * pageSize, pageNumber * pageSize).map(item => {
+          const { cards: _cards, interpretation, ...summary } = item
+          return { ...summary, interpretationPreview: interpretation?.slice(0, 240) ?? null }
+        }),
+        total: retained.length, page: pageNumber, pageSize,
+      } })
     }
     if (request.method() === 'DELETE' && path === `/api/readings/${reading.id}`) {
       state.attempts++
@@ -44,7 +58,7 @@ async function openHistory(page: Page) {
   })
   await page.goto('/history')
   await page.getByTestId('accept-necessary').click()
-  await expect(page.locator('.history-item')).toContainText(reading.question)
+  await expect(page.locator('.history-item').first()).toContainText(reading.question)
   await page.evaluate(() => document.fonts.ready)
   return state
 }
@@ -88,5 +102,30 @@ test('mobile history confirms soft deletion, keeps failed attempts and hides the
   await page.reload()
   await expect(page.getByText('Пока что пусто. Сделай первый расклад.')).toBeVisible()
   expect(state.attempts).toBe(2)
+  expect(state.unexpectedRequests).toEqual([])
+})
+
+test('history pages beyond fifty records and scrolls back to its heading at narrow widths', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 780 })
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const state = await openHistory(page, 61)
+  await expect(page.locator('.history-item')).toHaveCount(20)
+  for (let next = 2; next <= 4; next++) {
+    await page.getByTestId('history-next').click()
+    await expect(page.getByText(`Страница ${next} из 4`)).toBeVisible()
+    await expect(page.locator('.history-heading')).toBeFocused()
+    expect((await page.locator('.history-heading').boundingBox())!.y).toBeLessThan(160)
+  }
+  await expect(page.locator('.history-item')).toHaveCount(1)
+  await expect(page.locator('.history-item')).toContainText('№60')
+  await expect(page.getByTestId('history-next')).toBeDisabled()
+  const overflow = await page.locator('.history-page, .history-page *').evaluateAll(elements =>
+    elements.some(element => {
+      const bounds = element.getBoundingClientRect()
+      return bounds.width > 0 && (bounds.left < -1 || bounds.right > window.innerWidth + 1)
+    }))
+  expect(overflow).toBe(false)
+  await page.screenshot({ path: testInfo.outputPath('history-summary-pagination-mobile.png'), fullPage: true })
+  expect(state.historyPages).toEqual([1, 2, 3, 4])
   expect(state.unexpectedRequests).toEqual([])
 })

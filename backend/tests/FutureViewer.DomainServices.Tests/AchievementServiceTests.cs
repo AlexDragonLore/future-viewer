@@ -2,6 +2,7 @@ using FluentAssertions;
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.Interfaces;
+using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Services;
 using Moq;
 
@@ -59,16 +60,21 @@ public sealed class AchievementServiceTests
                 .ReturnsAsync(readingCount);
             Readings.Setup(r => r.GetDistinctReadingDatesAsync(user.Id, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
                 .ReturnsAsync(dates ?? Array.Empty<DateTime>());
-            Feedbacks.Setup(f => f.GetScoredByUserAsync(user.Id, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(scoredFeedbacks);
+            Feedbacks.Setup(f => f.GetScoreStatsAsync(user.Id, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new FeedbackScoreStats
+                {
+                    ScoredCount = scoredFeedbacks.Count,
+                    Perfect10Count = scoredFeedbacks.Count(f => f.AiScore == 10),
+                    AverageScore = scoredFeedbacks.Count == 0 ? 0 : scoredFeedbacks.Average(f => f.AiScore ?? 0)
+                });
 
             Achievements.Setup(a => a.GetAllAsync(It.IsAny<CancellationToken>()))
                 .ReturnsAsync(All);
             Achievements.Setup(a => a.GetByUserAsync(user.Id, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(() => Existing);
-            Achievements.Setup(a => a.GrantAsync(It.IsAny<UserAchievement>(), It.IsAny<CancellationToken>()))
-                .Callback((UserAchievement ua, CancellationToken _) => Granted.Add(ua))
-                .ReturnsAsync((UserAchievement ua, CancellationToken _) => ua);
+            Achievements.Setup(a => a.GrantManyAsync(It.IsAny<IReadOnlyCollection<UserAchievement>>(), It.IsAny<CancellationToken>()))
+                .Callback((IReadOnlyCollection<UserAchievement> rows, CancellationToken _) => Granted.AddRange(rows))
+                .ReturnsAsync((IReadOnlyCollection<UserAchievement> rows, CancellationToken _) => rows.ToArray());
 
             return new AchievementService(Achievements.Object, Readings.Object, Feedbacks.Object, Users.Object);
         }
@@ -238,4 +244,40 @@ public sealed class AchievementServiceTests
         result.First(r => r.Code == AchievementService.Codes.FirstReading).UnlockedAt.Should().Be(unlockedAt);
         result.First(r => r.Code == AchievementService.Codes.Total10).UnlockedAt.Should().BeNull();
     }
+    [Fact]
+    public async Task Combined_check_reuses_catalog_and_ownership_and_returns_new_unlocks()
+    {
+        var harness = new Harness();
+        var user = NewUser();
+        var sut = harness.Build(user, 50, []);
+        var result = await sut.CheckAndGetAllAsync(user.Id);
+        result.Should().HaveCount(11);
+        result.Where(a => a.UnlockedAt != null).Select(a => a.Code)
+            .Should().BeEquivalentTo("first_reading", "total_10", "total_50");
+        harness.Achievements.Verify(x => x.GetAllAsync(It.IsAny<CancellationToken>()), Times.Once);
+        harness.Achievements.Verify(x => x.GetByUserAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
+        harness.Achievements.Verify(x => x.GrantManyAsync(It.Is<IReadOnlyCollection<UserAchievement>>(a => a.Count == 3), It.IsAny<CancellationToken>()), Times.Once);
+        harness.Feedbacks.Verify(x => x.GetScoredByUserAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Combined_check_observes_unlock_won_by_concurrent_request()
+    {
+        var harness = new Harness();
+        var user = NewUser();
+        var sut = harness.Build(user, 1, []);
+        var winning = new UserAchievement
+        {
+            UserId = user.Id, AchievementId = harness.All.Single(a => a.Code == "first_reading").Id,
+            UnlockedAt = DateTime.UtcNow.AddMinutes(-1)
+        };
+        harness.Achievements.SetupSequence(x => x.GetByUserAsync(user.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]).ReturnsAsync([winning]);
+        harness.Achievements.Setup(x => x.GrantManyAsync(It.IsAny<IReadOnlyCollection<UserAchievement>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync([]);
+        var result = await sut.CheckAndGetAllAsync(user.Id);
+        result.Single(a => a.Code == "first_reading").UnlockedAt.Should().Be(winning.UnlockedAt);
+        harness.Achievements.Verify(x => x.GetAllAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
 }

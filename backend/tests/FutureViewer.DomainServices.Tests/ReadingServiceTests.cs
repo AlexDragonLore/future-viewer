@@ -267,6 +267,66 @@ public sealed class ReadingServiceTests
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Creating_authenticated_readings_does_not_load_or_forward_unused_personalization(bool streaming)
+    {
+        var repo = new Mock<IReadingRepository>();
+        repo.Setup(r => r.AddAsync(It.IsAny<Reading>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Reading r, CancellationToken _) => r);
+        var users = CompleteUserRepo();
+        var profileUsers = new Mock<IUserRepository>(MockBehavior.Strict);
+        var profileMemory = new Mock<IUserMemoryRepository>(MockBehavior.Strict);
+        var personalization = new PersonalizationService(profileUsers.Object, profileMemory.Object);
+        var ai = new Mock<IAIInterpreter>();
+        UserPromptContext? context = null;
+        ai.Setup(a => a.InterpretAsync(It.IsAny<Spread>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<ReadingCard>>(),
+                It.IsAny<DeckType>(), It.IsAny<IReadOnlyDictionary<int, string>>(), It.IsAny<UserPromptContext>(), It.IsAny<CancellationToken>()))
+            .Callback<Spread, string, IReadOnlyList<ReadingCard>, DeckType, IReadOnlyDictionary<int, string>, UserPromptContext, CancellationToken>(
+                (_, _, _, _, _, value, _) => context = value)
+            .ReturnsAsync(new InterpretationResult { Text = "answer", Model = "stub", GeneratedAt = DateTime.UtcNow });
+        ai.Setup(a => a.InterpretStreamAsync(It.IsAny<Spread>(), It.IsAny<string>(), It.IsAny<IReadOnlyList<ReadingCard>>(),
+                It.IsAny<DeckType>(), It.IsAny<IReadOnlyDictionary<int, string>>(), It.IsAny<UserPromptContext>(), It.IsAny<CancellationToken>()))
+            .Callback<Spread, string, IReadOnlyList<ReadingCard>, DeckType, IReadOnlyDictionary<int, string>, UserPromptContext, CancellationToken>(
+                (_, _, _, _, _, value, _) => context = value)
+            .Returns(StreamAnswer());
+        var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(),
+            Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
+        var service = new ReadingService(repo.Object, new CardDeckService(new TestDeck()), new InterpretationService(ai.Object),
+            subscription, new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>()),
+            personalization, AcceptedQuestionValidator().Object, EmptyMemoryExtractor().Object, users.Object,
+            NullLogger<ReadingService>.Instance);
+        var userId = Guid.NewGuid();
+        var request = new CreateReadingRequest
+        {
+            Question = "Что ждёт меня?", SpreadType = SpreadType.SingleCard,
+            ClientDate = new DateOnly(2026, 1, 1), ClientTimeZone = "private-location"
+        };
+        if (streaming)
+        {
+            await foreach (var _ in service.CreateStreamAsync(request, userId)) { }
+        }
+        else await service.CreateAsync(request, userId);
+
+        profileUsers.VerifyNoOtherCalls();
+        profileMemory.VerifyNoOtherCalls();
+        context.Should().NotBeNull();
+        context!.FirstName.Should().BeNull();
+        context.LastName.Should().BeNull();
+        context.BirthYear.Should().BeNull();
+        context.ClientTimeZone.Should().BeNull();
+        context.MemoryRules.Should().BeEmpty();
+        users.Verify(u => u.GetByIdAsync(userId, It.IsAny<CancellationToken>()), Times.Exactly(3));
+        users.Verify(u => u.LockAsync(userId, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private static async IAsyncEnumerable<string> StreamAnswer()
+    {
+        await Task.Yield();
+        yield return "answer";
+    }
+
     private static Mock<IUserRepository> CompleteUserRepo()
     {
         var users = new Mock<IUserRepository>();

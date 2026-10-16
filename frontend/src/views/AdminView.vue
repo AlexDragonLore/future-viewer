@@ -19,7 +19,7 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
 <template>
   <main class="admin-page w-full min-h-screen px-4 sm:px-6 py-6 sm:py-8 max-w-6xl mx-auto" data-testid="admin-view">
     <header class="admin-heading">
-      <h1 class="admin-title font-display text-2xl gold-text">Панель администратора</h1>
+      <h1 class="admin-title">Панель администратора</h1>
       <p class="admin-email text-mystic-muted text-xs">{{ auth.email }}</p>
     </header>
 
@@ -42,6 +42,7 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
 </template>
 
 <style scoped>
+.admin-title { font-family: inherit; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; color: #ece3f1; }
 .admin-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.35rem 1rem; margin-bottom: 0.75rem; }
 .admin-tab {
   min-height: 44px;
@@ -49,13 +50,11 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
   align-items: center;
   justify-content: center;
   padding: 0.5rem 1.25rem;
-  border-radius: 999px;
-  font-family: 'Cinzel', serif;
+  border-radius: 9px;
   font-size: 0.8rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
   color: rgba(224, 212, 186, 0.7);
-  border: 1px solid rgba(245, 194, 107, 0.2);
+  border: 1px solid transparent;
   transition:
     color 0.2s ease,
     border-color 0.2s ease,
@@ -69,9 +68,9 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
   border-color: rgba(245, 194, 107, 0.5);
 }
 .admin-tab.active {
-  background: rgba(245, 194, 107, 0.15);
+  background: rgba(202, 169, 118, 0.09);
   color: #f5c26b;
-  border-color: rgba(245, 194, 107, 0.7);
+  border-color: rgba(202, 169, 118, 0.2);
 }
 @media (max-width: 640px) {
   .admin-page {
@@ -93,7 +92,7 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
     text-align: center;
     padding: 0.55rem 0.75rem;
     font-size: 0.72rem;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
   }
 }
 </style>

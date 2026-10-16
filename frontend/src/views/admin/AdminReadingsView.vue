@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ArrowRight, RefreshCw, Search, X } from 'lucide-vue-next'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/useAdminStore'
 import AdminSubscriptionBadge from '@/components/admin/AdminSubscriptionBadge.vue'
@@ -44,26 +45,23 @@ function refresh() {
 <template>
   <section class="readings-view" data-testid="admin-readings-view">
     <div class="view-heading">
-      <div>
-        <h2 class="font-display text-xl gold-text">Последние сообщения</h2>
-      </div>
-      <button class="admin-button" :disabled="store.readingLoading" data-testid="admin-readings-refresh" @click="refresh">Обновить</button>
+      <h2>Сообщения</h2>
+      <button class="toolbar-action" type="button" :disabled="store.readingLoading" aria-label="Обновить сообщения" title="Обновить сообщения" data-testid="admin-readings-refresh" @click="refresh"><RefreshCw :size="17" :class="{ refreshing: store.readingLoading }" aria-hidden="true" /></button>
     </div>
 
-    <form class="search-toolbar mystic-card" @submit.prevent="search">
-      <label for="admin-reading-search">
-        <span>Поиск по email или вопросу</span>
-        <input id="admin-reading-search" v-model="searchInput" type="search" maxlength="200" placeholder="Email или текст вопроса" data-testid="admin-reading-search" />
-      </label>
-      <button type="submit" class="admin-button primary" :disabled="store.readingLoading">Найти</button>
-      <button v-if="store.readingSearch || searchInput" type="button" class="admin-button" :disabled="store.readingLoading" @click="clearSearch">Сбросить</button>
+    <form class="search-toolbar" @submit.prevent="search">
+      <label class="sr-only" for="admin-reading-search">Поиск по email или вопросу</label>
+      <Search class="search-leading" :size="17" aria-hidden="true" />
+      <input id="admin-reading-search" v-model="searchInput" type="search" maxlength="200" placeholder="Вопрос или email" data-testid="admin-reading-search" />
+      <button v-if="store.readingSearch || searchInput" type="button" class="toolbar-action clear-search" :disabled="store.readingLoading" aria-label="Сбросить поиск" title="Сбросить поиск" @click="clearSearch"><X :size="16" aria-hidden="true" /></button>
+      <button type="submit" class="search-submit" :disabled="store.readingLoading" aria-label="Найти" title="Найти"><ArrowRight :size="18" aria-hidden="true" /></button>
     </form>
 
     <p v-if="store.readingError" class="error" role="alert">{{ store.readingError }}<span v-if="store.readings.length"> Показана страница {{ store.readingDisplayedPage }}.</span></p>
     <p v-if="store.readingLoading" class="loading-status" role="status">Загружаю страницу {{ store.readingPage }}…</p>
     <p v-if="!store.readingLoading && !store.readingError && !store.readings.length" class="empty" data-testid="admin-readings-empty">{{ store.readingSearch ? 'По этому запросу сообщений нет.' : 'Сохранённых сообщений пока нет.' }}</p>
     <div v-if="store.readings.length" ref="readingList" class="reading-list" :aria-busy="store.readingLoading">
-      <article v-for="reading in store.readings" :key="reading.id" class="reading-card mystic-card" data-testid="admin-reading-row">
+      <article v-for="reading in store.readings" :key="reading.id" class="reading-card" data-testid="admin-reading-row">
         <AdminReadingMessage :reading="reading">
           <template #identity>
             <button v-if="reading.userId" class="user-link" :title="reading.userEmail ?? undefined" data-testid="admin-reading-user" @click="selectedUserId = reading.userId">{{ reading.userEmail ?? 'Открыть пользователя' }}</button>
@@ -88,32 +86,41 @@ function refresh() {
 
 <style scoped>
 .readings-view { min-width: 0; }
-.view-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; }
-.search-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem; margin-bottom: 0.5rem; }
-label { flex: 1 1 15rem; display: flex; flex-direction: column; gap: 0.5rem; color: rgba(224, 212, 186, 0.7); font-size: 0.8rem; }
-input { background: rgba(20, 16, 32, 0.7); border: 1px solid rgba(245, 194, 107, 0.3); border-radius: 8px; padding: 0.65rem 0.85rem; color: #f8f4eb; width: 100%; min-height: 44px; font-size: 1rem; }
-.admin-button { min-height: 44px; padding: 0.6rem 0.9rem; border: 1px solid rgba(245, 194, 107, 0.3); border-radius: 8px; color: #e0d4ba; font-size: 0.85rem; }
-.admin-button:hover:not(:disabled), .admin-button.primary { background: rgba(245, 194, 107, 0.1); color: #f5c26b; }
-.admin-button:disabled { opacity: 0.4; cursor: not-allowed; }
-.admin-button:focus-visible, input:focus-visible, .user-link:focus-visible { outline: 2px solid #f5c26b; outline-offset: 3px; }
-.reading-list { scroll-margin-top: 80px; display: flex; flex-direction: column; gap: 0.25rem; }
+.view-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.6rem; }
+.view-heading h2 { font-family: inherit; color: #e9e1ef; font-size: 1.1rem; line-height: 1.4; font-weight: 600; }
+.toolbar-action { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 9px; color: #b8abc8; }
+.toolbar-action:hover:not(:disabled) { background: rgba(198, 178, 224, 0.08); color: #eadbc3; }
+.search-toolbar { display: flex; align-items: center; gap: 0.4rem; min-width: 0; padding: 0.25rem 0.3rem 0.25rem 0.85rem; margin-bottom: 0.85rem; background: rgba(27, 20, 42, 0.85); border: 1px solid rgba(180, 158, 210, 0.18); border-radius: 11px; }
+.search-toolbar:focus-within { border-color: rgba(214, 183, 131, 0.55); box-shadow: 0 0 0 2px rgba(214, 183, 131, 0.06); }
+.search-leading { color: #897d99; flex-shrink: 0; }
+input { min-width: 0; flex: 1; background: transparent; border: 0; padding: 0.5rem 0.2rem; color: #f3edf6; min-height: 42px; font-size: 1rem; outline: none; }
+input::placeholder { color: #968aa6; }
+input::-webkit-search-cancel-button { display: none; }
+.search-submit { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; border-radius: 8px; color: #e1c397; background: rgba(220, 183, 120, 0.09); }
+.search-submit:hover:not(:disabled) { background: rgba(220, 183, 120, 0.16); }
+.admin-button { min-height: 40px; padding: 0.5rem 0.8rem; border: 1px solid rgba(180, 158, 210, 0.18); border-radius: 9px; color: #d7c9e1; font-size: 0.8rem; }
+.admin-button:hover:not(:disabled) { background: rgba(198, 178, 224, 0.08); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid #d6b783; outline-offset: 2px; }
+.reading-list { scroll-margin-top: 80px; display: flex; flex-direction: column; gap: 0.45rem; }
 .loading-status { color: #bcb0c7; font-size: 0.75rem; margin-bottom: 0.4rem; }
-.reading-card { padding: 0.35rem 0.65rem 0; }
-.user-link { display: block; width: 100%; min-width: 0; min-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; text-align: left; color: #f5c26b; font-size: 0.74rem; line-height: 1.4; overflow-wrap: anywhere; }
-.user-link span { opacity: 0.5; }
-.guest-label { margin-bottom: 0.25rem; color: #e0d4ba; font-size: 0.8125rem; line-height: 1.4; }
-.reading-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; color: rgba(224, 212, 186, 0.65); font-size: 0.8rem; }
-.reading-pager > div { display: flex; align-items: center; gap: 0.75rem; }
-.empty { text-align: center; padding: 2rem 0.5rem; color: rgba(224, 212, 186, 0.6); }
-.error { padding: 1rem; color: #fca5a5; background: rgba(248, 113, 113, 0.08); border-radius: 8px; }
+.reading-card { padding: 0.4rem 0.75rem 0.25rem; border: 1px solid rgba(176, 151, 203, 0.12); border-radius: 11px; background: rgba(27, 19, 43, 0.74); }
+.reading-card:hover, .reading-card:focus-within { border-color: rgba(194, 170, 220, 0.23); background: rgba(32, 23, 49, 0.84); }
+.user-link { display: block; width: 100%; min-width: 0; min-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; text-align: left; color: #d7b983; font-size: 0.75rem; font-weight: 500; line-height: 1.4; }
+.guest-label { color: #a7bfe0; font-size: 0.75rem; font-weight: 500; line-height: 1.4; }
+.reading-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; color: #a89ab7; font-size: 0.75rem; }
+.reading-pager > div { display: flex; align-items: center; gap: 0.6rem; }
+.empty { text-align: center; padding: 2rem 0.5rem; color: #a89ab7; }
+.error { padding: 0.8rem; color: #fca5a5; background: rgba(248, 113, 113, 0.08); border-radius: 9px; }
+.refreshing { animation: refresh-spin 1.2s linear infinite; }
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
 @media (max-width: 640px) {
-  .view-heading { align-items: flex-start; }
-  .view-heading .admin-button { flex-shrink: 0; }
-  .reading-card { padding: 0.25rem 0.55rem 0; }
+  .reading-card { padding: 0.2rem 0.65rem 0.3rem; }
   .user-link { min-height: 44px; }
-  .search-toolbar .admin-button { flex: 1; }
+  .toolbar-action, .search-submit { min-height: 44px; min-width: 44px; }
+  .clear-search { width: 32px; min-width: 32px; }
   .reading-pager { justify-content: center; }
   .reading-pager > div { width: 100%; justify-content: space-between; gap: 0.35rem; }
-  .reading-pager .admin-button { padding: 0.5rem; }
 }
+@media (prefers-reduced-motion: reduce) { .refreshing { animation: none; } }
 </style>

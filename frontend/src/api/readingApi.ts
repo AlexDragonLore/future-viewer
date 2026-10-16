@@ -2,6 +2,7 @@ import { httpClient } from './httpClient'
 import { accountSessionVersion, clearAccountSession } from '@/utils/accountSession'
 import { SpreadType, type DeckType, type Reading, type SpreadInfo } from '@/types'
 import type { GuestContinuation } from '@/utils/guestReading'
+import type { ReadingHistoryPage } from '@/types/history'
 
 export interface GuestReadingResponse extends GuestContinuation {
   reading: Reading
@@ -227,6 +228,11 @@ export const readingApi = {
 
   async history(): Promise<Reading[]> {
     const { data } = await httpClient.get<Reading[]>('/api/readings/history')
+    return data
+  },
+
+  async historySummary(page = 1, pageSize = 20): Promise<ReadingHistoryPage> {
+    const { data } = await httpClient.get<ReadingHistoryPage>('/api/readings/history/summary', { params: { page, pageSize } })
     return data
   },
 

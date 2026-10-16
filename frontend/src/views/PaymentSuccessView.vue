@@ -26,7 +26,7 @@ onMounted(async () => {
         } else if (['canceled', 'failed'].includes(payment.status)) clearPendingPayment()
       } catch { /* A failed check cannot imply a paid order. The user can retry. */ }
     }
-    await auth.refreshSubscription()
+    await auth.refreshSubscription({ force: true })
   }
   refreshing.value = false
 })

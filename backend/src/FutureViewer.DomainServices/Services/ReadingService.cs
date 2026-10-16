@@ -16,7 +16,6 @@ public sealed class ReadingService
     private readonly InterpretationService _interpreter;
     private readonly SubscriptionService _subscription;
     private readonly FeedbackService _feedback;
-    private readonly PersonalizationService _personalization;
     private readonly IAIQuestionValidator _questionValidator;
     private readonly IAiPrivacyGateway _privacyGateway;
     private readonly ILogger<ReadingService> _logger;
@@ -39,7 +38,7 @@ public sealed class ReadingService
         _interpreter = interpreter;
         _subscription = subscription;
         _feedback = feedback;
-        _personalization = personalization;
+        _ = personalization; // Compatibility only: the active interpreter intentionally ignores profile and memory.
         _questionValidator = questionValidator;
         _ = memoryExtractor; // Kept in the constructor for binary/test compatibility; extraction is disabled.
         _ = users; // Retained for constructor compatibility; history no longer has an account switch.
@@ -75,9 +74,7 @@ public sealed class ReadingService
         var privacy = _privacyGateway.Prepare(request.Question, AiPrivacyOperation.TarotInterpretation);
         EnsureAllowed(privacy);
         var spread = Spread.From(request.SpreadType);
-        var promptContext = userId is not null
-            ? await PreparePromptContextAsync(request, userId, ct)
-            : new UserPromptContext { Today = DateOnly.FromDateTime(DateTime.UtcNow), MemoryRules = [] };
+        var promptContext = EmptyPromptContext();
         if (userId is { } uid)
             await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
         var saveToHistory = userId is not null;
@@ -161,7 +158,7 @@ public sealed class ReadingService
         var privacy = _privacyGateway.Prepare(request.Question, AiPrivacyOperation.TarotInterpretation);
         EnsureAllowed(privacy);
         var spread = Spread.From(request.SpreadType);
-        var promptContext = await PreparePromptContextAsync(request, userId, ct);
+        var promptContext = EmptyPromptContext();
         var uid = userId ?? throw new UnauthorizedException("Authentication required");
         await _subscription.EnsureReadingAllowedAsync(uid, spread.Type, ct);
         var questionValidation = await ValidateQuestionAccessAsync(
@@ -264,6 +261,17 @@ public sealed class ReadingService
         return readings.Select(r => Map(r, Spread.From(r.SpreadType))).ToList();
     }
 
+    public async Task<ReadingHistoryPageDto> GetHistorySummaryAsync(
+        Guid userId, int page, int pageSize, CancellationToken ct = default)
+    {
+        var safeSize = Math.Clamp(pageSize, 1, 100);
+        var safePage = Math.Clamp(page, 1, int.MaxValue / safeSize);
+        var rows = await _repo.GetHistorySummaryAsync(userId, (safePage - 1) * safeSize, safeSize, ct);
+        var total = await _repo.CountHistoryAsync(userId, ct);
+        foreach (var row in rows) row.SpreadName = Spread.From(row.SpreadType).Name;
+        return new ReadingHistoryPageDto { Items = rows, Total = total, Page = safePage, PageSize = safeSize };
+    }
+
     public async Task DeleteFromHistoryAsync(Guid id, Guid userId, CancellationToken ct = default)
     {
         var reading = await _repo.GetByIdAsync(id, ct)
@@ -278,20 +286,11 @@ public sealed class ReadingService
         await _repo.UpdateAsync(reading, ct);
     }
 
-    private async Task<UserPromptContext> PreparePromptContextAsync(
-        CreateReadingRequest request,
-        Guid? userId,
-        CancellationToken ct)
+    private static UserPromptContext EmptyPromptContext() => new()
     {
-        if (userId is not { } uid)
-            throw new UnauthorizedException("Authentication required");
-
-        return await _personalization.GetPromptContextAsync(
-            uid,
-            request.ClientDate,
-            request.ClientTimeZone,
-            ct);
-    }
+        Today = DateOnly.FromDateTime(DateTime.UtcNow),
+        MemoryRules = []
+    };
 
     private async Task<QuestionValidationResult> ValidateQuestionAccessAsync(
         string safeQuestion,
