@@ -8,12 +8,11 @@ import sys
 import tarfile
 import tempfile
 
-RELEASE = "b6f262f213262ca7b906086dc72ff4ee4bcedb97"
-EXPECTED_CONFIGS = {
-    "backend": "72816cf0f6ffea53813e3dfc1db9ff6e5fa1f8d6916cf15156416b094c421e09",
-    "frontend": "301241380864794260346cfe9d15f2c5b29bbb2e8e29c3b3d28c6f0e0e1a4141",
-}
-TAGS = {role: f"future-viewer-{role}:{RELEASE}" for role in EXPECTED_CONFIGS}
+RELEASE = sys.argv[1] if len(sys.argv) == 4 else ''
+if not re.fullmatch(r'[0-9a-f]{40}', RELEASE) or not all(re.fullmatch(r'sha256:[0-9a-f]{64}', v) for v in sys.argv[2:]):
+    sys.exit('Expected pinned release and two archive configuration digests')
+EXPECTED_CONFIGS = {'backend': sys.argv[2][7:], 'frontend': sys.argv[3][7:]}
+TAGS = {role: f'future-viewer-{role}:{RELEASE}' for role in EXPECTED_CONFIGS}
 
 
 def require(condition, message):

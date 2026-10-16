@@ -4,12 +4,12 @@
 set -Eeuo pipefail
 umask 077
 
-readonly RELEASE=b6f262f213262ca7b906086dc72ff4ee4bcedb97
-readonly OLD_REV=d71d9bb5bbdb41f69873b430140de64aca76f513
-readonly OLD_BACKEND=future-viewer-backend:b42a732be9f5312186b0ab34be2e85bee7177ddc
-readonly OLD_FRONTEND=future-viewer-frontend:d71d9bb5bbdb41f69873b430140de64aca76f513
-readonly OLD_BACKEND_ID=sha256:0cdf32731cbabac8487b8cc64e7a4a995e070224e0d4bf669718f06bfae7e66a
-readonly OLD_FRONTEND_ID=sha256:0c44a6847d2a1d1eb826bf4d389e166b491f3b68a8996f07a3ea4ccaf46b3562
+readonly RELEASE=9128c51c5ed9abdb5432301fa09790058b2138fd
+readonly OLD_REV=b6f262f213262ca7b906086dc72ff4ee4bcedb97
+readonly OLD_BACKEND=future-viewer-backend:b6f262f213262ca7b906086dc72ff4ee4bcedb97
+readonly OLD_FRONTEND=future-viewer-frontend:b6f262f213262ca7b906086dc72ff4ee4bcedb97
+readonly OLD_BACKEND_ID=sha256:4aa52975d4c7e2b5cce64c963875f171a469b539fc2d74d99a7cbdebc4ff78bb
+readonly OLD_FRONTEND_ID=sha256:504a6680937aee60abe310bb9dab7eec2b9486205bbdff266ed7e514e9b7d189
 readonly OLD_CADDY_ID=sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 readonly CHECKOUT=/opt/future-viewer
 readonly ENV_FILE=/opt/fv-app/.env.production
@@ -154,7 +154,7 @@ finish() {
   if [[ -n "$STATE_DIR" ]]; then
     printf 'release=%s\nstatus=%s\nphase=%s\nexit_code=%s\n' "$RELEASE" "$result" "$failed_phase" "$code" >"$STATE_DIR/status"
   fi
-  printf 'Guest history delivery: %s (phase=%s).\n' "$result" "$failed_phase"
+  printf 'Admin release delivery: %s (phase=%s).\n' "$result" "$failed_phase"
   [[ -z "$STATE_DIR" ]] || printf 'Protected release record: %s\n' "$STATE_DIR"
   exit "$code"
 }
@@ -196,7 +196,7 @@ health || fail 'pre-deployment health failed'
 
 PHASE=capture
 install -d -m 700 -o root -g root /opt/fv-app/releases
-STATE_DIR=$(mktemp -d "/opt/fv-app/releases/guest-history-$RELEASE-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
+STATE_DIR=$(mktemp -d "/opt/fv-app/releases/admin-messages-$RELEASE-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
 chmod 700 "$STATE_DIR"
 cp -p "$ENV_FILE" "$STATE_DIR/env.before"
 snapshot "$STATE_DIR/before-state.json"
@@ -242,7 +242,7 @@ docker exec "$POSTGRES_ID" sh -euc \
 sha256sum "$STATE_DIR/database.dump.enc" >"$STATE_DIR/database.dump.enc.sha256"
 
 PHASE=isolated_restore
-RESTORE_NAME="fv-retention-restore-$(date -u +%s)-$(openssl rand -hex 6)"
+RESTORE_NAME="fv-admin-restore-$(date -u +%s)-$(openssl rand -hex 6)"
 TMPFS_BYTES=$(( DB_BYTES * 4 + 134217728 ))
 (( TMPFS_BYTES >= 268435456 )) || TMPFS_BYTES=268435456
 MEMORY_BYTES=$(( TMPFS_BYTES + 268435456 ))
@@ -320,6 +320,10 @@ health || fail 'production health did not recover'
 verify_snapshot "$NEW_BACKEND_ID" "$NEW_FRONTEND_ID" >/dev/null 2>&1 || fail 'image, persistence, or neighbor verification failed'
 docker exec "$(service_id frontend)" sh -ec 'grep -rq "Хранится 30 дней" /usr/share/nginx/html/assets' >/dev/null 2>&1 \
   || fail 'frontend retention label was not found'
+docker exec "$(service_id frontend)" sh -ec 'grep -rq "Куплено:" /usr/share/nginx/html/assets' >/dev/null 2>&1 \
+  || fail 'frontend purchased subscription label was not found'
+[[ $(curl --silent --max-time 15 --output /dev/null --write-out '%{http_code}' https://alex-taro.ru/api/admin/readings/00000000-0000-0000-0000-000000000000/interpretation) == 401 ]] \
+  || fail 'new admin answer endpoint is not available with authorization'
 migrations >"$STATE_DIR/migrations.after"
 cmp -s "$STATE_DIR/migrations.before" "$STATE_DIR/migrations.after" || fail 'database migrations changed'
 docker cp "$CADDY_ID:/etc/caddy/Caddyfile" "$STATE_DIR/Caddyfile.after" >/dev/null 2>&1

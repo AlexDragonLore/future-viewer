@@ -1,39 +1,148 @@
-name: admin-release-preflight
+name: admin-messages-release-delivery
+
 on:
   workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  RELEASE_SHA: 9128c51c5ed9abdb5432301fa09790058b2138fd
+
 jobs:
-  preflight:
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
     steps:
+      - uses: actions/checkout@v4
+        with:
+          path: delivery
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 9128c51c5ed9abdb5432301fa09790058b2138fd
+          path: release
+          persist-credentials: false
       - name: Configure existing deployment identity
         env:
           DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
         run: |
           set -euo pipefail
+          test -n "$DEPLOY_KEY"
           install -d -m 700 ~/.ssh
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/future_viewer_deploy
           chmod 600 ~/.ssh/future_viewer_deploy
           printf '%s\n' '80.87.104.245 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIe+wys2gdXm1hTHtWupCc1RMbVE296SI2SN34OXWltK' > ~/.ssh/known_hosts
-      - name: Verify running release and aggregate pagination payload
+          cat > ~/.ssh/config <<'SSH'
+          Host fv-retention-release
+            HostName 80.87.104.245
+            User deploy
+            IdentityFile ~/.ssh/future_viewer_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 25
+            ControlMaster auto
+            ControlPersist 600
+            ControlPath ~/.ssh/fv-retention-control
+          SSH
+          chmod 600 ~/.ssh/config ~/.ssh/known_hosts
+      - name: Read only public frontend build values
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/future_viewer_deploy -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@80.87.104.245 'bash -s' <<'REMOTE'
+          ssh fv-retention-release 'bash -s' > "$RUNNER_TEMP/frontend-build-args.json" <<'REMOTE_ARGS'
           set -euo pipefail
           cd /opt/future-viewer
-          git rev-parse HEAD
-          git status --short
-          sudo -n docker inspect future-viewer-backend-1 future-viewer-frontend-1 future-viewer-caddy-1 --format '{{.Name}} {{.Config.Image}} {{.Image}} {{.State.StartedAt}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
-          sudo -n env FV_SHARED_EDGE_PORT=18080 docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer ps
-          sudo -n docker exec -i future-viewer-postgres-1 sh -c 'PGOPTIONS="-c default_transaction_read_only=on -c statement_timeout=15000" psql -X -qAt -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
-          WITH visible AS (SELECT * FROM readings WHERE (user_id IS NOT NULL AND saved_to_history) OR (user_id IS NULL AND created_at > now()-interval '30 days' AND question<>'')), page AS (SELECT question,ai_interpretation FROM visible ORDER BY created_at DESC,id DESC LIMIT 20)
-          SELECT json_build_object('page_rows',count(*),'question_bytes',sum(octet_length(question)),'answer_bytes',sum(octet_length(coalesce(ai_interpretation,''))),'max_answer_bytes',max(octet_length(coalesce(ai_interpretation,'')))) FROM page;
-          SELECT json_build_object('retained_guests_older_than_24h',count(*) FILTER (WHERE created_at<now()-interval '24 hours'),'oldest_guest_hours',round(extract(epoch FROM now()-min(created_at))/3600,1)) FROM readings WHERE user_id IS NULL;
-          SELECT "MigrationId" FROM "__EFMigrationsHistory" ORDER BY "MigrationId";
-          SQL
-          REMOTE
-      - name: Remove temporary credential
+          sudo -n env FV_SHARED_EDGE_PORT=18080 docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer config --format json | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["services"]["frontend"]["build"]["args"]; assert all(k.startswith("VITE_") for k in a); json.dump(a,sys.stdout)'
+          REMOTE_ARGS
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("Preserved",len(d),"public frontend build arguments")' "$RUNNER_TEMP/frontend-build-args.json"
+      - name: Build exact tested backend and frontend
+        working-directory: release
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          docker build --platform linux/amd64 -t "future-viewer-backend:$RELEASE_SHA" backend
+          python3 - <<'PYBUILD'
+          import json,os,re,subprocess
+          from pathlib import Path
+          configured=json.load(open(os.environ['RUNNER_TEMP']+'/frontend-build-args.json'))
+          allowed=set(re.findall(r'^ARG (VITE_[A-Z0-9_]+)',Path('frontend/Dockerfile').read_text(),re.M))
+          assert set(configured)<=allowed
+          command=['docker','build','--platform','linux/amd64','--target','prod','-t','future-viewer-frontend:'+os.environ['RELEASE_SHA']]
+          for key,value in sorted(configured.items()): command+=['--build-arg',key+'='+str(value or '')]
+          subprocess.run(command+['frontend'],check=True)
+          PYBUILD
+      - name: Transfer and verify application images
+        run: |
+          set -euo pipefail
+          install -d "$RUNNER_TEMP/fv-delivery"
+          docker save "future-viewer-backend:$RELEASE_SHA" "future-viewer-frontend:$RELEASE_SHA" | gzip -1 > "$RUNNER_TEMP/fv-delivery/images.tar.gz"
+          python3 - <<'IMAGE_IDS'
+          import hashlib,json,os,tarfile
+          path=os.environ['RUNNER_TEMP']+'/fv-delivery/images.tar.gz'
+          with tarfile.open(path,'r:gz') as archive:
+              manifest=json.load(archive.extractfile('manifest.json'))
+              with open(os.environ['GITHUB_ENV'],'a') as output:
+                  for role in ('backend','frontend'):
+                      tag='future-viewer-'+role+':'+os.environ['RELEASE_SHA']
+                      matches=[item for item in manifest if tag in (item.get('RepoTags') or [])]
+                      assert len(matches)==1, 'Expected one archived image per service'
+                      config=archive.extractfile(matches[0]['Config']).read()
+                      parsed=json.loads(config)
+                      assert parsed['architecture']=='amd64' and parsed['os']=='linux'
+                      digest='sha256:'+hashlib.sha256(config).hexdigest()
+                      output.write('ARCHIVE_'+role.upper()+'_CONFIG_ID='+digest+'\n')
+                      print(role+' archived configuration: '+digest)
+          IMAGE_IDS
+          cp delivery/scripts/deploy-guest-history-release.sh "$RUNNER_TEMP/fv-delivery/deploy.sh"
+          cp delivery/scripts/verify-staged-retention-images.py "$RUNNER_TEMP/fv-delivery/verify-images.py"
+          cd "$RUNNER_TEMP/fv-delivery"
+          sha256sum images.tar.gz deploy.sh verify-images.py > SHA256SUMS
+          remote_dir="$(ssh fv-retention-release 'umask 077; mktemp -d /tmp/fv-history-release.XXXXXXXX')"
+          [[ "$remote_dir" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]
+          printf 'REMOTE_RELEASE_DIR=%s\n' "$remote_dir" >> "$GITHUB_ENV"
+          scp images.tar.gz deploy.sh verify-images.py SHA256SUMS "fv-retention-release:$remote_dir/"
+          ssh fv-retention-release "cd '$remote_dir' && sha256sum -c SHA256SUMS && sudo -n docker load -i images.tar.gz"
+          ssh fv-retention-release "sudo -n docker image inspect --format '{{.Id}}' 'future-viewer-backend:$RELEASE_SHA' 'future-viewer-frontend:$RELEASE_SHA'"
+      - name: Verify loaded image content and resolve server IDs
+        run: |
+          set -euo pipefail
+          [[ "$ARCHIVE_BACKEND_CONFIG_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
+          [[ "$ARCHIVE_FRONTEND_CONFIG_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
+          ssh fv-retention-release "sudo -n python3 '$REMOTE_RELEASE_DIR/verify-images.py' '$RELEASE_SHA' '$ARCHIVE_BACKEND_CONFIG_ID' '$ARCHIVE_FRONTEND_CONFIG_ID'" > "$RUNNER_TEMP/verified-image-ids.json"
+          python3 - <<'SERVER_IDS'
+          import json,os,re
+          values=json.load(open(os.environ['RUNNER_TEMP']+'/verified-image-ids.json'))
+          assert set(values)=={'backend','frontend'}
+          with open(os.environ['GITHUB_ENV'],'a') as output:
+              for role,value in values.items():
+                  assert re.fullmatch(r'sha256:[a-f0-9]{64}',value)
+                  output.write('NEW_'+role.upper()+'_IMAGE_ID='+value+'\n')
+                  print(role+' verified server ID: '+value)
+          SERVER_IDS
+      - name: Backup, verify restore and replace application services
+        run: |
+          set -euo pipefail
+          [[ "$REMOTE_RELEASE_DIR" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]
+          [[ "$NEW_BACKEND_IMAGE_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
+          [[ "$NEW_FRONTEND_IMAGE_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
+          ssh fv-retention-release "sudo -n bash '$REMOTE_RELEASE_DIR/deploy.sh' '$NEW_BACKEND_IMAGE_ID' '$NEW_FRONTEND_IMAGE_ID'"
+      - name: Public production smoke
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 25 https://alex-taro.ru/health
+          curl --fail --silent --show-error --max-time 25 -o /dev/null https://alex-taro.ru/
+          curl --fail --silent --show-error --max-time 25 -o /dev/null https://janetka.ru/
+          test "$(curl --silent --max-time 25 -o /dev/null -w '%{http_code}' https://alex-taro.ru/api/admin/readings)" = 401
+      - name: Remove temporary delivery and credential
         if: always()
-        run: rm -f ~/.ssh/future_viewer_deploy
+        run: |
+          if [[ "${REMOTE_RELEASE_DIR:-}" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]; then
+            ssh fv-retention-release "rm -f -- '$REMOTE_RELEASE_DIR/images.tar.gz' '$REMOTE_RELEASE_DIR/deploy.sh' '$REMOTE_RELEASE_DIR/verify-images.py' '$REMOTE_RELEASE_DIR/SHA256SUMS'; rmdir -- '$REMOTE_RELEASE_DIR'" || true
+          fi
+          ssh -O exit fv-retention-release 2>/dev/null || true
+          rm -f ~/.ssh/future_viewer_deploy
