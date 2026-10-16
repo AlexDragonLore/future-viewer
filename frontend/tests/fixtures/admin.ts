@@ -15,7 +15,7 @@ export const adminPaidSubscriptionFixture = {
   lastPurchase: { tariffCode: 'pro-30d', accessDays: 30, amount: 499, currency: 'RUB', completedAt: '2026-10-01T12:00:00Z' },
 }
 
-export const adminReadingFixtures = Array.from({ length: 21 }, (_, index) => ({
+export const adminReadingFixtures = Array.from({ length: 41 }, (_, index) => ({
   id: `cccccccc-cccc-4ccc-8ccc-${String(index + 1).padStart(12, '0')}`,
   userId: readerId,
   userEmail: readerEmail,

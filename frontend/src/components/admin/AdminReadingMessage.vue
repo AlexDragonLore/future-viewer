@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronsDown, Clock, EyeOff, Layers, MessageSquare } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import { findSpreadMeta } from '@/data/spreads'
 import { findDeckMeta } from '@/data/decks'
@@ -11,6 +12,10 @@ import type { AdminReadingSummary } from '@/types/admin'
 const props = defineProps<{ reading: AdminReadingSummary & { expiresAt?: string | null } }>()
 const questionId = useId()
 const answerId = useId()
+const createdAtLabel = computed(() => new Date(props.reading.createdAt).toLocaleString('ru-RU'))
+const shortCreatedAt = computed(() => new Date(props.reading.createdAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }))
+const spreadLabel = computed(() => [findSpreadMeta(props.reading.spreadType)?.label ?? 'Расклад', findDeckMeta(props.reading.deckType)?.label].filter(Boolean).join(' · '))
+const retentionLabel = computed(() => props.reading.expiresAt ? `Гостевой расклад хранится 30 дней, до ${new Date(props.reading.expiresAt).toLocaleString('ru-RU')}` : '')
 const questionElement = ref<HTMLElement | null>(null)
 const questionExpanded = ref(false)
 const questionOverflows = ref(false)
@@ -80,19 +85,18 @@ function toggleAnswer() {
 <template>
   <div class="reading-message">
     <div class="message-meta">
-      <slot name="identity" />
-      <time :datetime="reading.createdAt">{{ new Date(reading.createdAt).toLocaleString('ru-RU') }}</time>
-      <span>{{ findSpreadMeta(reading.spreadType)?.label ?? 'Расклад' }} · {{ findDeckMeta(reading.deckType)?.label }}</span>
-      <span v-if="reading.expiresAt" data-testid="admin-reading-retention">Хранится 30 дней · до <time :datetime="reading.expiresAt">{{ new Date(reading.expiresAt).toLocaleString('ru-RU') }}</time></span>
-      <span v-if="reading.deletedFromHistoryAt" class="hidden-badge" data-testid="admin-reading-hidden">Скрыт из истории</span>
+      <div v-if="$slots.identity" class="message-identity"><slot name="identity" /></div>
+      <slot name="subscription" />
+      <time class="message-time" :datetime="reading.createdAt" :title="createdAtLabel" :aria-label="createdAtLabel">{{ shortCreatedAt }}</time>
+      <span class="meta-icon" role="img" :title="spreadLabel" :aria-label="spreadLabel" data-testid="admin-reading-spread"><Layers :size="14" aria-hidden="true" /></span>
+      <span v-if="reading.expiresAt" class="meta-icon" role="img" :title="retentionLabel" :aria-label="retentionLabel" data-testid="admin-reading-retention"><Clock :size="14" aria-hidden="true" /></span>
+      <span v-if="reading.deletedFromHistoryAt" class="meta-icon" role="img" title="Скрыт из истории пользователем" aria-label="Скрыт из истории пользователем" data-testid="admin-reading-hidden"><EyeOff :size="14" aria-hidden="true" /></span>
+      <div class="message-actions">
+        <button v-if="canExpandQuestion" class="icon-action" type="button" :aria-expanded="questionExpanded" :aria-controls="questionId" :aria-label="questionExpanded ? 'Свернуть вопрос' : 'Показать весь вопрос'" :title="questionExpanded ? 'Свернуть вопрос' : 'Показать весь вопрос'" data-testid="admin-question-expand" @click="questionExpanded = !questionExpanded"><ChevronsDown :size="17" :class="{ rotated: questionExpanded }" aria-hidden="true" /></button>
+        <button v-if="hasAnswer" class="icon-action" type="button" :aria-expanded="answerOpen" :aria-controls="answerId" :aria-label="answerOpen ? 'Скрыть ответ ИИ' : 'Показать ответ ИИ'" :title="answerOpen ? 'Скрыть ответ ИИ' : 'Показать ответ ИИ'" data-testid="admin-reading-expand" @click="toggleAnswer"><MessageSquare :size="16" aria-hidden="true" /></button>
+      </div>
     </div>
-    <slot name="subscription" />
     <p :id="questionId" ref="questionElement" class="message-question" :class="{ collapsed: !questionExpanded }" data-testid="admin-reading-question">{{ reading.question || 'Текст вопроса не сохранён' }}</p>
-    <div class="message-actions">
-      <button v-if="canExpandQuestion" type="button" :aria-expanded="questionExpanded" :aria-controls="questionId" data-testid="admin-question-expand" @click="questionExpanded = !questionExpanded">{{ questionExpanded ? 'Свернуть вопрос' : 'Весь вопрос' }}</button>
-      <button v-if="hasAnswer" type="button" :aria-expanded="answerOpen" :aria-controls="answerId" data-testid="admin-reading-expand" @click="toggleAnswer">{{ answerOpen ? 'Скрыть ответ' : 'Ответ ИИ' }}</button>
-      <span v-else class="message-empty">Ответ пока отсутствует</span>
-    </div>
     <div v-if="answerOpen" :id="answerId" class="message-answer">
       <p v-if="answerLoading" role="status">Загружаю ответ…</p>
       <div v-else-if="answerError" role="alert"><p>{{ answerError }}</p><button type="button" @click="loadAnswer">Повторить</button></div>
@@ -104,12 +108,18 @@ function toggleAnswer() {
 
 <style scoped>
 .reading-message { min-width: 0; overflow-wrap: anywhere; }
-.message-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 0.15rem 0.65rem; color: rgba(224, 212, 186, 0.55); font-size: 0.68rem; line-height: 1.35; }
-.message-question { margin-top: 0.15rem; white-space: pre-wrap; font-size: 0.84rem; line-height: 1.4; color: #eee0cf; }
+.message-meta { display: flex; align-items: center; gap: 0.3rem; min-width: 0; min-height: 28px; color: rgba(224, 212, 186, 0.55); font-size: 0.66rem; line-height: 1.35; }
+.message-identity { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.message-time { flex-shrink: 0; white-space: nowrap; }
+.meta-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
+.message-question { margin: 0.05rem 0 0.35rem; white-space: pre-wrap; font-size: 0.84rem; line-height: 1.4; color: #eee0cf; }
 .message-question.collapsed { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.message-actions { display: flex; align-items: center; gap: 1rem; }
-button { min-height: 32px; color: #f5c26b; font-size: 0.73rem; text-align: left; }
-button:focus-visible { outline: 2px solid #f5c26b; outline-offset: 2px; border-radius: 3px; }
+.message-actions { display: flex; align-items: center; flex-shrink: 0; margin-left: auto; }
+button { color: #f5c26b; font-size: 0.73rem; text-align: left; }
+.icon-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; min-width: 28px; height: 28px; border-radius: 4px; }
+.icon-action:hover, .icon-action[aria-expanded="true"] { background: rgba(245, 194, 107, 0.1); }
+.rotated { transform: rotate(180deg); }
+button:focus-visible { outline: 2px solid #f5c26b; outline-offset: -2px; border-radius: 3px; }
 .message-answer { border-top: 1px solid rgba(245, 194, 107, 0.15); padding: 0.6rem 0 0.4rem; }
 .hidden-badge { color: #c8af8b; }
 .message-empty { color: rgba(224, 212, 186, 0.5); font-size: 0.72rem; }
@@ -122,6 +132,7 @@ button:focus-visible { outline: 2px solid #f5c26b; outline-offset: 2px; border-r
 .interpretation :deep(pre) { white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (max-width: 640px) {
   .message-question.collapsed { -webkit-line-clamp: 3; }
-  button { min-height: 44px; }
+  .message-meta { gap: 0.15rem; }
+  .icon-action { width: 44px; min-width: 44px; height: 44px; }
 }
 </style>

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAdminStore } from '@/stores/useAdminStore'
 import AdminReadingsView from '@/views/admin/AdminReadingsView.vue'
@@ -36,15 +36,19 @@ describe('AdminReadingsView', () => {
     const wrapper = mountReadings()
     const row = wrapper.get('[data-testid="admin-reading-row"]')
 
-    expect(row.get('[data-testid="admin-reading-guest"]').text()).toBe('Анонимный гость')
+    expect(row.get('[data-testid="admin-reading-guest"]').text()).toBe('Гость')
     expect(row.get('[data-testid="admin-reading-question"]').text()).toBe(guestReading.question)
     expect(row.find('[data-testid="admin-reading-user"]').exists()).toBe(false)
     expect(wrapper.find('admin-user-detail-drawer-stub').exists()).toBe(false)
     const retention = row.get('[data-testid="admin-reading-retention"]')
-    expect(retention.text()).toContain('Хранится 30 дней')
-    expect(retention.get('time').attributes('datetime')).toBe(guestReading.expiresAt)
-    expect(retention.get('time').text()).toBe(new Date(guestReading.expiresAt!).toLocaleString('ru-RU'))
-    expect(wrapper.text()).toContain('Гостевые вопросы и ответы хранятся 30 дней, зарегистрированных пользователей — бессрочно.')
+    expect(retention.attributes('aria-label')).toContain('30 дней')
+    expect(retention.attributes('title')).toContain(new Date(guestReading.expiresAt!).toLocaleString('ru-RU'))
+    expect(retention.text()).toBe('')
+    expect(wrapper.text()).not.toContain('Вопросы пользователей и гостей')
+    expect(wrapper.text()).not.toContain('Гостевые вопросы и ответы хранятся')
+    expect(wrapper.text()).not.toContain('Без подписки')
+    expect(row.get('[data-testid="admin-reading-spread"]').attributes('aria-label')).toContain('Rider–Waite–Smith')
+    expect(row.text()).not.toContain('Rider–Waite–Smith')
   })
 
   it('keeps saved readings linked to their user without a guest expiry notice', async () => {
@@ -57,6 +61,56 @@ describe('AdminReadingsView', () => {
     expect(row.get('[data-testid="admin-reading-user"]').text()).toContain(savedReading.userEmail)
     await row.get('[data-testid="admin-reading-user"]').trigger('click')
     expect(wrapper.getComponent({ name: 'AdminUserDetailDrawer' }).props('userId')).toBe(savedReading.userId)
+  })
+
+  it('opens the user drawer from a compact paid subscription badge', async () => {
+    useAdminStore().readings = [savedReading]
+    const wrapper = mountReadings()
+    const badge = wrapper.get('[data-testid="admin-subscription-button"]')
+    expect(badge.text()).toBe('30д')
+    expect(badge.attributes('aria-label')).toContain('499')
+    await badge.trigger('click')
+    expect(wrapper.getComponent({ name: 'AdminUserDetailDrawer' }).props('userId')).toBe(savedReading.userId)
+  })
+
+  it('scrolls after a successful page change but keeps the viewport on a failed request', async () => {
+    const store = useAdminStore()
+    store.readings = adminReadingFixtures.slice(0, 20)
+    store.readingTotal = 41
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const wrapper = mountReadings()
+    vi.mocked(store.loadReadings).mockImplementationOnce(async () => {
+      store.readings = adminReadingFixtures.slice(20, 40)
+      store.readingDisplayedPage = 2
+    })
+    await wrapper.get('[data-testid="admin-reading-next"]').trigger('click')
+    await flushPromises()
+    expect(scroll).toHaveBeenCalledOnce()
+    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ block: 'start' }))
+    scroll.mockClear()
+    vi.mocked(store.loadReadings).mockImplementationOnce(async () => { store.readingError = 'network'; store.readingPage = 2 })
+    await wrapper.get('[data-testid="admin-reading-next"]').trigger('click')
+    await flushPromises()
+    expect(scroll).not.toHaveBeenCalled()
+    scroll.mockRestore()
+  })
+
+  it('does not scroll for a superseded page request after a new search', async () => {
+    const store = useAdminStore()
+    store.readings = adminReadingFixtures.slice(0, 20)
+    store.readingTotal = 41
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
+    const wrapper = mountReadings()
+    let finish!: () => void
+    vi.mocked(store.loadReadings).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+    await wrapper.get('[data-testid="admin-reading-next"]').trigger('click')
+    await wrapper.get('[data-testid="admin-reading-search"]').setValue('new query')
+    await wrapper.get('form').trigger('submit')
+    store.readingDisplayedPage = 2
+    finish()
+    await flushPromises()
+    expect(scroll).not.toHaveBeenCalled()
+    scroll.mockRestore()
   })
 
 })

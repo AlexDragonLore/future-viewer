@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAdminStore } from '@/stores/useAdminStore'
 import AdminUsersTable from '@/components/admin/AdminUsersTable.vue'
@@ -9,6 +9,8 @@ const store = useAdminStore()
 const route = useRoute()
 const router = useRouter()
 const searchInput = ref(store.userSearch ?? '')
+const usersList = ref<HTMLElement | null>(null)
+let pageNavigation = 0
 const pageCount = computed(() => Math.max(1, Math.ceil(store.userTotal / store.userPageSize)))
 const openUserId = computed<string | null>(() => {
   const id = route.params.id
@@ -18,6 +20,7 @@ onMounted(() => store.loadUsers())
 
 function refresh(): void {
   if (store.userLoading) return
+  pageNavigation++
   if ((searchInput.value.trim() || null) !== store.userSearch) store.setUserSearch(searchInput.value)
   store.loadUsers(true)
 }
@@ -27,15 +30,17 @@ function clearSearch(): void {
   refresh()
 }
 
-function nextPage(): void {
-  store.setUserPage(store.userPage + 1)
-  store.loadUsers()
+async function changePage(page: number) {
+  const navigation = ++pageNavigation
+  store.setUserPage(page)
+  await store.loadUsers()
+  if (navigation !== pageNavigation || store.userLoading || store.userError || store.userDisplayedPage !== page) return
+  await nextTick()
+  if (navigation !== pageNavigation) return
+  usersList.value?.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
 }
-
-function prevPage(): void {
-  store.setUserPage(store.userPage - 1)
-  store.loadUsers()
-}
+function nextPage() { void changePage(store.userPage + 1) }
+function prevPage() { void changePage(store.userPage - 1) }
 
 function onSelect(id: string): void {
   router.push({ name: 'admin-user-detail', params: { id } })
@@ -72,7 +77,7 @@ function onCloseDrawer(): void {
     <div v-if="store.userToast" class="toast" role="status" data-testid="admin-user-toast">{{ store.userToast }}</div>
 
     <p v-if="store.userLoading && store.users.length" role="status" class="text-sm text-mystic-muted">Загружаю страницу {{ store.userPage }}…</p>
-    <div :aria-busy="store.userLoading"><AdminUsersTable @select="onSelect" /></div>
+    <div ref="usersList" class="users-list" :aria-busy="store.userLoading"><AdminUsersTable @select="onSelect" /></div>
 
     <div class="admin-pager flex justify-between items-center mt-4 text-sm text-mystic-muted">
       <span data-testid="admin-user-total">Всего: {{ store.userTotal }}</span>
@@ -95,6 +100,7 @@ function onCloseDrawer(): void {
 </template>
 
 <style scoped>
+.users-list { scroll-margin-top: 80px; }
 .admin-input {
   min-height: 44px;
   background: rgba(20, 16, 32, 0.6);
