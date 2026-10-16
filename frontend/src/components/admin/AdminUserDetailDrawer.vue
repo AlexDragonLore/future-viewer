@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/useAdminStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { FeedbackStatus, SubscriptionStatusValue } from '@/types'
+import AdminSubscriptionBadge from '@/components/admin/AdminSubscriptionBadge.vue'
 import AdminReadingMessage from '@/components/admin/AdminReadingMessage.vue'
 
 const props = defineProps<{ userId: string }>()
@@ -224,7 +225,8 @@ async function recheckAchievements(): Promise<void> {
       </section>
 
       <section class="section">
-        <h4>Доступ</h4>
+        <h4>Подписка и последняя покупка</h4>
+        <AdminSubscriptionBadge :subscription="store.selectedUser.subscription" show-purchase-date class="mb-3" />
         <div class="grid grid-cols-2 gap-3">
           <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
             <span>Статус</span>

@@ -19,7 +19,7 @@ onMounted(() => store.loadUsers())
 function refresh(): void {
   if (store.userLoading) return
   if ((searchInput.value.trim() || null) !== store.userSearch) store.setUserSearch(searchInput.value)
-  store.loadUsers()
+  store.loadUsers(true)
 }
 
 function clearSearch(): void {
@@ -68,16 +68,17 @@ function onCloseDrawer(): void {
       <button v-if="searchInput || store.userSearch" class="admin-btn" type="button" :disabled="store.userLoading" data-testid="admin-users-reset" @click="clearSearch">Сбросить</button>
     </form>
 
-    <div v-if="store.userError" class="error" role="alert" data-testid="admin-user-error">{{ store.userError }}</div>
+    <div v-if="store.userError" class="error" role="alert" data-testid="admin-user-error">{{ store.userError }}<span v-if="store.users.length"> Показана страница {{ store.userDisplayedPage }}.</span></div>
     <div v-if="store.userToast" class="toast" role="status" data-testid="admin-user-toast">{{ store.userToast }}</div>
 
-    <AdminUsersTable @select="onSelect" />
+    <p v-if="store.userLoading && store.users.length" role="status" class="text-sm text-mystic-muted">Загружаю страницу {{ store.userPage }}…</p>
+    <div :aria-busy="store.userLoading"><AdminUsersTable @select="onSelect" /></div>
 
     <div class="admin-pager flex justify-between items-center mt-4 text-sm text-mystic-muted">
       <span data-testid="admin-user-total">Всего: {{ store.userTotal }}</span>
       <div class="flex gap-2 items-center">
         <button class="admin-btn" :disabled="store.userLoading || store.userPage === 1" aria-label="Предыдущая страница пользователей" @click="prevPage">←</button>
-        <span class="page-number">{{ store.userPage }} / {{ pageCount }}</span>
+        <span class="page-number">{{ store.userDisplayedPage }} / {{ pageCount }}</span>
         <button
           class="admin-btn"
           :disabled="store.userLoading || store.userPage * store.userPageSize >= store.userTotal"

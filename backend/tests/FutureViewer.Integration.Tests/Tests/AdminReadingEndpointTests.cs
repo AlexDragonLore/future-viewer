@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
@@ -21,6 +22,8 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
     {
         var response = await fixture.CreateClient().GetAsync("/api/admin/readings");
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await fixture.CreateClient().GetAsync($"/api/admin/readings/{Guid.NewGuid()}/interpretation"))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
@@ -29,6 +32,59 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
         var (client, _) = await CreateClient();
         var response = await client.GetAsync("/api/admin/readings");
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await client.GetAsync($"/api/admin/readings/{Guid.NewGuid()}/interpretation"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Compact_list_omits_answer_body_and_loads_it_on_demand_with_the_same_visibility()
+    {
+        var (admin, _) = await CreateClient(admin: true);
+        var (_, owner) = await CreateClient();
+        var marker = Guid.NewGuid().ToString("N");
+        var body = $"PRIVATE-ANSWER-{marker}" + new string('a', 50_000);
+        var saved = Reading(owner.UserId, $"{marker} Вопрос", body);
+        saved.DeletedFromHistoryAt = DateTime.UtcNow;
+        var unfinished = Reading(owner.UserId, $"{marker} Без ответа", null);
+        var guest = new Reading
+        {
+            Question = $"{marker} Гостевой вопрос", AiInterpretation = body,
+            SpreadType = SpreadType.SingleCard, CreatedAt = DateTime.UtcNow.AddDays(-29)
+        };
+        var expired = new Reading
+        {
+            Question = $"{marker} Истёкший вопрос", AiInterpretation = body,
+            SpreadType = SpreadType.SingleCard, CreatedAt = DateTime.UtcNow.AddDays(-30)
+        };
+        var unsaved = Reading(owner.UserId, $"{marker} Несохранённый вопрос", body);
+        unsaved.SavedToHistory = false;
+        await Seed(saved, unfinished, guest, expired, unsaved);
+
+        var response = await admin.GetAsync($"/api/admin/readings?search={marker}&includeInterpretation=false");
+        response.EnsureSuccessStatusCode();
+        response.Headers.CacheControl!.NoStore.Should().BeTrue();
+        var json = await response.Content.ReadAsStringAsync();
+        json.Should().NotContain("PRIVATE-ANSWER-");
+        using var document = JsonDocument.Parse(json);
+        document.RootElement.GetProperty("items").EnumerateArray()
+            .Select(item => item.TryGetProperty("interpretation", out _)).Should().OnlyContain(included => !included);
+        var compact = JsonSerializer.Deserialize<AdminReadingListResult>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+        compact.Total.Should().Be(3);
+        compact.Items.Single(r => r.Id == saved.Id).HasInterpretation.Should().BeTrue();
+        compact.Items.Single(r => r.Id == unfinished.Id).HasInterpretation.Should().BeFalse();
+        (await Read(admin, $"search={marker}")).Items.Single(r => r.Id == saved.Id).Interpretation.Should().Be(body);
+
+        foreach (var reading in new[] { saved, unfinished, guest })
+        {
+            var answer = await admin.GetAsync($"/api/admin/readings/{reading.Id}/interpretation");
+            answer.EnsureSuccessStatusCode();
+            answer.Headers.CacheControl!.NoStore.Should().BeTrue();
+            var dto = (await answer.Content.ReadFromJsonAsync<AdminReadingInterpretationDto>())!;
+            dto.Id.Should().Be(reading.Id);
+            dto.Interpretation.Should().Be(reading.AiInterpretation);
+        }
+        foreach (var id in new[] { expired.Id, unsaved.Id, Guid.NewGuid() })
+            (await admin.GetAsync($"/api/admin/readings/{id}/interpretation")).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]

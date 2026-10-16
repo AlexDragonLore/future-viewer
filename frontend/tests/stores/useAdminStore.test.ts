@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { FeedbackStatus } from '@/types'
 import type { AdminFeedback } from '@/types/admin'
@@ -14,10 +14,12 @@ const getStatsMock = vi.fn()
 const readingsMock = vi.fn()
 const userDetailMock = vi.fn()
 const usersMock = vi.fn()
+const subscriptionMock = vi.fn()
 
 vi.mock('@/api/adminApi', () => ({
   adminApi: {
     listReadings: (...args: unknown[]) => readingsMock(...args),
+    setUserSubscription: (...args: unknown[]) => subscriptionMock(...args),
     getUser: (...args: unknown[]) => userDetailMock(...args),
     listUsers: (...args: unknown[]) => usersMock(...args),
     listFeedbacks: (...args: unknown[]) => listMock(...args),
@@ -63,7 +65,10 @@ describe('useAdminStore', () => {
     readingsMock.mockReset()
     userDetailMock.mockReset()
     usersMock.mockReset()
+    subscriptionMock.mockReset()
   })
+
+  afterEach(() => vi.useRealTimers())
 
   it('loadFeedbacks populates list and total', async () => {
     listMock.mockResolvedValue({ items: [buildFeedback()], total: 1 })
@@ -83,7 +88,7 @@ describe('useAdminStore', () => {
     const older = store.loadReadings()
     store.setReadingSearch('  сложного разговора  ')
     await store.loadReadings()
-    expect(readingsMock).toHaveBeenLastCalledWith({ search: 'сложного разговора', page: 1, pageSize: 20 })
+    expect(readingsMock).toHaveBeenLastCalledWith({ search: 'сложного разговора', page: 1, pageSize: 20, includeInterpretation: false }, expect.any(AbortSignal))
     finishOld({ items: [adminReadingFixtures[0]], total: 21 })
     await older
     expect(store.readings[0].id).toBe(adminReadingFixtures[1].id)
@@ -112,6 +117,61 @@ describe('useAdminStore', () => {
     expect(store.readings).toEqual([])
     expect(store.readingError).toBeTruthy()
     expect(store.readingLoading).toBe(false)
+  })
+
+  it('keeps the visible page while loading and rolls back its page number on failure', async () => {
+    readingsMock.mockResolvedValueOnce({ items: [adminReadingFixtures[0]], total: 21 })
+    const store = useAdminStore()
+    await store.loadReadings()
+    let reject!: (error: Error) => void
+    readingsMock.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail }))
+    store.setReadingPage(2)
+    const next = store.loadReadings()
+    expect(store.readings[0].id).toBe(adminReadingFixtures[0].id)
+    expect(store.readingDisplayedPage).toBe(1)
+    reject(new Error('network'))
+    await next
+    expect(store.readingPage).toBe(1)
+    expect(store.readings).toHaveLength(1)
+    expect(store.readingError).toBeTruthy()
+  })
+
+  it('reuses recent pages, expires them, and bypasses the cache on refresh and account change', async () => {
+    vi.useFakeTimers()
+    readingsMock.mockResolvedValue({ items: [adminReadingFixtures[0]], total: 21 })
+    const store = useAdminStore()
+    await store.loadReadings()
+    store.setReadingPage(2)
+    await store.loadReadings()
+    store.setReadingPage(1)
+    await store.loadReadings()
+    expect(readingsMock).toHaveBeenCalledTimes(2)
+    vi.advanceTimersByTime(30_001)
+    await store.loadReadings()
+    expect(readingsMock).toHaveBeenCalledTimes(3)
+    await store.loadReadings(true)
+    expect(readingsMock).toHaveBeenCalledTimes(4)
+    clearAccountSession()
+    await store.loadReadings()
+    expect(readingsMock).toHaveBeenCalledTimes(5)
+  })
+
+  it('aborts the previous request and empties caches after subscription edits', async () => {
+    readingsMock.mockResolvedValue({ items: [adminReadingFixtures[0]], total: 21 })
+    usersMock.mockResolvedValue({ items: [adminUserDetailFixture], total: 1 })
+    subscriptionMock.mockResolvedValue({ ...adminUserDetailFixture, subscription: { status: 0, isActive: false, expiresAt: null, lastPurchase: null } })
+    const store = useAdminStore()
+    await store.loadReadings()
+    const signal = readingsMock.mock.calls[0][1] as AbortSignal
+    await store.loadReadings()
+    expect(signal.aborted).toBe(true)
+    await store.loadUsers()
+    await store.setUserSubscription(adminUserDetailFixture.id, { status: 0 })
+    expect(store.readings[0].subscription?.isActive).toBe(false)
+    await store.loadReadings()
+    await store.loadUsers()
+    expect(readingsMock).toHaveBeenCalledTimes(2)
+    expect(usersMock).toHaveBeenCalledTimes(2)
   })
 
   it('keeps the latest selected user when requests finish out of order', async () => {

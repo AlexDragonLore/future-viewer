@@ -63,6 +63,7 @@ export interface AdminUserListItem {
   isAdmin: boolean
   subscriptionStatus: SubscriptionStatusValue
   subscriptionExpiresAt: string | null
+  subscription?: AdminSubscription | null
   totalReadings: number
   totalFeedbacks: number
   totalScore: number
@@ -79,7 +80,8 @@ export interface AdminReadingSummary {
   spreadType: SpreadType
   deckType: DeckType
   createdAt: string
-  interpretation: string | null
+  interpretation?: string | null
+  hasInterpretation?: boolean
   deletedFromHistoryAt: string | null
 }
 
@@ -87,6 +89,20 @@ export interface AdminReading extends AdminReadingSummary {
   userId: string | null
   userEmail: string | null
   expiresAt: string | null
+  subscription?: AdminSubscription | null
+}
+
+export interface AdminSubscription {
+  status: SubscriptionStatusValue
+  isActive: boolean
+  expiresAt: string | null
+  lastPurchase: {
+    tariffCode: string
+    accessDays: number
+    amount: number
+    currency: string
+    completedAt: string
+  } | null
 }
 
 export interface AdminReadingListResponse {
@@ -95,6 +111,7 @@ export interface AdminReadingListResponse {
 }
 
 export interface ReadingSearchFilters {
+  includeInterpretation?: boolean
   search?: string | null
   userId?: string | null
   page?: number
@@ -115,6 +132,7 @@ export interface AdminUserDetail {
   isAdmin: boolean
   subscriptionStatus: SubscriptionStatusValue
   subscriptionExpiresAt: string | null
+  subscription?: AdminSubscription | null
   yukassaSubscriptionId: string | null
   totalReadings: number
   totalFeedbacks: number

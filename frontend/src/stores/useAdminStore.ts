@@ -1,12 +1,15 @@
 import { resetOnAccountChange } from '@/utils/accountSession'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { createAdminPageCache } from '@/utils/adminPageCache'
 import { adminApi } from '@/api/adminApi'
 import { extractApiError } from '@/api/httpClient'
 import type { FeedbackStatus } from '@/types'
 import type {
   AdminFeedback,
   AdminReading,
+  AdminReadingListResponse,
+  AdminUserListResponse,
   AdminStats,
   AdminUserDetail,
   AdminUserListItem,
@@ -24,6 +27,12 @@ export const useAdminStore = defineStore('admin', () => {
   const readingSearch = ref<string | null>(null)
   const readingLoading = ref(false)
   const readingError = ref<string | null>(null)
+  const readingDisplayedPage = ref(1)
+  const userDisplayedPage = ref(1)
+  const readingCache = createAdminPageCache<AdminReadingListResponse>()
+  const userCache = createAdminPageCache<AdminUserListResponse>()
+  let readingController: AbortController | undefined
+  let userController: AbortController | undefined
   let readingRequest = 0
   let userRequest = 0
   let detailRequest = 0
@@ -56,23 +65,34 @@ export const useAdminStore = defineStore('admin', () => {
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
 
-  resetOnAccountChange({ readings, readingTotal, readingPage, readingPageSize, readingSearch, readingLoading, readingError, feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => { readingRequest++; userRequest++; detailRequest++; feedbackRequest++ })
+  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingLoading, readingError, feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
+    readingRequest++; userRequest++; detailRequest++; feedbackRequest++
+    readingController?.abort(); userController?.abort()
+    readingCache.clear(); userCache.clear()
+  })
 
-  async function loadReadings(): Promise<void> {
+  async function loadReadings(force = false): Promise<void> {
     const request = ++readingRequest
+    readingController?.abort()
+    const controller = new AbortController()
+    readingController = controller
+    const page = readingPage.value
+    const filters = { search: readingSearch.value, page, pageSize: readingPageSize.value, includeInterpretation: false }
+    const key = JSON.stringify(filters)
+    if (force) readingCache.clear()
     readingLoading.value = true
     readingError.value = null
     try {
-      const result = await adminApi.listReadings({
-        search: readingSearch.value, page: readingPage.value, pageSize: readingPageSize.value,
-      })
+      const cached = readingCache.get(key)
+      const result = cached ?? await adminApi.listReadings(filters, controller.signal)
       if (request !== readingRequest) return
+      if (!cached) readingCache.set(key, result)
       readings.value = result.items
       readingTotal.value = result.total
+      readingDisplayedPage.value = page
     } catch (e) {
       if (request !== readingRequest) return
-      readings.value = []
-      readingTotal.value = 0
+      readingPage.value = readingDisplayedPage.value
       readingError.value = extractApiError(e, 'Не удалось загрузить сообщения')
     } finally {
       if (request === readingRequest) readingLoading.value = false
@@ -80,12 +100,28 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   function setReadingSearch(value: string): void {
+    readingRequest++
+    readingController?.abort()
+    readingCache.clear()
+    readings.value = []
+    readingTotal.value = 0
     readingSearch.value = value.trim() || null
     readingPage.value = 1
+    readingDisplayedPage.value = 1
   }
 
   function setReadingPage(value: number): void {
     readingPage.value = Math.max(1, value)
+  }
+
+  function invalidateAdminPages(): void {
+    readingCache.clear()
+    userCache.clear()
+    readingRequest++; userRequest++
+    readingController?.abort(); userController?.abort()
+    readingLoading.value = false; userLoading.value = false
+    readingPage.value = readingDisplayedPage.value
+    userPage.value = userDisplayedPage.value
   }
 
   async function loadFeedbacks(): Promise<void> {
@@ -128,6 +164,7 @@ export const useAdminStore = defineStore('admin', () => {
     feedbackError.value = null
     try {
       const created = await adminApi.createFeedback(payload)
+      invalidateAdminPages()
       feedbackToast.value = 'Отзыв создан'
       await loadFeedbacks()
       return created
@@ -141,6 +178,7 @@ export const useAdminStore = defineStore('admin', () => {
     feedbackError.value = null
     try {
       const created = await adminApi.createSyntheticFeedback(payload)
+      invalidateAdminPages()
       feedbackToast.value = 'Синтетический отзыв создан'
       await loadFeedbacks()
       return created
@@ -154,6 +192,7 @@ export const useAdminStore = defineStore('admin', () => {
     feedbackError.value = null
     try {
       const updated = await adminApi.updateFeedback(id, payload)
+      invalidateAdminPages()
       const idx = feedbacks.value.findIndex((f) => f.id === id)
       if (idx >= 0) feedbacks.value[idx] = updated
       feedbackToast.value = 'Сохранено'
@@ -168,6 +207,7 @@ export const useAdminStore = defineStore('admin', () => {
     feedbackError.value = null
     try {
       await adminApi.deleteFeedback(id)
+      invalidateAdminPages()
       feedbacks.value = feedbacks.value.filter((f) => f.id !== id)
       feedbackTotal.value = Math.max(0, feedbackTotal.value - 1)
       feedbackToast.value = 'Удалено'
@@ -182,21 +222,28 @@ export const useAdminStore = defineStore('admin', () => {
     feedbackToast.value = null
   }
 
-  async function loadUsers(): Promise<void> {
+  async function loadUsers(force = false): Promise<void> {
     const request = ++userRequest
+    userController?.abort()
+    const controller = new AbortController()
+    userController = controller
+    const page = userPage.value
+    const filters = { search: userSearch.value, page, pageSize: userPageSize.value }
+    const key = JSON.stringify(filters)
+    if (force) userCache.clear()
     userLoading.value = true
     userError.value = null
     try {
-      const result = await adminApi.listUsers({
-        search: userSearch.value,
-        page: userPage.value,
-        pageSize: userPageSize.value,
-      })
+      const cached = userCache.get(key)
+      const result = cached ?? await adminApi.listUsers(filters, controller.signal)
       if (request !== userRequest) return
+      if (!cached) userCache.set(key, result)
       users.value = result.items
       userTotal.value = result.total
+      userDisplayedPage.value = page
     } catch (e) {
       if (request !== userRequest) return
+      userPage.value = userDisplayedPage.value
       userError.value = extractApiError(e, 'Не удалось загрузить пользователей')
     } finally {
       if (request === userRequest) userLoading.value = false
@@ -208,8 +255,14 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   function setUserSearch(value: string | null): void {
+    userRequest++
+    userController?.abort()
+    userCache.clear()
+    users.value = []
+    userTotal.value = 0
     userSearch.value = value && value.trim() !== '' ? value.trim() : null
     userPage.value = 1
+    userDisplayedPage.value = 1
   }
 
   async function loadUserDetail(id: string): Promise<void> {
@@ -241,6 +294,7 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       const updated = await adminApi.setUserAdmin(id, isAdmin)
+      invalidateAdminPages()
       const idx = users.value.findIndex((u) => u.id === id)
       if (idx >= 0) users.value[idx] = updated
       if (selectedUser.value?.id === id) {
@@ -258,6 +312,8 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       await adminApi.deleteUser(id)
+      invalidateAdminPages()
+      readings.value = readings.value.filter(reading => reading.userId !== id)
       users.value = users.value.filter((u) => u.id !== id)
       userTotal.value = Math.max(0, userTotal.value - 1)
       if (selectedUser.value?.id === id) selectedUser.value = null
@@ -273,6 +329,8 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       const detail = await adminApi.setUserSubscription(id, payload)
+      invalidateAdminPages()
+      readings.value = readings.value.map(reading => reading.userId === id ? { ...reading, subscription: detail.subscription } : reading)
       if (selectedUser.value?.id === id) selectedUser.value = detail
       const idx = users.value.findIndex((u) => u.id === id)
       if (idx >= 0) {
@@ -280,6 +338,7 @@ export const useAdminStore = defineStore('admin', () => {
           ...users.value[idx],
           subscriptionStatus: detail.subscriptionStatus,
           subscriptionExpiresAt: detail.subscriptionExpiresAt,
+          subscription: detail.subscription,
         }
       }
       userToast.value = 'Доступ обновлён'
@@ -294,6 +353,7 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       await adminApi.grantAchievement(id, code)
+      invalidateAdminPages()
       userToast.value = `Достижение ${code} выдана`
       if (selectedUser.value?.id === id) await loadUserDetail(id)
       return true
@@ -307,6 +367,7 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       await adminApi.revokeAchievement(id, code)
+      invalidateAdminPages()
       userToast.value = `Достижение ${code} снята`
       if (selectedUser.value?.id === id) await loadUserDetail(id)
       return true
@@ -320,6 +381,7 @@ export const useAdminStore = defineStore('admin', () => {
     userError.value = null
     try {
       const granted = await adminApi.recheckAchievements(id)
+      invalidateAdminPages()
       userToast.value = granted.length > 0
         ? `Выдано новых достижений: ${granted.length}`
         : 'Новых достижений нет'
@@ -348,6 +410,7 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   return {
+    readingDisplayedPage, userDisplayedPage,
     readings, readingTotal, readingPage, readingPageSize, readingSearch, readingLoading, readingError,
     loadReadings, setReadingSearch, setReadingPage,
     feedbacks,

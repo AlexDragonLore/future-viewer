@@ -17,14 +17,13 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
 </script>
 
 <template>
-  <main class="admin-page w-full min-h-screen px-4 sm:px-6 py-10 sm:py-12 max-w-6xl mx-auto" data-testid="admin-view">
-    <header class="mb-6 text-center">
-      <div class="admin-kicker text-mystic-accent text-xs tracking-[0.4em] mb-2">✦ АДМИН ✦</div>
-      <h1 class="admin-title font-display text-4xl gold-text">Панель администратора</h1>
-      <p class="admin-email text-mystic-muted mt-2 text-sm">{{ auth.email }}</p>
+  <main class="admin-page w-full min-h-screen px-4 sm:px-6 py-6 sm:py-8 max-w-6xl mx-auto" data-testid="admin-view">
+    <header class="admin-heading">
+      <h1 class="admin-title font-display text-2xl gold-text">Панель администратора</h1>
+      <p class="admin-email text-mystic-muted text-xs">{{ auth.email }}</p>
     </header>
 
-    <nav class="flex gap-2 justify-center mb-8 flex-wrap" aria-label="Разделы администрирования" data-testid="admin-tabs">
+    <nav class="flex gap-2 mb-4 flex-wrap" aria-label="Разделы администрирования" data-testid="admin-tabs">
       <RouterLink
         v-for="tab in tabs"
         :key="tab.name"
@@ -43,6 +42,7 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
 </template>
 
 <style scoped>
+.admin-heading { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.35rem 1rem; margin-bottom: 0.75rem; }
 .admin-tab {
   min-height: 44px;
   display: inline-flex;
@@ -75,14 +75,14 @@ const activeTab = computed(() => route.name === 'admin-user-detail' ? 'admin-use
 }
 @media (max-width: 640px) {
   .admin-page {
-    padding-top: 2rem;
+    padding-top: 1.25rem;
     padding-bottom: 2.5rem;
   }
   .admin-kicker {
     letter-spacing: 0.14em;
   }
   .admin-title {
-    font-size: 2rem;
+    font-size: 1.3rem;
     line-height: 1.15;
   }
   .admin-email {

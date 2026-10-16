@@ -29,12 +29,20 @@ public static class AdminEndpoints
             string? search,
             int? page,
             int? pageSize,
+            bool? includeInterpretation,
             AdminService service,
             HttpContext ctx,
             CancellationToken ct) =>
         {
             ctx.Response.Headers.CacheControl = "no-store";
-            return Results.Ok(await service.SearchReadingsAsync(userId, search, page ?? 1, pageSize ?? 20, ct));
+            return Results.Ok(await service.SearchReadingsAsync(userId, search, page ?? 1, pageSize ?? 20, ct, includeInterpretation ?? true));
+        });
+
+        group.MapGet("/readings/{id:guid}/interpretation", async (
+            Guid id, AdminService service, HttpContext ctx, CancellationToken ct) =>
+        {
+            ctx.Response.Headers.CacheControl = "no-store";
+            return Results.Ok(await service.GetReadingInterpretationAsync(id, ct));
         });
     }
 
@@ -133,8 +141,10 @@ public static class AdminEndpoints
             int? page,
             int? pageSize,
             AdminService service,
+            HttpContext ctx,
             CancellationToken ct) =>
         {
+            ctx.Response.Headers.CacheControl = "no-store";
             var result = await service.SearchUsersAsync(search, page ?? 1, pageSize ?? 20, ct);
             return Results.Ok(new { items = result.Items, total = result.Total });
         });

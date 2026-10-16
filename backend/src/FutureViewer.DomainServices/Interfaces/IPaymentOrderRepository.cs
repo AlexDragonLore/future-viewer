@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.DomainServices.DTOs.Admin;
 
 namespace FutureViewer.DomainServices.Interfaces;
 
@@ -11,4 +12,5 @@ public interface IPaymentOrderRepository
     Task<PaymentOrder?> GetByProviderPaymentIdAsync(string providerPaymentId, CancellationToken ct = default);
     Task UpdateAsync(PaymentOrder order, CancellationToken ct = default);
     Task<decimal> GetPaidTotalAsync(DateTime fromUtc, DateTime toUtc, CancellationToken ct = default);
+    Task<IReadOnlyDictionary<Guid, AdminSubscriptionPurchaseDto>> GetLatestPaidSubscriptionsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
 }

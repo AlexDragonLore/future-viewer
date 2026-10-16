@@ -18,6 +18,7 @@ public sealed class AdminService
     private readonly AchievementService _achievements;
     private readonly ILogger<AdminService> _logger;
     private readonly IPrivacyRepository? _privacy;
+    private readonly IPaymentOrderRepository? _orders;
 
     public AdminService(
         IFeedbackRepository feedbacks,
@@ -26,7 +27,8 @@ public sealed class AdminService
         IAchievementRepository achievementsRepo,
         AchievementService achievements,
         ILogger<AdminService> logger,
-        IPrivacyRepository? privacy = null)
+        IPrivacyRepository? privacy = null,
+        IPaymentOrderRepository? orders = null)
     {
         _feedbacks = feedbacks;
         _readings = readings;
@@ -35,6 +37,7 @@ public sealed class AdminService
         _achievements = achievements;
         _logger = logger;
         _privacy = privacy;
+        _orders = orders;
     }
 
     public async Task<AdminReadingListResult> SearchReadingsAsync(
@@ -42,31 +45,25 @@ public sealed class AdminService
         string? search,
         int page,
         int pageSize,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        bool includeInterpretation = true)
     {
         var safeSize = Math.Clamp(pageSize, 1, 100);
         var safePage = Math.Clamp(page, 1, int.MaxValue / safeSize);
         var skip = (safePage - 1) * safeSize;
-        var readings = await _readings.SearchForAdminAsync(userId, search, skip, safeSize, ct);
+        var readings = await _readings.SearchAdminListAsync(userId, search, skip, safeSize, includeInterpretation, ct);
         var total = await _readings.CountForAdminAsync(userId, search, ct);
+        await AttachPurchasesAsync(readings.Where(r => r.UserId != null && r.Subscription != null)
+            .Select(r => (r.UserId!.Value, r.Subscription!)), ct);
         return new AdminReadingListResult
         {
-            Items = readings.Select(r => new AdminReadingDto
-            {
-                Id = r.Id,
-                UserId = r.UserId,
-                UserEmail = r.User?.Email,
-                Question = r.Question,
-                Interpretation = r.AiInterpretation,
-                SpreadType = r.SpreadType,
-                DeckType = r.DeckType,
-                CreatedAt = r.CreatedAt,
-                DeletedFromHistoryAt = r.DeletedFromHistoryAt,
-                ExpiresAt = r.UserId is null ? r.CreatedAt + GuestReadingRetention.ContentDuration : null
-            }).ToList(),
+            Items = readings,
             Total = total
         };
     }
+
+    public async Task<AdminReadingInterpretationDto> GetReadingInterpretationAsync(Guid id, CancellationToken ct = default) =>
+        await _readings.GetAdminInterpretationAsync(id, ct) ?? throw new NotFoundException("Reading not found");
 
     public async Task<AdminFeedbackListResult> SearchFeedbacksAsync(
         Guid? userId,
@@ -254,22 +251,17 @@ public sealed class AdminService
         int pageSize,
         CancellationToken ct = default)
     {
-        var safePage = Math.Max(1, page);
         var safeSize = Math.Clamp(pageSize, 1, 100);
+        var safePage = Math.Clamp(page, 1, int.MaxValue / safeSize);
         var skip = (safePage - 1) * safeSize;
 
-        var users = await _users.SearchAsync(search, skip, safeSize, ct);
+        var users = await _users.SearchAdminListAsync(search, skip, safeSize, ct);
         var total = await _users.CountAsync(search, ct);
-
-        var items = new List<AdminUserListItem>(users.Count);
-        foreach (var user in users)
-        {
-            items.Add(await BuildListItemAsync(user, ct));
-        }
+        await AttachPurchasesAsync(users.Where(u => u.Subscription != null).Select(u => (u.Id, u.Subscription!)), ct);
 
         return new AdminUserListResult
         {
-            Items = items,
+            Items = users,
             Total = total
         };
     }
@@ -289,6 +281,8 @@ public sealed class AdminService
         var userAchievements = await _achievementsRepo.GetByUserAsync(userId, ct);
         var allAchievements = await _achievementsRepo.GetAllAsync(ct);
         var byId = allAchievements.ToDictionary(a => a.Id, a => a);
+        var subscription = BuildSubscription(user);
+        await AttachPurchasesAsync([(user.Id, subscription)], ct);
 
         return new AdminUserDetailDto
         {
@@ -298,6 +292,7 @@ public sealed class AdminService
             IsAdmin = user.IsAdmin,
             SubscriptionStatus = user.SubscriptionStatus,
             SubscriptionExpiresAt = user.SubscriptionExpiresAt,
+            Subscription = subscription,
             YukassaSubscriptionId = user.YukassaSubscriptionId,
             TotalReadings = totalReadings,
             TotalFeedbacks = allFeedbacksCount,
@@ -306,6 +301,7 @@ public sealed class AdminService
             {
                 Id = r.Id,
                 Question = r.Question,
+                HasInterpretation = !string.IsNullOrWhiteSpace(r.AiInterpretation),
                 Interpretation = r.AiInterpretation,
                 SpreadType = r.SpreadType,
                 DeckType = r.DeckType,
@@ -577,6 +573,8 @@ public sealed class AdminService
         var totalFeedbacks = await _feedbacks.CountAsync(user.Id, null, ct);
         var scored = await _feedbacks.GetScoredByUserAsync(user.Id, ct);
         var totalScore = scored.Sum(f => f.AiScore ?? 0);
+        var subscription = BuildSubscription(user);
+        await AttachPurchasesAsync([(user.Id, subscription)], ct);
 
         return new AdminUserListItem
         {
@@ -586,10 +584,29 @@ public sealed class AdminService
             IsAdmin = user.IsAdmin,
             SubscriptionStatus = user.SubscriptionStatus,
             SubscriptionExpiresAt = user.SubscriptionExpiresAt,
+            Subscription = subscription,
             TotalReadings = totalReadings,
             TotalFeedbacks = totalFeedbacks,
             TotalScore = totalScore
         };
+    }
+
+    private static AdminSubscriptionDto BuildSubscription(User user) => new()
+    {
+        Status = user.SubscriptionStatus,
+        IsActive = user.SubscriptionStatus == SubscriptionStatus.Active
+            && user.SubscriptionExpiresAt is { } expiresAt && expiresAt > DateTime.UtcNow,
+        ExpiresAt = user.SubscriptionExpiresAt
+    };
+
+    private async Task AttachPurchasesAsync(
+        IEnumerable<(Guid UserId, AdminSubscriptionDto Subscription)> subscriptions, CancellationToken ct)
+    {
+        var rows = subscriptions.ToArray();
+        if (_orders is null || rows.Length == 0) return;
+        var purchases = await _orders.GetLatestPaidSubscriptionsAsync(rows.Select(r => r.UserId).Distinct().ToArray(), ct);
+        foreach (var row in rows)
+            row.Subscription.LastPurchase = purchases.GetValueOrDefault(row.UserId);
     }
 
     private static AdminFeedbackDto MapAdmin(ReadingFeedback feedback) =>

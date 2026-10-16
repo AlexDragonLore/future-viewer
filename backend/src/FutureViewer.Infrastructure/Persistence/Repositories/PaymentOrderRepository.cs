@@ -1,5 +1,6 @@
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
+using FutureViewer.DomainServices.DTOs.Admin;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -60,4 +61,26 @@ public sealed class PaymentOrderRepository : IPaymentOrderRepository
             .Where(x => x.Status == PaymentOrderStatus.Paid &&
                         x.CompletedAt >= fromUtc && x.CompletedAt < toUtc)
             .SumAsync(x => x.Amount, ct);
+
+    public async Task<IReadOnlyDictionary<Guid, AdminSubscriptionPurchaseDto>> GetLatestPaidSubscriptionsAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
+    {
+        if (userIds.Count == 0) return new Dictionary<Guid, AdminSubscriptionPurchaseDto>();
+        var purchases = await _db.PaymentOrders.AsNoTracking()
+            .Where(o => o.UserId.HasValue && userIds.Contains(o.UserId.Value)
+                && o.Status == PaymentOrderStatus.Paid && o.ReceiptStatus != NpdReceiptStatus.Refunded
+                && o.AccessDays > 0 && o.CompletedAt != null)
+            .GroupBy(o => o.UserId!.Value)
+            .Select(group => group.OrderByDescending(o => o.CompletedAt).ThenByDescending(o => o.CreatedAt)
+                .ThenByDescending(o => o.Id).Select(o => new
+                {
+                    UserId = o.UserId!.Value,
+                    Purchase = new AdminSubscriptionPurchaseDto
+                    {
+                        TariffCode = o.TariffCode, AccessDays = o.AccessDays, Amount = o.Amount,
+                        Currency = o.Currency, CompletedAt = o.CompletedAt!.Value
+                    }
+                }).First()).ToListAsync(ct);
+        return purchases.ToDictionary(p => p.UserId, p => p.Purchase);
+    }
 }

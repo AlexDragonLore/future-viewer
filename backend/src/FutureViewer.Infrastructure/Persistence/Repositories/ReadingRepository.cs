@@ -1,5 +1,7 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices;
+using FutureViewer.DomainServices.DTOs.Admin;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -72,6 +74,37 @@ public sealed class ReadingRepository : IReadingRepository
 
     public Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default) =>
         AdminReadingsQuery(userId, search).CountAsync(ct);
+
+    public async Task<IReadOnlyList<AdminReadingDto>> SearchAdminListAsync(
+        Guid? userId, string? search, int skip, int take, bool includeInterpretation, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        return await AdminReadingsQuery(userId, search)
+            .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
+            .Skip(skip).Take(take)
+            .Select(r => new AdminReadingDto
+            {
+                Id = r.Id, UserId = r.UserId, UserEmail = r.User == null ? null : r.User.Email,
+                Question = r.Question,
+                HasInterpretation = r.AiInterpretation != null && r.AiInterpretation.Trim() != string.Empty,
+                Interpretation = includeInterpretation ? r.AiInterpretation : null,
+                SpreadType = r.SpreadType, DeckType = r.DeckType, CreatedAt = r.CreatedAt,
+                DeletedFromHistoryAt = r.DeletedFromHistoryAt,
+                ExpiresAt = r.UserId == null ? r.CreatedAt + GuestReadingRetention.ContentDuration : null,
+                Subscription = r.User == null ? null : new AdminSubscriptionDto
+                {
+                    Status = r.User.SubscriptionStatus,
+                    IsActive = r.User.SubscriptionStatus == SubscriptionStatus.Active
+                        && r.User.SubscriptionExpiresAt != null && r.User.SubscriptionExpiresAt > now,
+                    ExpiresAt = r.User.SubscriptionExpiresAt
+                }
+            }).ToListAsync(ct);
+    }
+
+    public Task<AdminReadingInterpretationDto?> GetAdminInterpretationAsync(Guid id, CancellationToken ct = default) =>
+        AdminReadingsQuery(null, null).Where(r => r.Id == id)
+            .Select(r => new AdminReadingInterpretationDto { Id = r.Id, Interpretation = r.AiInterpretation })
+            .SingleOrDefaultAsync(ct);
 
     private IQueryable<Reading> AdminReadingsQuery(Guid? userId, string? search)
     {

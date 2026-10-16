@@ -12,6 +12,7 @@ const guestReading: AdminReading = {
   id: 'guest-reading',
   userId: null,
   userEmail: null,
+  subscription: null,
   question: 'На что обратить внимание сегодня?',
   expiresAt: '2026-11-05T12:00:00Z',
 }

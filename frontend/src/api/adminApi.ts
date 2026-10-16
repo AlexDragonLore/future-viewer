@@ -18,15 +18,22 @@ import type {
 } from '@/types/admin'
 
 export const adminApi = {
-  async listReadings(filters: ReadingSearchFilters = {}): Promise<AdminReadingListResponse> {
+  async listReadings(filters: ReadingSearchFilters = {}, signal?: AbortSignal): Promise<AdminReadingListResponse> {
     const { data } = await httpClient.get<AdminReadingListResponse>('/api/admin/readings', {
+      signal,
       params: {
+        includeInterpretation: filters.includeInterpretation ?? false,
         search: filters.search || undefined,
         userId: filters.userId || undefined,
         page: filters.page ?? 1,
         pageSize: filters.pageSize ?? 20,
       },
     })
+    return data
+  },
+
+  async getReadingInterpretation(id: string, signal?: AbortSignal): Promise<{ id: string; interpretation: string | null }> {
+    const { data } = await httpClient.get<{ id: string; interpretation: string | null }>(`/api/admin/readings/${id}/interpretation`, { signal })
     return data
   },
 
@@ -61,8 +68,9 @@ export const adminApi = {
     await httpClient.delete(`/api/admin/feedbacks/${id}`)
   },
 
-  async listUsers(filters: UserSearchFilters = {}): Promise<AdminUserListResponse> {
+  async listUsers(filters: UserSearchFilters = {}, signal?: AbortSignal): Promise<AdminUserListResponse> {
     const { data } = await httpClient.get<AdminUserListResponse>('/api/admin/users', {
+      signal,
       params: {
         search: filters.search || undefined,
         page: filters.page ?? 1,

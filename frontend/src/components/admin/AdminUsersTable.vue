@@ -1,19 +1,10 @@
 <script setup lang="ts">
 import { useAdminStore } from '@/stores/useAdminStore'
-import { SubscriptionStatusValue } from '@/types'
+import AdminSubscriptionBadge from './AdminSubscriptionBadge.vue'
 import type { AdminUserListItem } from '@/types/admin'
 
 const store = useAdminStore()
 const emit = defineEmits<{ select: [id: string] }>()
-
-function statusLabel(s: SubscriptionStatusValue): string {
-  switch (s) {
-    case SubscriptionStatusValue.Active: return 'Активен'
-    case SubscriptionStatusValue.Expired: return 'Истёк'
-    case SubscriptionStatusValue.Cancelled: return 'Отменён'
-    default: return 'Бесплатный'
-  }
-}
 
 function onRow(u: AdminUserListItem): void {
   emit('select', u.id)
@@ -21,7 +12,7 @@ function onRow(u: AdminUserListItem): void {
 </script>
 
 <template>
-  <div v-if="store.userLoading" class="empty" data-testid="admin-users-loading">Загрузка…</div>
+  <div v-if="store.userLoading && !store.users.length" class="empty" data-testid="admin-users-loading">Загрузка…</div>
   <div v-else-if="store.users.length === 0" class="empty" data-testid="admin-users-empty">
     Нет пользователей
   </div>
@@ -33,7 +24,7 @@ function onRow(u: AdminUserListItem): void {
             <th>Email</th>
             <th class="mobile-hide">Регистрация</th>
             <th class="mobile-hide">Админ</th>
-            <th>Доступ</th>
+            <th>Подписка / покупка</th>
             <th class="num">Раскладов</th>
             <th class="num mobile-hide">Отзывов</th>
             <th class="num">Баллов</th>
@@ -54,12 +45,7 @@ function onRow(u: AdminUserListItem): void {
               <span v-else class="badge muted">—</span>
             </td>
             <td>
-              <span class="badge" :class="{ active: u.subscriptionStatus === SubscriptionStatusValue.Active }">
-                {{ statusLabel(u.subscriptionStatus) }}
-              </span>
-              <span v-if="u.subscriptionExpiresAt" class="expiry">
-                → {{ new Date(u.subscriptionExpiresAt).toLocaleDateString() }}
-              </span>
+              <AdminSubscriptionBadge :subscription="u.subscription" />
             </td>
             <td class="num">{{ u.totalReadings }}</td>
             <td class="num mobile-hide">{{ u.totalFeedbacks }}</td>
@@ -81,21 +67,14 @@ function onRow(u: AdminUserListItem): void {
         </div>
         <div class="mobile-card-meta mono">{{ new Date(u.createdAt).toLocaleDateString() }}</div>
         <div class="mobile-card-grid">
-          <span>Доступ</span>
-          <span>
-            <span class="badge" :class="{ active: u.subscriptionStatus === SubscriptionStatusValue.Active }">
-              {{ statusLabel(u.subscriptionStatus) }}
-            </span>
-          </span>
+          <span>Подписка</span>
+          <AdminSubscriptionBadge :subscription="u.subscription" />
           <span>Раскладов</span>
           <strong>{{ u.totalReadings }}</strong>
           <span>Отзывов</span>
           <strong>{{ u.totalFeedbacks }}</strong>
           <span>Баллов</span>
           <strong>{{ u.totalScore }}</strong>
-        </div>
-        <div v-if="u.subscriptionExpiresAt" class="expiry mobile-expiry">
-          до {{ new Date(u.subscriptionExpiresAt).toLocaleDateString() }}
         </div>
         <span class="mobile-open">Открыть профиль →</span>
         </button>
@@ -239,7 +218,7 @@ function onRow(u: AdminUserListItem): void {
   }
   .mobile-card-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     gap: 0.45rem 0.75rem;
     margin-top: 0.75rem;
     color: rgba(224, 212, 186, 0.78);

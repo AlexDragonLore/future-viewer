@@ -10,6 +10,7 @@ public sealed class AdminUserDetailDto
     public required bool IsAdmin { get; init; }
     public required SubscriptionStatus SubscriptionStatus { get; init; }
     public DateTime? SubscriptionExpiresAt { get; init; }
+    public AdminSubscriptionDto? Subscription { get; init; }
     public string? YukassaSubscriptionId { get; init; }
     public required int TotalReadings { get; init; }
     public required int TotalFeedbacks { get; init; }
@@ -23,6 +24,7 @@ public sealed class AdminReadingSummary
 {
     public required Guid Id { get; init; }
     public required string Question { get; init; }
+    public bool HasInterpretation { get; init; }
     public string? Interpretation { get; init; }
     public required SpreadType SpreadType { get; init; }
     public required DeckType DeckType { get; init; }

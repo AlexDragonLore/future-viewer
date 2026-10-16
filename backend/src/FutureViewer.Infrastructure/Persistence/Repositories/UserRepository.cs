@@ -1,4 +1,6 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.Domain.Enums;
+using FutureViewer.DomainServices.DTOs.Admin;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -65,9 +67,39 @@ public sealed class UserRepository : IUserRepository
         }
         return await query
             .OrderByDescending(u => u.CreatedAt)
+            .ThenByDescending(u => u.Id)
             .Skip(skip)
             .Take(take)
             .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<AdminUserListItem>> SearchAdminListAsync(
+        string? email, int skip, int take, CancellationToken ct = default)
+    {
+        var query = _db.Users.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            var pattern = $"%{email.Trim()}%";
+            query = query.Where(u => EF.Functions.ILike(u.Email, pattern));
+        }
+        var now = DateTime.UtcNow;
+        return await query.OrderByDescending(u => u.CreatedAt).ThenByDescending(u => u.Id)
+            .Skip(skip).Take(take)
+            .Select(u => new AdminUserListItem
+            {
+                Id = u.Id, Email = u.Email, CreatedAt = u.CreatedAt, IsAdmin = u.IsAdmin,
+                SubscriptionStatus = u.SubscriptionStatus, SubscriptionExpiresAt = u.SubscriptionExpiresAt,
+                Subscription = new AdminSubscriptionDto
+                {
+                    Status = u.SubscriptionStatus,
+                    IsActive = u.SubscriptionStatus == SubscriptionStatus.Active
+                        && u.SubscriptionExpiresAt != null && u.SubscriptionExpiresAt > now,
+                    ExpiresAt = u.SubscriptionExpiresAt
+                },
+                TotalReadings = u.Readings.Count(),
+                TotalFeedbacks = u.Feedbacks.Count(),
+                TotalScore = u.Feedbacks.Where(f => f.Status == FeedbackStatus.Scored).Sum(f => f.AiScore ?? 0)
+            }).ToListAsync(ct);
     }
 
     public Task<int> CountAsync(string? email, CancellationToken ct = default)

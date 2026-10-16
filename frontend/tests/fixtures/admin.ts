@@ -10,10 +10,17 @@ export const adminFixtureSession = {
 const readerId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
 const readerEmail = 'reader.with.a.long.email.for.mobile.layout@example.com'
 
+export const adminPaidSubscriptionFixture = {
+  status: 1, isActive: true, expiresAt: '2026-11-01T00:00:00Z',
+  lastPurchase: { tariffCode: 'pro-30d', accessDays: 30, amount: 499, currency: 'RUB', completedAt: '2026-10-01T12:00:00Z' },
+}
+
 export const adminReadingFixtures = Array.from({ length: 21 }, (_, index) => ({
   id: `cccccccc-cccc-4ccc-8ccc-${String(index + 1).padStart(12, '0')}`,
   userId: readerId,
   userEmail: readerEmail,
+  subscription: adminPaidSubscriptionFixture,
+  hasInterpretation: true,
   question: index === 0
     ? `Как решиться на смену работы и сохранить спокойствие? ${'Хочу обдумать новый этап и найти подходящий темп. '.repeat(5)}Финальная часть вопроса о переменах.`
     : index === 1
@@ -23,7 +30,7 @@ export const adminReadingFixtures = Array.from({ length: 21 }, (_, index) => ({
     ? `## Следующий шаг\n\n${'Начни с небольшого действия, которое поможет тебе почувствовать опору. '.repeat(9)}\n\n**Финальный совет: запиши один конкретный шаг на завтра.**`
     : 'Выбери спокойный темп и обрати внимание на собственные силы.',
   spreadType: index === 0 ? 3 : 1,
-  deckType: 0,
+  deckType: 1,
   createdAt: new Date(Date.UTC(2026, 9, 6, 12, 0) - index * 3_600_000).toISOString(),
   deletedFromHistoryAt: index === 1 ? '2026-10-06T11:30:00Z' : null,
   expiresAt: null,
@@ -53,6 +60,7 @@ export const adminUserFixtures = [{
   isAdmin: false,
   subscriptionStatus: 1,
   subscriptionExpiresAt: '2026-11-01T00:00:00Z',
+  subscription: adminPaidSubscriptionFixture,
   totalReadings: adminReadingFixtures.length,
   totalFeedbacks: 1,
   totalScore: 19,

@@ -1,4 +1,5 @@
 using FutureViewer.Domain.Entities;
+using FutureViewer.DomainServices.DTOs.Admin;
 
 namespace FutureViewer.DomainServices.Interfaces;
 
@@ -9,6 +10,8 @@ public interface IReadingRepository
     Task<IReadOnlyList<Reading>> GetHistoryAsync(Guid userId, int take = 50, CancellationToken ct = default);
     Task<IReadOnlyList<Reading>> GetByUserAsync(Guid userId, int take, CancellationToken ct = default);
     Task<IReadOnlyList<Reading>> SearchForAdminAsync(Guid? userId, string? search, int skip, int take, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminReadingDto>> SearchAdminListAsync(Guid? userId, string? search, int skip, int take, bool includeInterpretation, CancellationToken ct = default);
+    Task<AdminReadingInterpretationDto?> GetAdminInterpretationAsync(Guid id, CancellationToken ct = default);
     Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default);
     Task UpdateAsync(Reading reading, CancellationToken ct = default);
     Task<bool> AttachGuestAsync(Guid id, Guid userId, string question, string? interpretation, CancellationToken ct = default);

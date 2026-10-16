@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/useAdminStore'
+import AdminSubscriptionBadge from '@/components/admin/AdminSubscriptionBadge.vue'
 import AdminReadingMessage from '@/components/admin/AdminReadingMessage.vue'
 import AdminUserDetailDrawer from '@/components/admin/AdminUserDetailDrawer.vue'
 
@@ -35,7 +36,7 @@ function changePage(page: number) {
         <p>Вопросы пользователей и гостей, ответы ИИ · сначала новые</p>
         <p>Гостевые вопросы и ответы хранятся 30 дней, зарегистрированных пользователей — бессрочно.</p>
       </div>
-      <button class="admin-button" :disabled="store.readingLoading" data-testid="admin-readings-refresh" @click="store.loadReadings()">Обновить</button>
+      <button class="admin-button" :disabled="store.readingLoading" data-testid="admin-readings-refresh" @click="store.loadReadings(true)">Обновить</button>
     </div>
 
     <form class="search-toolbar mystic-card" @submit.prevent="search">
@@ -47,14 +48,18 @@ function changePage(page: number) {
       <button v-if="store.readingSearch || searchInput" type="button" class="admin-button" :disabled="store.readingLoading" @click="clearSearch">Сбросить</button>
     </form>
 
-    <p v-if="store.readingError" class="error" role="alert">{{ store.readingError }}</p>
-    <p v-else-if="store.readingLoading" class="empty" role="status">Загружаю сообщения…</p>
-    <p v-else-if="!store.readings.length" class="empty" data-testid="admin-readings-empty">{{ store.readingSearch ? 'По этому запросу сообщений нет.' : 'Сохранённых сообщений пока нет.' }}</p>
-    <div v-else class="reading-list">
+    <p v-if="store.readingError" class="error" role="alert">{{ store.readingError }}<span v-if="store.readings.length"> Показана страница {{ store.readingDisplayedPage }}.</span></p>
+    <p v-if="store.readingLoading" class="loading-status" role="status">Загружаю страницу {{ store.readingPage }}…</p>
+    <p v-if="!store.readingLoading && !store.readingError && !store.readings.length" class="empty" data-testid="admin-readings-empty">{{ store.readingSearch ? 'По этому запросу сообщений нет.' : 'Сохранённых сообщений пока нет.' }}</p>
+    <div v-if="store.readings.length" class="reading-list" :aria-busy="store.readingLoading">
       <article v-for="reading in store.readings" :key="reading.id" class="reading-card mystic-card" data-testid="admin-reading-row">
-        <button v-if="reading.userId" class="user-link" data-testid="admin-reading-user" @click="selectedUserId = reading.userId">{{ reading.userEmail ?? 'Открыть пользователя' }} <span aria-hidden="true">↗</span></button>
-        <p v-else class="guest-label" data-testid="admin-reading-guest">Анонимный гость</p>
-        <AdminReadingMessage :reading="reading" />
+        <AdminReadingMessage :reading="reading">
+          <template #identity>
+            <button v-if="reading.userId" class="user-link" data-testid="admin-reading-user" @click="selectedUserId = reading.userId">{{ reading.userEmail ?? 'Открыть пользователя' }}</button>
+            <span v-else class="guest-label" data-testid="admin-reading-guest">Анонимный гость</span>
+          </template>
+          <template #subscription><AdminSubscriptionBadge :subscription="reading.subscription" /></template>
+        </AdminReadingMessage>
       </article>
     </div>
 
@@ -62,7 +67,7 @@ function changePage(page: number) {
       <span data-testid="admin-readings-total">Всего: {{ store.readingTotal }}</span>
       <div>
         <button class="admin-button" :disabled="store.readingLoading || store.readingPage <= 1" data-testid="admin-reading-prev" aria-label="Предыдущая страница сообщений" @click="changePage(store.readingPage - 1)">← Назад</button>
-        <span>Страница {{ store.readingPage }} из {{ pageCount }}</span>
+        <span>Страница {{ store.readingDisplayedPage }} из {{ pageCount }}</span>
         <button class="admin-button" :disabled="store.readingLoading || store.readingPage >= pageCount" data-testid="admin-reading-next" aria-label="Следующая страница сообщений" @click="changePage(store.readingPage + 1)">Далее →</button>
       </div>
     </div>
@@ -72,18 +77,19 @@ function changePage(page: number) {
 
 <style scoped>
 .readings-view { min-width: 0; }
-.view-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem; }
-.view-heading p { color: rgba(224, 212, 186, 0.6); font-size: 0.85rem; margin-top: 0.4rem; }
-.search-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem; margin-bottom: 1rem; }
+.view-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.5rem; }
+.view-heading p { color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; margin-top: 0.2rem; }
+.search-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 0.5rem; padding: 0.5rem; margin-bottom: 0.5rem; }
 label { flex: 1 1 15rem; display: flex; flex-direction: column; gap: 0.5rem; color: rgba(224, 212, 186, 0.7); font-size: 0.8rem; }
 input { background: rgba(20, 16, 32, 0.7); border: 1px solid rgba(245, 194, 107, 0.3); border-radius: 8px; padding: 0.65rem 0.85rem; color: #f8f4eb; width: 100%; min-height: 44px; font-size: 1rem; }
 .admin-button { min-height: 44px; padding: 0.6rem 0.9rem; border: 1px solid rgba(245, 194, 107, 0.3); border-radius: 8px; color: #e0d4ba; font-size: 0.85rem; }
 .admin-button:hover:not(:disabled), .admin-button.primary { background: rgba(245, 194, 107, 0.1); color: #f5c26b; }
 .admin-button:disabled { opacity: 0.4; cursor: not-allowed; }
 .admin-button:focus-visible, input:focus-visible, .user-link:focus-visible { outline: 2px solid #f5c26b; outline-offset: 3px; }
-.reading-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.reading-card { padding: 1rem; }
-.user-link { display: block; min-height: 44px; margin-bottom: 0.125rem; text-align: left; color: #f5c26b; font-size: 0.875rem; line-height: 1.4; overflow-wrap: anywhere; }
+.reading-list { display: flex; flex-direction: column; gap: 0.25rem; }
+.loading-status { color: #bcb0c7; font-size: 0.75rem; margin-bottom: 0.4rem; }
+.reading-card { padding: 0.35rem 0.65rem 0; }
+.user-link { display: inline; min-height: 28px; margin: 0; text-align: left; color: #f5c26b; font-size: 0.74rem; line-height: 1.4; overflow-wrap: anywhere; }
 .user-link span { opacity: 0.5; }
 .guest-label { margin-bottom: 0.25rem; color: #e0d4ba; font-size: 0.8125rem; line-height: 1.4; }
 .reading-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 1.5rem; color: rgba(224, 212, 186, 0.65); font-size: 0.8rem; }
@@ -93,7 +99,8 @@ input { background: rgba(20, 16, 32, 0.7); border: 1px solid rgba(245, 194, 107,
 @media (max-width: 640px) {
   .view-heading { align-items: flex-start; }
   .view-heading .admin-button { flex-shrink: 0; }
-  .reading-card { padding: 0.75rem; }
+  .reading-card { padding: 0.25rem 0.55rem 0; }
+  .user-link { min-height: 44px; }
   .search-toolbar .admin-button { flex: 1; }
   .reading-pager { justify-content: center; }
   .reading-pager > div { width: 100%; justify-content: space-between; gap: 0.35rem; }
