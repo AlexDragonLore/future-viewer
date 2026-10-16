@@ -76,13 +76,28 @@ jobs:
           for key,value in sorted(configured.items()): command+=['--build-arg',key+'='+str(value or '')]
           subprocess.run(command+['frontend'],check=True)
           PYBUILD
-          printf 'NEW_BACKEND_IMAGE_ID=%s\n' "$(docker image inspect "future-viewer-backend:$RELEASE_SHA" --format '{{.Id}}')" >> "$GITHUB_ENV"
-          printf 'NEW_FRONTEND_IMAGE_ID=%s\n' "$(docker image inspect "future-viewer-frontend:$RELEASE_SHA" --format '{{.Id}}')" >> "$GITHUB_ENV"
       - name: Transfer and verify application images
         run: |
           set -euo pipefail
           install -d "$RUNNER_TEMP/fv-delivery"
           docker save "future-viewer-backend:$RELEASE_SHA" "future-viewer-frontend:$RELEASE_SHA" | gzip -1 > "$RUNNER_TEMP/fv-delivery/images.tar.gz"
+          python3 - <<'IMAGE_IDS'
+          import hashlib,json,os,tarfile
+          path=os.environ['RUNNER_TEMP']+'/fv-delivery/images.tar.gz'
+          with tarfile.open(path,'r:gz') as archive:
+              manifest=json.load(archive.extractfile('manifest.json'))
+              with open(os.environ['GITHUB_ENV'],'a') as output:
+                  for role in ('backend','frontend'):
+                      tag='future-viewer-'+role+':'+os.environ['RELEASE_SHA']
+                      matches=[item for item in manifest if tag in (item.get('RepoTags') or [])]
+                      assert len(matches)==1, 'Expected one archived image per service'
+                      config=archive.extractfile(matches[0]['Config']).read()
+                      parsed=json.loads(config)
+                      assert parsed['architecture']=='amd64' and parsed['os']=='linux'
+                      digest='sha256:'+hashlib.sha256(config).hexdigest()
+                      output.write('NEW_'+role.upper()+'_IMAGE_ID='+digest+'\n')
+                      print(role+' archived configuration: '+digest)
+          IMAGE_IDS
           cp delivery/scripts/deploy-guest-history-release.sh "$RUNNER_TEMP/fv-delivery/deploy.sh"
           cd "$RUNNER_TEMP/fv-delivery"
           sha256sum images.tar.gz deploy.sh > SHA256SUMS
@@ -91,6 +106,7 @@ jobs:
           printf 'REMOTE_RELEASE_DIR=%s\n' "$remote_dir" >> "$GITHUB_ENV"
           scp images.tar.gz deploy.sh SHA256SUMS "fv-retention-release:$remote_dir/"
           ssh fv-retention-release "cd '$remote_dir' && sha256sum -c SHA256SUMS && sudo -n docker load -i images.tar.gz"
+          ssh fv-retention-release "sudo -n docker image inspect --format '{{.Id}}' 'future-viewer-backend:$RELEASE_SHA' 'future-viewer-frontend:$RELEASE_SHA'"
       - name: Backup, verify restore and replace application services
         run: |
           set -euo pipefail
