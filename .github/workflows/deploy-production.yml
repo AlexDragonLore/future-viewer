@@ -1,4 +1,4 @@
-name: guest-history-delivery-preflight
+name: guest-history-release-delivery
 
 on:
   workflow_dispatch:
@@ -6,11 +6,27 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  RELEASE_SHA: b6f262f213262ca7b906086dc72ff4ee4bcedb97
+
 jobs:
-  preflight:
+  deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 25
     steps:
+      - uses: actions/checkout@v4
+        with:
+          path: delivery
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: b6f262f213262ca7b906086dc72ff4ee4bcedb97
+          path: release
+          persist-credentials: false
       - name: Configure existing deployment identity
         env:
           DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
@@ -21,19 +37,79 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/future_viewer_deploy
           chmod 600 ~/.ssh/future_viewer_deploy
           printf '%s\n' '80.87.104.245 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIe+wys2gdXm1hTHtWupCc1RMbVE296SI2SN34OXWltK' > ~/.ssh/known_hosts
-      - name: Read current production state
+          cat > ~/.ssh/config <<'SSH'
+          Host fv-retention-release
+            HostName 80.87.104.245
+            User deploy
+            IdentityFile ~/.ssh/future_viewer_deploy
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 25
+            ControlMaster auto
+            ControlPersist 600
+            ControlPath ~/.ssh/fv-retention-control
+          SSH
+          chmod 600 ~/.ssh/config ~/.ssh/known_hosts
+      - name: Read only public frontend build values
         run: |
           set -euo pipefail
-          ssh -i ~/.ssh/future_viewer_deploy -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=25 deploy@80.87.104.245 'bash -s' <<'REMOTE'
+          ssh fv-retention-release 'bash -s' > "$RUNNER_TEMP/frontend-build-args.json" <<'REMOTE_ARGS'
           set -euo pipefail
           cd /opt/future-viewer
-          git rev-parse HEAD
-          git status --short
-          sudo -n docker ps --format '{{.Names}} {{.ID}} {{.Image}} {{.Status}}'
-          sudo -n docker inspect future-viewer-backend-1 future-viewer-frontend-1 future-viewer-caddy-1 --format '{{.Name}} {{.Config.Image}} {{.Image}} {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
-          sudo -n stat -c '%a %U %n' /opt/fv-app/.env.production
-          sudo -n docker compose version --short
-          REMOTE
-      - name: Remove temporary credential
+          sudo -n env FV_SHARED_EDGE_PORT=18080 docker compose --env-file /opt/fv-app/.env.production -f docker-compose.prod.yml -p future-viewer config --format json | python3 -c 'import json,sys; d=json.load(sys.stdin); a=d["services"]["frontend"]["build"]["args"]; assert all(k.startswith("VITE_") for k in a); json.dump(a,sys.stdout)'
+          REMOTE_ARGS
+          python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("Preserved",len(d),"public frontend build arguments")' "$RUNNER_TEMP/frontend-build-args.json"
+      - name: Build exact tested backend and frontend
+        working-directory: release
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          docker build --platform linux/amd64 -t "future-viewer-backend:$RELEASE_SHA" backend
+          python3 - <<'PYBUILD'
+          import json,os,re,subprocess
+          from pathlib import Path
+          configured=json.load(open(os.environ['RUNNER_TEMP']+'/frontend-build-args.json'))
+          allowed=set(re.findall(r'^ARG (VITE_[A-Z0-9_]+)',Path('frontend/Dockerfile').read_text(),re.M))
+          assert set(configured)<=allowed
+          command=['docker','build','--platform','linux/amd64','--target','prod','-t','future-viewer-frontend:'+os.environ['RELEASE_SHA']]
+          for key,value in sorted(configured.items()): command+=['--build-arg',key+'='+str(value or '')]
+          subprocess.run(command+['frontend'],check=True)
+          PYBUILD
+          printf 'NEW_BACKEND_IMAGE_ID=%s\n' "$(docker image inspect "future-viewer-backend:$RELEASE_SHA" --format '{{.Id}}')" >> "$GITHUB_ENV"
+          printf 'NEW_FRONTEND_IMAGE_ID=%s\n' "$(docker image inspect "future-viewer-frontend:$RELEASE_SHA" --format '{{.Id}}')" >> "$GITHUB_ENV"
+      - name: Transfer and verify application images
+        run: |
+          set -euo pipefail
+          install -d "$RUNNER_TEMP/fv-delivery"
+          docker save "future-viewer-backend:$RELEASE_SHA" "future-viewer-frontend:$RELEASE_SHA" | gzip -1 > "$RUNNER_TEMP/fv-delivery/images.tar.gz"
+          cp delivery/scripts/deploy-guest-history-release.sh "$RUNNER_TEMP/fv-delivery/deploy.sh"
+          cd "$RUNNER_TEMP/fv-delivery"
+          sha256sum images.tar.gz deploy.sh > SHA256SUMS
+          remote_dir="$(ssh fv-retention-release 'umask 077; mktemp -d /tmp/fv-history-release.XXXXXXXX')"
+          [[ "$remote_dir" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]
+          printf 'REMOTE_RELEASE_DIR=%s\n' "$remote_dir" >> "$GITHUB_ENV"
+          scp images.tar.gz deploy.sh SHA256SUMS "fv-retention-release:$remote_dir/"
+          ssh fv-retention-release "cd '$remote_dir' && sha256sum -c SHA256SUMS && sudo -n docker load -i images.tar.gz"
+      - name: Backup, verify restore and replace application services
+        run: |
+          set -euo pipefail
+          [[ "$REMOTE_RELEASE_DIR" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]
+          [[ "$NEW_BACKEND_IMAGE_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
+          [[ "$NEW_FRONTEND_IMAGE_ID" =~ ^sha256:[a-f0-9]{64}$ ]]
+          ssh fv-retention-release "sudo -n bash '$REMOTE_RELEASE_DIR/deploy.sh' '$NEW_BACKEND_IMAGE_ID' '$NEW_FRONTEND_IMAGE_ID'"
+      - name: Public production smoke
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --max-time 25 https://alex-taro.ru/health
+          curl --fail --silent --show-error --max-time 25 -o /dev/null https://alex-taro.ru/
+          curl --fail --silent --show-error --max-time 25 -o /dev/null https://janetka.ru/
+          test "$(curl --silent --max-time 25 -o /dev/null -w '%{http_code}' https://alex-taro.ru/api/admin/readings)" = 401
+      - name: Remove temporary delivery and credential
         if: always()
-        run: rm -f ~/.ssh/future_viewer_deploy
+        run: |
+          if [[ "${REMOTE_RELEASE_DIR:-}" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]; then
+            ssh fv-retention-release "rm -f -- '$REMOTE_RELEASE_DIR/images.tar.gz' '$REMOTE_RELEASE_DIR/deploy.sh' '$REMOTE_RELEASE_DIR/SHA256SUMS'; rmdir -- '$REMOTE_RELEASE_DIR'" || true
+          fi
+          ssh -O exit fv-retention-release 2>/dev/null || true
+          rm -f ~/.ssh/future_viewer_deploy
