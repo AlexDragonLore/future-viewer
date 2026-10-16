@@ -8,10 +8,11 @@ import sys
 import tarfile
 import tempfile
 
-RELEASE = sys.argv[1] if len(sys.argv) == 4 else ''
+RELEASE = sys.argv[1] if len(sys.argv) in (3, 4) else ''
 if not re.fullmatch(r'[0-9a-f]{40}', RELEASE) or not all(re.fullmatch(r'sha256:[0-9a-f]{64}', v) for v in sys.argv[2:]):
-    sys.exit('Expected pinned release and two archive configuration digests')
-EXPECTED_CONFIGS = {'backend': sys.argv[2][7:], 'frontend': sys.argv[3][7:]}
+    sys.exit('Expected pinned release and archive configuration digests')
+EXPECTED_CONFIGS = ({'frontend': sys.argv[2][7:]} if len(sys.argv) == 3
+                    else {'backend': sys.argv[2][7:], 'frontend': sys.argv[3][7:]})
 TAGS = {role: f'future-viewer-{role}:{RELEASE}' for role in EXPECTED_CONFIGS}
 
 
