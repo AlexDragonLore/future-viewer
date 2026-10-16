@@ -62,7 +62,7 @@ public sealed class AdminService
                 DeckType = r.DeckType,
                 CreatedAt = r.CreatedAt,
                 DeletedFromHistoryAt = r.DeletedFromHistoryAt,
-                ExpiresAt = r.UserId is null ? r.CreatedAt + GuestReadingRetention.Duration : null
+                ExpiresAt = r.UserId is null ? r.CreatedAt + GuestReadingRetention.ContentDuration : null
             }).ToList(),
             Total = total
         };

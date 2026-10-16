@@ -17,7 +17,7 @@ const interpretationHtml = computed(() => safeMarkdown(props.reading.interpretat
       <time :datetime="reading.createdAt">{{ new Date(reading.createdAt).toLocaleString('ru-RU') }}</time>
     </div>
     <p v-if="reading.expiresAt" class="message-retention" data-testid="admin-reading-retention">
-      Хранится 24 часа · до <time :datetime="reading.expiresAt">{{ new Date(reading.expiresAt).toLocaleString('ru-RU') }}</time>
+      Хранится 30 дней · до <time :datetime="reading.expiresAt">{{ new Date(reading.expiresAt).toLocaleString('ru-RU') }}</time>
     </p>
     <span v-if="reading.deletedFromHistoryAt" class="hidden-badge" data-testid="admin-reading-hidden">Скрыт из истории пользователем</span>
     <p class="message-label">Вопрос</p>

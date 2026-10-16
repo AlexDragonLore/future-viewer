@@ -115,7 +115,7 @@ public sealed class ReadingService
         };
 
         // Persist the safe question before AI interpretation. Unclaimed guest
-        // content is available to admins for 24 hours, then removed by cleanup.
+        // content is available to admins for 30 days, then removed by cleanup.
         if (userId is not null)
             await _subscription.AddReadingAsync(reading, ct);
         else

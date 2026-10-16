@@ -65,7 +65,7 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
         guestItem.UserId.Should().BeNull();
         guestItem.UserEmail.Should().BeNull();
         guestItem.Interpretation.Should().Be(guest.AiInterpretation);
-        guestItem.ExpiresAt.Should().BeCloseTo(guest.CreatedAt.AddHours(24), TimeSpan.FromMicroseconds(1));
+        guestItem.ExpiresAt.Should().BeCloseTo(guest.CreatedAt.AddDays(30), TimeSpan.FromMicroseconds(1));
         all.Items.Single(r => r.Id == hidden.Id).DeletedFromHistoryAt.Should().NotBeNull();
 
         var owned = await Read(admin, $"userId={owner.UserId}&search={marker}");
@@ -103,7 +103,8 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
         message.Question.Should().Be(question);
         message.Interpretation.Should().NotBeNullOrWhiteSpace();
         message.Interpretation!.Length.Should().BeGreaterThan(guest.Reading.Interpretation!.Length);
-        message.ExpiresAt.Should().BeCloseTo(guest.ExpiresAt.UtcDateTime, TimeSpan.FromMicroseconds(1));
+        message.ExpiresAt.Should().BeCloseTo(guest.Reading.CreatedAt.AddDays(30), TimeSpan.FromMicroseconds(1));
+        guest.ExpiresAt.Should().Be(new DateTimeOffset(guest.Reading.CreatedAt, TimeSpan.Zero).AddHours(24));
 
         var (ownerClient, owner) = await CreateClient();
         (await ownerClient.PostAsJsonAsync("/api/readings/guest/unlock", new GuestReadingTicketRequest(guest.Ticket)))
@@ -124,19 +125,29 @@ public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : 
         var marker = Guid.NewGuid().ToString("N");
         var fresh = Reading(null, $"{marker} Анонимный вопрос", "Свежий ответ");
         fresh.SavedToHistory = false;
+        var retained = new Reading
+        {
+            SpreadType = SpreadType.SingleCard, Question = $"{marker} Архивный гостевой вопрос",
+            AiInterpretation = "Ответ после истечения гостевого доступа", CreatedAt = DateTime.UtcNow.AddDays(-29)
+        };
         var expired = new Reading
         {
             SpreadType = SpreadType.SingleCard, Question = $"{marker} Просроченный вопрос",
-            AiInterpretation = "Просроченный ответ", CreatedAt = DateTime.UtcNow.AddHours(-24)
+            AiInterpretation = "Просроченный ответ", CreatedAt = DateTime.UtcNow.AddDays(-30)
         };
         var legacy = Reading(null, string.Empty, null);
         legacy.SavedToHistory = false;
-        await Seed(fresh, expired, legacy);
+        await Seed(fresh, retained, expired, legacy);
 
         var result = await Read(admin, $"search={marker}&pageSize=1");
-        result.Total.Should().Be(1);
+        result.Total.Should().Be(2);
         result.Items.Should().ContainSingle().Which.Id.Should().Be(fresh.Id);
-        (await Read(admin, $"search={marker}&page=2&pageSize=1")).Items.Should().BeEmpty();
+        var archived = (await Read(admin, $"search={marker}&page=2&pageSize=1")).Items.Should().ContainSingle().Which;
+        archived.Id.Should().Be(retained.Id);
+        archived.Question.Should().Be(retained.Question);
+        archived.Interpretation.Should().Be(retained.AiInterpretation);
+        archived.ExpiresAt.Should().BeCloseTo(retained.CreatedAt.AddDays(30), TimeSpan.FromMicroseconds(1));
+        (await Read(admin, $"search={marker}&page=3&pageSize=1")).Items.Should().BeEmpty();
         (await Read(admin, "")).Items.Should().NotContain(r => r.Id == legacy.Id || r.Id == expired.Id);
     }
 

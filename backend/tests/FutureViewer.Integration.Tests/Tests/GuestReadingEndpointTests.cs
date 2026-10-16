@@ -181,13 +181,20 @@ public sealed class GuestReadingEndpointTests(IntegrationTestFixture fixture) : 
     }
 
     [Fact]
-    public async Task Expired_guest_row_cannot_be_claimed_even_before_cleanup()
+    public async Task Guest_content_retained_beyond_access_expiry_cannot_be_claimed()
     {
         var guest = await CreateGuest();
         using var scope = fixture.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var expiredAt = DateTime.UtcNow.AddDays(-3);
         await db.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE readings SET created_at = {DateTime.UtcNow.AddHours(-24)} WHERE id = {guest.Reading.Id}");
+            $"UPDATE readings SET created_at = {expiredAt} WHERE id = {guest.Reading.Id}");
+        var privacy = scope.ServiceProvider.GetRequiredService<IPrivacyRepository>();
+        await privacy.PurgeGuestReadingsBeforeAsync(DateTime.UtcNow.AddDays(-30));
+        await privacy.PurgeUnsavedReadingsBeforeAsync(DateTime.UtcNow.AddHours(-48));
+        var retained = await db.Readings.AsNoTracking().SingleAsync(x => x.Id == guest.Reading.Id);
+        retained.Question.Should().Be(guest.Reading.Question);
+        retained.AiInterpretation.Should().NotBeNullOrWhiteSpace();
 
         var owner = await Login();
         var response = await owner.PostAsJsonAsync("/api/readings/guest/unlock", new GuestReadingTicketRequest(guest.Ticket));

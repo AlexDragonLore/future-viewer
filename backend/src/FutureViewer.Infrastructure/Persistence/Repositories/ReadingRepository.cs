@@ -77,7 +77,7 @@ public sealed class ReadingRepository : IReadingRepository
     {
         // Retained content stays available to admins after removal from user history.
         // Guest content expires independently of when the cleanup job next runs.
-        var guestCutoff = DateTime.UtcNow - GuestReadingRetention.Duration;
+        var guestCutoff = DateTime.UtcNow - GuestReadingRetention.ContentDuration;
         var query = _db.Readings.AsNoTracking().Where(r =>
             (r.UserId != null && r.SavedToHistory)
             || (r.UserId == null && r.CreatedAt > guestCutoff && r.Question != string.Empty));
@@ -108,7 +108,7 @@ public sealed class ReadingRepository : IReadingRepository
     {
         // Claim and store the protected ticket together. The owner may retry, but a
         // second account cannot claim it and removing it from history is permanent.
-        var guestCutoff = DateTime.UtcNow - GuestReadingRetention.Duration;
+        var guestCutoff = DateTime.UtcNow - GuestReadingRetention.AccessDuration;
         var updated = await _db.Readings
             .Where(r => r.Id == id && ((r.UserId == null && !r.SavedToHistory && r.CreatedAt > guestCutoff) || r.UserId == userId)
                         && r.DeletedFromHistoryAt == null)

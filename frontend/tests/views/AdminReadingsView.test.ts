@@ -13,7 +13,7 @@ const guestReading: AdminReading = {
   userId: null,
   userEmail: null,
   question: 'На что обратить внимание сегодня?',
-  expiresAt: '2026-10-07T12:00:00Z',
+  expiresAt: '2026-11-05T12:00:00Z',
 }
 
 function mountReadings() {
@@ -40,10 +40,10 @@ describe('AdminReadingsView', () => {
     expect(row.find('[data-testid="admin-reading-user"]').exists()).toBe(false)
     expect(wrapper.find('admin-user-detail-drawer-stub').exists()).toBe(false)
     const retention = row.get('[data-testid="admin-reading-retention"]')
-    expect(retention.text()).toContain('Хранится 24 часа')
+    expect(retention.text()).toContain('Хранится 30 дней')
     expect(retention.get('time').attributes('datetime')).toBe(guestReading.expiresAt)
     expect(retention.get('time').text()).toBe(new Date(guestReading.expiresAt!).toLocaleString('ru-RU'))
-    expect(wrapper.text()).toContain('Анонимные сообщения хранятся 24 часа.')
+    expect(wrapper.text()).toContain('Гостевые вопросы и ответы хранятся 30 дней, зарегистрированных пользователей — бессрочно.')
   })
 
   it('keeps saved readings linked to their user without a guest expiry notice', async () => {

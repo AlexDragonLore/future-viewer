@@ -13,6 +13,7 @@ public sealed class AdminReadingDto
     public required DeckType DeckType { get; init; }
     public required DateTime CreatedAt { get; init; }
     public DateTime? DeletedFromHistoryAt { get; init; }
+    // Guest content retention deadline; independent of the guest access ticket.
     public DateTime? ExpiresAt { get; init; }
 }
 

@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.DataProtection;
 namespace FutureViewer.Host.Auth;
 
 // The browser keeps only this encrypted continuation ticket, never the hidden text.
-// The database retains full guest content for admins until the same 24-hour expiry.
+// The database retains guest content for admins independently of ticket access.
 public sealed class GuestReadingTickets(IDataProtectionProvider provider)
 {
     private readonly ITimeLimitedDataProtector _protector = provider
@@ -18,7 +18,7 @@ public sealed class GuestReadingTickets(IDataProtectionProvider provider)
     {
         if (string.IsNullOrWhiteSpace(reading.Interpretation))
             throw new InvalidOperationException("The guest interpretation is empty.");
-        var expiresAt = new DateTimeOffset(reading.CreatedAt, TimeSpan.Zero) + GuestReadingRetention.Duration;
+        var expiresAt = new DateTimeOffset(reading.CreatedAt, TimeSpan.Zero) + GuestReadingRetention.AccessDuration;
         var ticket = _protector.Protect(JsonSerializer.Serialize(reading), expiresAt);
         return new(Preview(reading), ticket, expiresAt);
     }

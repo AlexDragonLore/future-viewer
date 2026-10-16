@@ -287,7 +287,8 @@ public sealed class PrivacyRepository : IPrivacyRepository
         DateTime cutoff,
         CancellationToken ct = default) =>
         _db.Readings
-            .Where(x => !x.SavedToHistory && x.CreatedAt < cutoff)
+            // Guest content has its own longer retention policy and cleanup job.
+            .Where(x => x.UserId != null && !x.SavedToHistory && x.CreatedAt < cutoff)
             .ExecuteDeleteAsync(ct);
 
     public Task<int> PurgeAuditEventsBeforeAsync(

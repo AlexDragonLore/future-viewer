@@ -33,7 +33,7 @@ function changePage(page: number) {
       <div>
         <h2 class="font-display text-xl gold-text">Последние сообщения</h2>
         <p>Вопросы пользователей и гостей, ответы ИИ · сначала новые</p>
-        <p>Анонимные сообщения хранятся 24 часа.</p>
+        <p>Гостевые вопросы и ответы хранятся 30 дней, зарегистрированных пользователей — бессрочно.</p>
       </div>
       <button class="admin-button" :disabled="store.readingLoading" data-testid="admin-readings-refresh" @click="store.loadReadings()">Обновить</button>
     </div>

@@ -19,9 +19,20 @@
       "policy_id": "reading-history",
       "data_categories": ["question", "cards", "ai_interpretation"],
       "trigger": "authenticated_reading_created_or_guest_claimed",
-      "retention_period": null,
+      "retention_period": "indefinite_until_account_or_data_deletion",
       "legal_basis_reference": null,
       "deletion_mechanism": "history_soft_delete_retains_data_until_account_or_data_deletion",
+      "backup_handling": null,
+      "status": "proposed",
+      "manual_approved": false
+    },
+    {
+      "policy_id": "guest-reading-content",
+      "data_categories": ["question", "cards", "ai_interpretation"],
+      "trigger": "unclaimed_guest_reading_created",
+      "retention_period": "30 days; guest preview and claim ticket remains valid for 24 hours",
+      "legal_basis_reference": null,
+      "deletion_mechanism": "guest_content_cleanup_after_30_days",
       "backup_handling": null,
       "status": "proposed",
       "manual_approved": false
