@@ -92,14 +92,16 @@ public sealed class ReadingRepository : IReadingRepository
             .Take(take)
             .ToListAsync(ct);
 
-    public Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default) =>
-        AdminReadingsQuery(userId, search).CountAsync(ct);
+    public Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default,
+        AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null) =>
+        AdminReadingsQuery(userId, search, audience, asOfUtc).CountAsync(ct);
 
     public async Task<IReadOnlyList<AdminReadingDto>> SearchAdminListAsync(
-        Guid? userId, string? search, int skip, int take, bool includeInterpretation, CancellationToken ct = default)
+        Guid? userId, string? search, int skip, int take, bool includeInterpretation,
+        CancellationToken ct = default, AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null)
     {
-        var now = DateTime.UtcNow;
-        return await AdminReadingsQuery(userId, search)
+        var now = asOfUtc ?? DateTime.UtcNow;
+        return await AdminReadingsQuery(userId, search, audience, now)
             .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
             .Skip(skip).Take(take)
             .Select(r => new AdminReadingDto
@@ -126,14 +128,26 @@ public sealed class ReadingRepository : IReadingRepository
             .Select(r => new AdminReadingInterpretationDto { Id = r.Id, Interpretation = r.AiInterpretation })
             .SingleOrDefaultAsync(ct);
 
-    private IQueryable<Reading> AdminReadingsQuery(Guid? userId, string? search)
+    private IQueryable<Reading> AdminReadingsQuery(Guid? userId, string? search,
+        AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null)
     {
         // Retained content stays available to admins after removal from user history.
         // Guest content expires independently of when the cleanup job next runs.
-        var guestCutoff = DateTime.UtcNow - GuestReadingRetention.ContentDuration;
+        var now = asOfUtc ?? DateTime.UtcNow;
+        var guestCutoff = now - GuestReadingRetention.ContentDuration;
         var query = _db.Readings.AsNoTracking().Where(r =>
             (r.UserId != null && r.SavedToHistory)
             || (r.UserId == null && r.CreatedAt > guestCutoff && r.Question != string.Empty));
+        query = audience switch
+        {
+            AdminReadingAudience.All => query,
+            AdminReadingAudience.Registered => query.Where(r => r.UserId != null),
+            AdminReadingAudience.Guests => query.Where(r => r.UserId == null),
+            AdminReadingAudience.Subscribers => query.Where(r => r.User != null
+                && r.User.SubscriptionStatus == SubscriptionStatus.Active
+                && r.User.SubscriptionExpiresAt != null && r.User.SubscriptionExpiresAt > now),
+            _ => throw new ArgumentOutOfRangeException(nameof(audience))
+        };
         if (userId.HasValue) query = query.Where(r => r.UserId == userId.Value);
         if (!string.IsNullOrWhiteSpace(search))
         {

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FutureViewer.Domain.Enums;
+using FutureViewer.DomainServices.DTOs.Admin;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Services;
 
@@ -30,12 +31,22 @@ public static class AdminEndpoints
             int? page,
             int? pageSize,
             bool? includeInterpretation,
+            string? audience,
             AdminService service,
             HttpContext ctx,
             CancellationToken ct) =>
         {
             ctx.Response.Headers.CacheControl = "no-store";
-            return Results.Ok(await service.SearchReadingsAsync(userId, search, page ?? 1, pageSize ?? 20, ct, includeInterpretation ?? true));
+            if (audience is not (null or "" or "all" or "subscribers" or "registered" or "guests"))
+                return Results.BadRequest(new { error = "invalid_audience", message = "Неизвестный фильтр пользователей." });
+            var filter = audience switch
+            {
+                "subscribers" => AdminReadingAudience.Subscribers,
+                "registered" => AdminReadingAudience.Registered,
+                "guests" => AdminReadingAudience.Guests,
+                _ => AdminReadingAudience.All
+            };
+            return Results.Ok(await service.SearchReadingsAsync(userId, search, page ?? 1, pageSize ?? 20, ct, includeInterpretation ?? true, filter));
         });
 
         group.MapGet("/readings/{id:guid}/interpretation", async (

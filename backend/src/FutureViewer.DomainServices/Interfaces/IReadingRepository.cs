@@ -13,9 +13,11 @@ public interface IReadingRepository
     Task<int> CountHistoryAsync(Guid userId, CancellationToken ct = default);
     Task<IReadOnlyList<Reading>> GetByUserAsync(Guid userId, int take, CancellationToken ct = default);
     Task<IReadOnlyList<Reading>> SearchForAdminAsync(Guid? userId, string? search, int skip, int take, CancellationToken ct = default);
-    Task<IReadOnlyList<AdminReadingDto>> SearchAdminListAsync(Guid? userId, string? search, int skip, int take, bool includeInterpretation, CancellationToken ct = default);
+    Task<IReadOnlyList<AdminReadingDto>> SearchAdminListAsync(Guid? userId, string? search, int skip, int take, bool includeInterpretation,
+        CancellationToken ct = default, AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null);
     Task<AdminReadingInterpretationDto?> GetAdminInterpretationAsync(Guid id, CancellationToken ct = default);
-    Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default);
+    Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default,
+        AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null);
     Task UpdateAsync(Reading reading, CancellationToken ct = default);
     Task<bool> AttachGuestAsync(Guid id, Guid userId, string question, string? interpretation, CancellationToken ct = default);
     Task<int> CountTodayByUserAsync(Guid userId, CancellationToken ct = default);

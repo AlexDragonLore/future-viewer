@@ -8,6 +8,7 @@ import type { FeedbackStatus } from '@/types'
 import type {
   AdminFeedback,
   AdminReading,
+  AdminReadingAudience,
   AdminReadingListResponse,
   AdminUserListResponse,
   AdminStats,
@@ -25,6 +26,7 @@ export const useAdminStore = defineStore('admin', () => {
   const readingPage = ref(1)
   const readingPageSize = ref(20)
   const readingSearch = ref<string | null>(null)
+  const readingAudience = ref<AdminReadingAudience>('all')
   const readingLoading = ref(false)
   const readingError = ref<string | null>(null)
   const readingDisplayedPage = ref(1)
@@ -65,7 +67,7 @@ export const useAdminStore = defineStore('admin', () => {
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
 
-  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingLoading, readingError, feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
+  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingLoading, readingError, feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
     readingRequest++; userRequest++; detailRequest++; feedbackRequest++
     readingController?.abort(); userController?.abort()
     readingCache.clear(); userCache.clear()
@@ -77,7 +79,7 @@ export const useAdminStore = defineStore('admin', () => {
     const controller = new AbortController()
     readingController = controller
     const page = readingPage.value
-    const filters = { search: readingSearch.value, page, pageSize: readingPageSize.value, includeInterpretation: false }
+    const filters = { search: readingSearch.value, audience: readingAudience.value, page, pageSize: readingPageSize.value, includeInterpretation: false }
     const key = JSON.stringify(filters)
     if (force) readingCache.clear()
     readingLoading.value = true
@@ -99,15 +101,27 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
-  function setReadingSearch(value: string): void {
+  function clearReadingResults(): void {
     readingRequest++
     readingController?.abort()
     readingCache.clear()
     readings.value = []
     readingTotal.value = 0
-    readingSearch.value = value.trim() || null
     readingPage.value = 1
     readingDisplayedPage.value = 1
+    readingLoading.value = false
+    readingError.value = null
+  }
+
+  function setReadingSearch(value: string): void {
+    clearReadingResults()
+    readingSearch.value = value.trim() || null
+  }
+
+  function setReadingAudience(value: AdminReadingAudience): void {
+    if (readingAudience.value === value) return
+    clearReadingResults()
+    readingAudience.value = value
   }
 
   function setReadingPage(value: number): void {
@@ -330,7 +344,9 @@ export const useAdminStore = defineStore('admin', () => {
     try {
       const detail = await adminApi.setUserSubscription(id, payload)
       invalidateAdminPages()
-      readings.value = readings.value.map(reading => reading.userId === id ? { ...reading, subscription: detail.subscription } : reading)
+      if (readingAudience.value !== 'subscribers') {
+        readings.value = readings.value.map(reading => reading.userId === id ? { ...reading, subscription: detail.subscription } : reading)
+      }
       if (selectedUser.value?.id === id) selectedUser.value = detail
       const idx = users.value.findIndex((u) => u.id === id)
       if (idx >= 0) {
@@ -340,6 +356,12 @@ export const useAdminStore = defineStore('admin', () => {
           subscriptionExpiresAt: detail.subscriptionExpiresAt,
           subscription: detail.subscription,
         }
+      }
+      if (readingAudience.value === 'subscribers') {
+        // Access edits can add/remove every question by this user from the filtered result.
+        // Reload from page one so the total and membership stay correct, including on failure.
+        clearReadingResults()
+        await loadReadings()
       }
       userToast.value = 'Доступ обновлён'
       return true
@@ -411,8 +433,8 @@ export const useAdminStore = defineStore('admin', () => {
 
   return {
     readingDisplayedPage, userDisplayedPage,
-    readings, readingTotal, readingPage, readingPageSize, readingSearch, readingLoading, readingError,
-    loadReadings, setReadingSearch, setReadingPage,
+    readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingLoading, readingError,
+    loadReadings, setReadingSearch, setReadingAudience, setReadingPage,
     feedbacks,
     feedbackTotal,
     feedbackPage,

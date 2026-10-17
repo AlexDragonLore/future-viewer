@@ -23,6 +23,7 @@ export const adminApi = {
       signal,
       params: {
         includeInterpretation: filters.includeInterpretation ?? false,
+        audience: filters.audience ?? 'all',
         search: filters.search || undefined,
         userId: filters.userId || undefined,
         page: filters.page ?? 1,

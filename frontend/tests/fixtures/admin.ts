@@ -1,3 +1,4 @@
+import type { AdminReading } from '@/types/admin'
 import { legalDocumentsResponse } from './legalDocuments'
 
 export const adminFixtureSession = {
@@ -35,6 +36,15 @@ export const adminReadingFixtures = Array.from({ length: 41 }, (_, index) => ({
   deletedFromHistoryAt: index === 1 ? '2026-10-06T11:30:00Z' : null,
   expiresAt: null,
 }))
+
+// Mixed audiences for filtering QA; paid history alone never implies current access.
+export const adminAudienceReadingFixtures: AdminReading[] = adminReadingFixtures.map((row, index) => {
+  if (index % 4 === 2) return { ...row, userId: null, userEmail: null, subscription: null, expiresAt: '2026-11-05T12:00:00Z' }
+  if (index === 3) return { ...row, subscription: { ...adminPaidSubscriptionFixture, lastPurchase: null } }
+  if (index % 4 === 1) return { ...row, subscription: { status: 0, isActive: false, expiresAt: null, lastPurchase: null } }
+  if (index % 4 === 3) return { ...row, subscription: { ...adminPaidSubscriptionFixture, status: 2, isActive: false, expiresAt: '2026-10-01T00:00:00Z' } }
+  return row
+})
 
 export const adminFeedbackFixtures = [{
   id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',

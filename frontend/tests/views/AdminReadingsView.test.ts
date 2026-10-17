@@ -113,4 +113,36 @@ describe('AdminReadingsView', () => {
     scroll.mockRestore()
   })
 
+  it('restores the audience selection and sends exactly one request when it changes', async () => {
+    const store = useAdminStore()
+    store.readingSearch = 'saved question'
+    store.readingAudience = 'registered'
+    store.readingPage = 3
+    store.readings = [savedReading]
+    const wrapper = mountReadings()
+    const subscribers = wrapper.get('[data-testid="admin-reading-audience-subscribers"]')
+    expect(wrapper.get('[data-testid="admin-reading-audience-registered"]').attributes('aria-pressed')).toBe('true')
+    expect(store.loadReadings).toHaveBeenCalledTimes(1)
+    await subscribers.trigger('click')
+    expect(store.readingAudience).toBe('subscribers')
+    expect(store.readingPage).toBe(1)
+    expect(store.readingSearch).toBe('saved question')
+    expect((wrapper.get('[data-testid="admin-reading-search"]').element as HTMLInputElement).value).toBe('saved question')
+    expect(store.readings).toEqual([])
+    expect(subscribers.attributes('aria-pressed')).toBe('true')
+    expect(store.loadReadings).toHaveBeenCalledTimes(2)
+    await subscribers.trigger('click')
+    expect(store.loadReadings).toHaveBeenCalledTimes(2)
+    await wrapper.get('[data-testid="admin-reading-search"]').setValue('new question')
+    await wrapper.get('form').trigger('submit')
+    expect(store.readingSearch).toBe('new question')
+    expect(store.readingAudience).toBe('subscribers')
+  })
+
+  it('describes an empty audience without implying the whole history is empty', () => {
+    useAdminStore().setReadingAudience('guests')
+    const wrapper = mountReadings()
+    expect(wrapper.get('[data-testid="admin-readings-empty"]').text()).toBe('По выбранному фильтру сообщений нет.')
+  })
+
 })

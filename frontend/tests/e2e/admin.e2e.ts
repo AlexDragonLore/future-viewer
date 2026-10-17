@@ -1,14 +1,16 @@
+import type { AdminReading } from '@/types/admin'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import {
   adminFeedbackFixtures,
+  adminAudienceReadingFixtures,
   adminFixtureResponses,
   adminFixtureSession,
   adminReadingFixtures,
   adminUserDetailFixture,
 } from '../fixtures/admin'
 
-async function openAdmin(page: Page, path = '/admin') {
-  const requests = { readings: [] as { page: number; search: string }[], answers: [] as string[], unexpected: [] as string[] }
+async function openAdmin(page: Page, path = '/admin', sourceRows: readonly AdminReading[] = adminReadingFixtures) {
+  const requests = { readings: [] as { page: number; search: string; audience: string }[], answers: [] as string[], unexpected: [] as string[] }
   await page.route('**/api/**', async route => {
     const request = route.request()
     const url = new URL(request.url())
@@ -26,12 +28,15 @@ async function openAdmin(page: Page, path = '/admin') {
       const pageSize = Number(url.searchParams.get('pageSize') ?? 20)
       const search = url.searchParams.get('search') ?? ''
       const userId = url.searchParams.get('userId')
-      requests.readings.push({ page: pageNumber, search })
-      const rows = adminReadingFixtures.filter(reading =>
+      const audience = url.searchParams.get('audience') ?? 'all'
+      requests.readings.push({ page: pageNumber, search, audience })
+      const rows = sourceRows.filter(reading =>
         (!userId || reading.userId === userId)
+        && (audience === 'all' || audience === 'subscribers' && reading.subscription?.isActive
+          || audience === 'registered' && reading.userId !== null || audience === 'guests' && reading.userId === null)
         && `${reading.userEmail} ${reading.question}`.toLowerCase().includes(search.toLowerCase()),
       )
-      if (pageNumber === 2) await new Promise(resolve => setTimeout(resolve, 300))
+      if (pageNumber === 2 || audience === 'guests') await new Promise(resolve => setTimeout(resolve, 300))
       return route.fulfill({ json: {
         items: rows.slice((pageNumber - 1) * pageSize, pageNumber * pageSize).map(({ interpretation: _answer, ...reading }) => reading), total: rows.length,
       } })
@@ -39,7 +44,7 @@ async function openAdmin(page: Page, path = '/admin') {
     if (/^\/api\/admin\/readings\/[^/]+\/interpretation$/.test(url.pathname)) {
       const id = url.pathname.split('/')[4]
       requests.answers.push(id)
-      const reading = adminReadingFixtures.find(row => row.id === id)
+      const reading = sourceRows.find(row => row.id === id)
       return route.fulfill({ status: reading ? 200 : 404, json: { id, interpretation: reading?.interpretation } })
     }
     if (url.pathname in adminFixtureResponses) {
@@ -138,7 +143,7 @@ test('latest messages show full content, hidden status, user details and reset p
   await page.getByTestId('admin-reading-search').press('Enter')
   await expect(rows).toHaveCount(1)
   await expect(rows.first()).toContainText('Как решиться на смену работы')
-  expect(requests.readings.at(-1)).toEqual({ page: 1, search: 'смену работы' })
+  expect(requests.readings.at(-1)).toEqual({ page: 1, search: 'смену работы', audience: 'all' })
   await expect(page.getByTestId('admin-reading-next')).toBeDisabled()
   await expectContained(page.getByTestId('admin-view'))
   expect(requests.unexpected).toEqual([])
@@ -174,4 +179,73 @@ test('users show actual purchases on desktop and mobile and in the detail drawer
   await expect(drawer.getByTestId('admin-subscription-status')).toContainText('Доступ активен')
   await expectContained(drawer)
   expect(requests.unexpected).toEqual([])
+})
+
+
+test('audience filters combine with search, reset pagination, and support keyboard switching', async ({ page }, testInfo) => {
+  const requests = await openAdmin(page, '/admin', adminAudienceReadingFixtures)
+  const rows = page.getByTestId('admin-reading-row')
+  await expect(rows).toHaveCount(20)
+  await expect(page.getByTestId('admin-reading-audience-all')).toHaveAttribute('aria-pressed', 'true')
+  await page.screenshot({ path: testInfo.outputPath('admin-audience-all.png') })
+  await page.getByTestId('admin-reading-next').click()
+  await expect(rows.first()).toContainText('Архивный вопрос 21')
+  await page.getByTestId('admin-reading-search').fill('Архивный')
+  await page.getByTestId('admin-reading-search').press('Enter')
+  await expect(rows.first()).toContainText('Архивный вопрос 3')
+  const matches = adminAudienceReadingFixtures.filter(row => row.question.includes('Архивный'))
+
+  await page.getByTestId('admin-reading-audience-registered').click()
+  await expect(page.getByTestId('admin-reading-audience-registered')).toHaveAttribute('aria-pressed', 'true')
+  await expect(rows).toHaveCount(20)
+  const registered = matches.filter(row => row.userId !== null)
+  await expect(page.getByTestId('admin-readings-total')).toHaveText(`Всего: ${registered.length}`)
+  await expect(page.getByTestId('admin-reading-guest')).toHaveCount(0)
+  // Registered includes active subscribers and users whose access has expired.
+  await expect(page.getByTestId('admin-subscription-purchase').first()).toBeVisible()
+  await expect(rows.filter({ hasText: 'Архивный вопрос 8:' })).toHaveCount(1)
+  await expect(page.getByTestId('admin-reading-search')).toHaveValue('Архивный')
+  expect(requests.readings.at(-1)).toEqual({ page: 1, search: 'Архивный', audience: 'registered' })
+  await page.getByTestId('admin-reading-next').click()
+  await expect(rows).toHaveCount(registered.length - 20)
+
+  await page.getByTestId('admin-reading-audience-subscribers').click()
+  const subscribers = matches.filter(row => row.subscription?.isActive)
+  await expect(rows).toHaveCount(subscribers.length)
+  await expect(page.getByTestId('admin-readings-total')).toHaveText(`Всего: ${subscribers.length}`)
+  expect(requests.readings.at(-1)).toEqual({ page: 1, search: 'Архивный', audience: 'subscribers' })
+  await expect(page.getByTestId('admin-reading-prev')).toBeDisabled()
+  await expect(rows.filter({ hasText: 'Архивный вопрос 4:' })).toHaveCount(1) // manual active access
+  await expect(rows.filter({ hasText: 'Архивный вопрос 8:' })).toHaveCount(0) // expired paid access
+  await page.screenshot({ path: testInfo.outputPath('admin-audience-subscribers.png') })
+
+  const guestsButton = page.getByTestId('admin-reading-audience-guests')
+  await guestsButton.focus()
+  await guestsButton.press('Enter')
+  await expect(guestsButton).toHaveAttribute('aria-pressed', 'true')
+  await expect(rows).toHaveCount(0)
+  await expect(page.getByRole('status').filter({ hasText: 'Загружаю' })).toBeVisible()
+  await expect(rows).toHaveCount(matches.filter(row => row.userId === null).length)
+  await expect(page.getByTestId('admin-reading-user')).toHaveCount(0)
+  const requestCount = requests.readings.length
+  await guestsButton.click()
+  expect(requests.readings).toHaveLength(requestCount)
+  await page.screenshot({ path: testInfo.outputPath('admin-audience-guests.png') })
+  await expectContained(page.getByTestId('admin-view'))
+  expect(requests.unexpected).toEqual([])
+})
+
+test('audience filters wrap without overflow at320px', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 740 })
+  await openAdmin(page, '/admin', adminAudienceReadingFixtures)
+  const group = page.getByRole('group', { name: 'Фильтр авторов вопросов' })
+  await expect(group.getByRole('button')).toHaveCount(4)
+  for (const button of await group.getByRole('button').all()) {
+    await expect(button).toBeVisible()
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+  }
+  await group.getByRole('button', { name: 'Зарегистрированные', exact: true }).click()
+  await expect(page.getByTestId('admin-readings-total')).toHaveText('Всего: 31')
+  await expectContained(page.getByTestId('admin-view'))
+  await page.screenshot({ path: testInfo.outputPath('admin-audience-320.png') })
 })

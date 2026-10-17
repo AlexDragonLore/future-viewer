@@ -125,12 +125,19 @@ public sealed class AdminSubscriptionSummaryTests(IntegrationTestFixture fixture
         capture.Commands.Count(sql => sql.Contains("payment_orders")).Should().Be(1);
         capture.Commands.Clear();
 
-        var readingPage = await service.SearchReadingsAsync(null, marker, 1, 20, includeInterpretation: false);
-        readingPage.Items.Should().HaveCount(20).And.OnlyContain(r => r.HasInterpretation && r.Interpretation == null);
-        capture.Commands.Should().HaveCount(3);
-        capture.Commands.Should().OnlyContain(sql => !sql.Contains("password_hash"));
-        capture.Commands.Count(sql => sql.Contains("payment_orders")).Should().Be(1);
-        capture.Fields.Should().NotContain("Interpretation");
+        foreach (var audience in new[] { AdminReadingAudience.All, AdminReadingAudience.Subscribers, AdminReadingAudience.Registered })
+        {
+            capture.Commands.Clear();
+            var readingPage = await service.SearchReadingsAsync(null, marker, 1, 20, includeInterpretation: false, audience: audience);
+            readingPage.Items.Should().HaveCount(20).And.OnlyContain(r => r.HasInterpretation && r.Interpretation == null);
+            capture.Commands.Should().HaveCount(3);
+            capture.Commands.Should().OnlyContain(sql => !sql.Contains("password_hash"));
+            capture.Commands.Count(sql => sql.Contains("payment_orders")).Should().Be(1);
+            capture.Fields.Should().NotContain("Interpretation");
+        }
+        capture.Commands.Clear();
+        (await service.SearchReadingsAsync(null, marker, 1, 20, audience: AdminReadingAudience.Guests)).Items.Should().BeEmpty();
+        capture.Commands.Should().HaveCount(2).And.OnlyContain(sql => !sql.Contains("payment_orders"));
         db.ChangeTracker.Entries().Should().BeEmpty();
     }
 

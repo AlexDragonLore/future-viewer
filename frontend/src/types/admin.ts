@@ -110,7 +110,10 @@ export interface AdminReadingListResponse {
   total: number
 }
 
+export type AdminReadingAudience = 'all' | 'subscribers' | 'registered' | 'guests'
+
 export interface ReadingSearchFilters {
+  audience?: AdminReadingAudience
   includeInterpretation?: boolean
   search?: string | null
   userId?: string | null

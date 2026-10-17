@@ -46,13 +46,16 @@ public sealed class AdminService
         int page,
         int pageSize,
         CancellationToken ct = default,
-        bool includeInterpretation = true)
+        bool includeInterpretation = true,
+        AdminReadingAudience audience = AdminReadingAudience.All)
     {
         var safeSize = Math.Clamp(pageSize, 1, 100);
         var safePage = Math.Clamp(page, 1, int.MaxValue / safeSize);
         var skip = (safePage - 1) * safeSize;
-        var readings = await _readings.SearchAdminListAsync(userId, search, skip, safeSize, includeInterpretation, ct);
-        var total = await _readings.CountForAdminAsync(userId, search, ct);
+        // Use one instant for access/retention filtering, row metadata and the total.
+        var now = DateTime.UtcNow;
+        var readings = await _readings.SearchAdminListAsync(userId, search, skip, safeSize, includeInterpretation, ct, audience, now);
+        var total = await _readings.CountForAdminAsync(userId, search, ct, audience, now);
         await AttachPurchasesAsync(readings.Where(r => r.UserId != null && r.Subscription != null)
             .Select(r => (r.UserId!.Value, r.Subscription!)), ct);
         return new AdminReadingListResult

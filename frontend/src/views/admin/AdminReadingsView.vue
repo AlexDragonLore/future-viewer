@@ -2,12 +2,19 @@
 import { ArrowRight, RefreshCw, Search, X } from 'lucide-vue-next'
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useAdminStore } from '@/stores/useAdminStore'
+import type { AdminReadingAudience } from '@/types/admin'
 import AdminSubscriptionBadge from '@/components/admin/AdminSubscriptionBadge.vue'
 import AdminReadingMessage from '@/components/admin/AdminReadingMessage.vue'
 import AdminUserDetailDrawer from '@/components/admin/AdminUserDetailDrawer.vue'
 
 const store = useAdminStore()
 const searchInput = ref(store.readingSearch ?? '')
+const audiences = [
+  { value: 'all', label: 'Все' },
+  { value: 'subscribers', label: 'Подписчики' },
+  { value: 'registered', label: 'Зарегистрированные' },
+  { value: 'guests', label: 'Гости' },
+] as const
 const selectedUserId = ref<string | null>(null)
 const readingList = ref<HTMLElement | null>(null)
 let pageNavigation = 0
@@ -19,6 +26,13 @@ function search() {
   pageNavigation++
   store.setReadingSearch(searchInput.value)
   store.loadReadings()
+}
+
+function changeAudience(value: AdminReadingAudience) {
+  if (store.readingAudience === value) return
+  pageNavigation++
+  store.setReadingAudience(value)
+  void store.loadReadings()
 }
 
 function clearSearch() {
@@ -57,9 +71,13 @@ function refresh() {
       <button type="submit" class="search-submit" :disabled="store.readingLoading" aria-label="Найти" title="Найти"><ArrowRight :size="18" aria-hidden="true" /></button>
     </form>
 
+    <div class="audience-filters" role="group" aria-label="Фильтр авторов вопросов">
+      <button v-for="audience in audiences" :key="audience.value" type="button" class="audience-filter" :aria-pressed="store.readingAudience === audience.value" :data-testid="`admin-reading-audience-${audience.value}`" @click="changeAudience(audience.value)">{{ audience.label }}</button>
+    </div>
+
     <p v-if="store.readingError" class="error" role="alert">{{ store.readingError }}<span v-if="store.readings.length"> Показана страница {{ store.readingDisplayedPage }}.</span></p>
     <p v-if="store.readingLoading" class="loading-status" role="status">Загружаю страницу {{ store.readingPage }}…</p>
-    <p v-if="!store.readingLoading && !store.readingError && !store.readings.length" class="empty" data-testid="admin-readings-empty">{{ store.readingSearch ? 'По этому запросу сообщений нет.' : 'Сохранённых сообщений пока нет.' }}</p>
+    <p v-if="!store.readingLoading && !store.readingError && !store.readings.length" class="empty" data-testid="admin-readings-empty">{{ store.readingSearch ? 'По этому запросу сообщений нет.' : store.readingAudience !== 'all' ? 'По выбранному фильтру сообщений нет.' : 'Сохранённых сообщений пока нет.' }}</p>
     <div v-if="store.readings.length" ref="readingList" class="reading-list" :aria-busy="store.readingLoading">
       <article v-for="reading in store.readings" :key="reading.id" class="reading-card" data-testid="admin-reading-row">
         <AdminReadingMessage :reading="reading">
@@ -91,6 +109,10 @@ function refresh() {
 .toolbar-action { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 9px; color: #b8abc8; }
 .toolbar-action:hover:not(:disabled) { background: rgba(198, 178, 224, 0.08); color: #eadbc3; }
 .search-toolbar { display: flex; align-items: center; gap: 0.4rem; min-width: 0; padding: 0.25rem 0.3rem 0.25rem 0.85rem; margin-bottom: 0.85rem; background: rgba(27, 20, 42, 0.85); border: 1px solid rgba(180, 158, 210, 0.18); border-radius: 11px; }
+.audience-filters { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: -0.25rem 0 0.75rem; }
+.audience-filter { min-height: 32px; padding: 0.3rem 0.6rem; border: 1px solid transparent; border-radius: 8px; color: #a99bb9; font-size: 0.75rem; line-height: 1.4; white-space: nowrap; }
+.audience-filter:hover { color: #e6dbea; background: rgba(180, 158, 210, 0.06); }
+.audience-filter[aria-pressed="true"] { color: #e1c397; border-color: rgba(214, 183, 131, 0.22); background: rgba(214, 183, 131, 0.08); }
 .search-toolbar:focus-within { border-color: rgba(214, 183, 131, 0.55); box-shadow: 0 0 0 2px rgba(214, 183, 131, 0.06); }
 .search-leading { color: #897d99; flex-shrink: 0; }
 input { min-width: 0; flex: 1; background: transparent; border: 0; padding: 0.5rem 0.2rem; color: #f3edf6; min-height: 42px; font-size: 1rem; outline: none; }
@@ -115,6 +137,7 @@ button:focus-visible { outline: 2px solid #d6b783; outline-offset: 2px; }
 .refreshing { animation: refresh-spin 1.2s linear infinite; }
 @keyframes refresh-spin { to { transform: rotate(360deg); } }
 @media (max-width: 640px) {
+  .audience-filter { min-height: 44px; padding-inline: 0.5rem; }
   .reading-card { padding: 0.2rem 0.65rem 0.3rem; }
   .user-link { min-height: 44px; }
   .toolbar-action, .search-submit { min-height: 44px; min-width: 44px; }
