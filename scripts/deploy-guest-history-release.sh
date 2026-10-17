@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# One-shot server-side delivery of the reviewed performance release. Run as root
+# One-shot server-side delivery of the reviewed admin audience release. Run as root
 # after loading its images: bash this-script NEW_BACKEND_IMAGE_ID NEW_FRONTEND_IMAGE_ID
 set -Eeuo pipefail
 umask 077
 
-readonly RELEASE=c8e7de36d18ea1e2f277450af900d0e298dbd3ee
-readonly OLD_REV=af445d9646fe6fb75e6728c6525dea666a2f0578
-readonly OLD_BACKEND=future-viewer-backend:9128c51c5ed9abdb5432301fa09790058b2138fd
-readonly OLD_FRONTEND=future-viewer-frontend:af445d9646fe6fb75e6728c6525dea666a2f0578
-readonly OLD_BACKEND_ID=sha256:91c96c78363c1a5b8581a0a4e4619b74c26df7f69877429a7be9e1fd56ba1b92
-readonly OLD_FRONTEND_ID=sha256:062f8dd7c2772236aa49e1e6f6547fb5f07f19d8706559cf4f3378f45e188112
+readonly RELEASE=c2543b3f6a44544e269dc9aa178f7ed953937b31
+readonly OLD_REV=c8e7de36d18ea1e2f277450af900d0e298dbd3ee
+readonly OLD_BACKEND=future-viewer-backend:c8e7de36d18ea1e2f277450af900d0e298dbd3ee
+readonly OLD_FRONTEND=future-viewer-frontend:c8e7de36d18ea1e2f277450af900d0e298dbd3ee
+readonly OLD_BACKEND_ID=sha256:f9d1cf272d8326094f6d3e774a9e9c444292cc84fe0b915ce35b1294fc2fdd12
+readonly OLD_FRONTEND_ID=sha256:bcbe966b0086a1c98f58e213e6781c36750968a004216d9620c539e120f44b92
 readonly OLD_CADDY_ID=sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 readonly CHECKOUT=/opt/future-viewer
 readonly ENV_FILE=/opt/fv-app/.env.production
@@ -154,7 +154,7 @@ finish() {
   if [[ -n "$STATE_DIR" ]]; then
     printf 'release=%s\nstatus=%s\nphase=%s\nexit_code=%s\n' "$RELEASE" "$result" "$failed_phase" "$code" >"$STATE_DIR/status"
   fi
-  printf 'Performance release delivery: %s (phase=%s).\n' "$result" "$failed_phase"
+  printf 'Admin audience release delivery: %s (phase=%s).\n' "$result" "$failed_phase"
   [[ -z "$STATE_DIR" ]] || printf 'Protected release record: %s\n' "$STATE_DIR"
   exit "$code"
 }
@@ -196,7 +196,7 @@ health || fail 'pre-deployment health failed'
 
 PHASE=capture
 install -d -m 700 -o root -g root /opt/fv-app/releases
-STATE_DIR=$(mktemp -d "/opt/fv-app/releases/site-performance-$RELEASE-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
+STATE_DIR=$(mktemp -d "/opt/fv-app/releases/admin-audience-$RELEASE-$(date -u +%Y%m%dT%H%M%SZ)-XXXXXX")
 chmod 700 "$STATE_DIR"
 cp -p "$ENV_FILE" "$STATE_DIR/env.before"
 snapshot "$STATE_DIR/before-state.json"
@@ -242,7 +242,7 @@ docker exec "$POSTGRES_ID" sh -euc \
 sha256sum "$STATE_DIR/database.dump.enc" >"$STATE_DIR/database.dump.enc.sha256"
 
 PHASE=isolated_restore
-RESTORE_NAME="fv-admin-restore-$(date -u +%s)-$(openssl rand -hex 6)"
+RESTORE_NAME="fv-admin-audience-restore-$(date -u +%s)-$(openssl rand -hex 6)"
 TMPFS_BYTES=$(( DB_BYTES * 4 + 134217728 ))
 (( TMPFS_BYTES >= 268435456 )) || TMPFS_BYTES=268435456
 MEMORY_BYTES=$(( TMPFS_BYTES + 268435456 ))
@@ -322,6 +322,8 @@ docker exec "$(service_id frontend)" sh -ec 'grep -rq "/api/readings/history/sum
   || fail 'frontend compact history endpoint marker was not found'
 docker exec "$(service_id frontend)" sh -ec 'grep -rq "Куплено:" /usr/share/nginx/html/assets' >/dev/null 2>&1 \
   || fail 'frontend purchased subscription label was not found'
+docker exec "$(service_id frontend)" sh -ec 'grep -rq "Подписчики" /usr/share/nginx/html/assets' >/dev/null 2>&1 \
+  || fail 'frontend subscriber audience filter was not found'
 [[ $(curl --silent --max-time 15 --output /dev/null --write-out '%{http_code}' https://alex-taro.ru/api/admin/readings/00000000-0000-0000-0000-000000000000/interpretation) == 401 ]] \
   || fail 'new admin answer endpoint is not available with authorization'
 [[ $(curl --silent --max-time 15 --output /dev/null --write-out '%{http_code}' https://alex-taro.ru/api/readings/history/summary) == 401 ]] \

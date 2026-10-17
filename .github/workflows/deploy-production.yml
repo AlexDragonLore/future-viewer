@@ -1,4 +1,4 @@
-name: site-performance-release-delivery
+name: admin-audience-release-delivery
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  RELEASE_SHA: c8e7de36d18ea1e2f277450af900d0e298dbd3ee
+  RELEASE_SHA: c2543b3f6a44544e269dc9aa178f7ed953937b31
 
 jobs:
   deploy:
@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: c8e7de36d18ea1e2f277450af900d0e298dbd3ee
+          ref: c2543b3f6a44544e269dc9aa178f7ed953937b31
           path: release
           persist-credentials: false
       - name: Configure existing deployment identity
