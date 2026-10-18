@@ -24,3 +24,11 @@
 - Frontend type-check/build, 354 unit tests, 16 desktop/mobile admin Playwright scenarios and backend/frontend technical checks passed.
 - In-app browser inspected a synthetic admin page with personal unseen filtering and oldest-first sorting; responsive screenshots verified 320 px layout without overflow. No production admin session was used.
 - The new receipt history starts with this release; past visits were not tracked and cannot be reconstructed.
+
+## Production result — 18 October 2026, 20:27 MSK
+- Published application release `87cae8e9ded3bdb2080180e0e3f1b6d546d50ec4` to main and deployed it successfully: https://github.com/AlexDragonLore/future-viewer/actions/runs/39148981010.
+- Exact-release CI passed: 452 backend tests, 355 frontend unit tests, type-check/build and all 118 browser scenarios. Local focused admin/navigation browser checks passed; an additional broad local run was stopped after resource-related timeouts, and its six affected guest/legal cases passed with one worker. Full CI provides the completed broad browser result.
+- Encrypted database backup, isolated restore, migration rehearsal, retained row counts, image digests, mounts/networks and unchanged neighboring services all verified. The only new migration is `20261018170408_AddAdminReadingViews`.
+- Required base Compose ps succeeded. Public health returned status ok/database ready; the new acknowledgment endpoint requires admin authentication. Shipped assets contain both new filter labels and the acknowledgment endpoint.
+- In-app production browser rendered the homepage with `/assets/index-BbZweU1H.js`. No production admin session was available; authenticated behavior was verified using synthetic browser fixtures and real PostgreSQL integration tests, including independent administrators.
+- Protected recovery record: `/opt/fv-app/releases/admin-unseen-87cae8e9ded3bdb2080180e0e3f1b6d546d50ec4-20261018T172636Z-wNzHyf`.
