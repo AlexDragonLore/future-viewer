@@ -12,12 +12,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  RELEASE_SHA: 89a96400be559116412afa389ac514bb921caaf8
+  RELEASE_SHA: 676e9bed23b4ad24108a6d401bea9d570954ed63
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,10 +25,10 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: 89a96400be559116412afa389ac514bb921caaf8
+          ref: 676e9bed23b4ad24108a6d401bea9d570954ed63
           path: release
           persist-credentials: false
-      - name: Require successful checks for the exact release
+      - name: Require successful frontend checks for the exact release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -37,11 +37,19 @@ jobs:
           python3 - <<'CHECKS'
           import json,os
           checks=json.load(open(os.environ['RUNNER_TEMP']+'/release-checks.json'))['check_runs']
-          for name in ('build','build-test'):
+          for name in ('build',):
               matches=[c for c in checks if c['name']==name and c['app']['slug']=='github-actions']
               assert any(c['head_sha']==os.environ['RELEASE_SHA'] and c['status']=='completed' and c['conclusion']=='success' for c in matches), 'Required release checks are not successful: '+name
-          print('Frontend and backend checks passed for the pinned release')
+          print('Frontend checks passed for the pinned release')
           CHECKS
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify backend tests against the exact release
+        working-directory: release
+        env:
+          ASPNETCORE_ENVIRONMENT: Testing
+        run: dotnet test backend/FutureViewer.slnx --configuration Release
       - name: Configure existing deployment identity
         env:
           DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
@@ -154,9 +162,7 @@ jobs:
           curl --fail --silent --show-error --max-time 25 -o /dev/null https://alex-taro.ru/
           curl --fail --silent --show-error --max-time 25 -o /dev/null https://janetka.ru/
           test "$(curl --silent --max-time 25 -o /dev/null -w '%{http_code}' https://alex-taro.ru/api/admin/readings)" = 401
-          for path in /api/feedbacks/my /api/feedbacks/probe /api/admin/feedbacks; do
-            test "$(curl --silent --max-time 25 -o /dev/null -w '%{http_code}' "https://alex-taro.ru$path")" = 404
-          done
+          test "$(curl --silent --max-time 25 --request POST --header 'Content-Type: application/json' --data '{"readingIds":[]}' -o /dev/null -w '%{http_code}' https://alex-taro.ru/api/admin/readings/viewed)" = 401
       - name: Remove temporary delivery and credential
         if: always()
         run: |
