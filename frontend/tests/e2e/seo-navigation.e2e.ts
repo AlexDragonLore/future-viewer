@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { adminFixtureResponses, adminFixtureSession } from '../fixtures/admin'
+import { adminFixtureResponses, adminFixtureSession, adminReadingFixtures } from '../fixtures/admin'
 
 async function seoState(page: Page) {
   return page.evaluate(() => ({
@@ -94,7 +94,7 @@ test('catalog SEO loads only for content and clears on client navigation to priv
   expect(admin.jsonld).toEqual([])
   expect(admin.sameDocument).toBe(true)
   expect(catalogRequests).toHaveLength(1)
-  await expect.poll(() => viewed).toEqual([adminFixtureResponses['/api/admin/readings'].items.map(row => row.id)])
+  await expect.poll(() => viewed).toEqual([adminReadingFixtures.slice(0, 20).map(row => row.id)])
   expect(unexpected).toEqual([])
   expect(pageErrors).toEqual([])
   await page.screenshot({ path: testInfo.outputPath('private-admin-cleared-seo.png') })
