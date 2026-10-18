@@ -29,3 +29,12 @@
 - Delivery workflow YAML, nine shell blocks and embedded Python syntax checks passed; independent workflow/script review found no blockers.
 - Exact BOM-free migration SQL rehearsed in an isolated local PostgreSQL17: retained records and unrelated achievement grants preserved, retired table/codes removed, migration recorded.
 - Production-state guards pin the verified previous image IDs from successful CI run39013037553. The CI runner will revalidate them before mutation.
+
+## Production result — 18 October 2026, 12:12 MSK
+
+- GitHub Actions delivery39114202557 succeeded from workflow revision8702ced051eaaa661287b9b7f69ff852477a35b6, deploying application ace5ed21c70b11d9e8b986db366db9034e022feb.
+- CI SSH succeeded despite the local connection timeout. Encrypted database backup, isolated restore and migration rehearsal passed; retained table counts were unchanged in the rehearsal.
+- Live migration20261018073538_RemoveRetiredFeedback applied; feedback table and four related achievement codes removed. Backend/frontend image identity, preserved mounts/networks, shared Caddy and neighboring containers verified.
+- Required Compose ps command executed successfully. Public health200/database ready; retired feedback API404; protected admin readings401; public catalog contains seven remaining achievements.
+- Independent public asset verification: /assets/index-BROMvtYT.js contains counter113366341 and no retired feedback view/table references. No test goals, accounts, readings or payments created.
+- Main frontend/backend GitHub checks passed, including116 browser scenarios. Production in-app browser verified rendered homepage and legacy feedback redirect; authenticated admin/profile removal was covered by earlier synthetic browser QA.
