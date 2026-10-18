@@ -4,7 +4,7 @@
 set -Eeuo pipefail
 umask 077
 
-readonly RELEASE=676e9bed23b4ad24108a6d401bea9d570954ed63
+readonly RELEASE=87cae8e9ded3bdb2080180e0e3f1b6d546d50ec4
 readonly OLD_REV=ace5ed21c70b11d9e8b986db366db9034e022feb
 readonly OLD_BACKEND=future-viewer-backend:ace5ed21c70b11d9e8b986db366db9034e022feb
 readonly OLD_FRONTEND=future-viewer-frontend:ace5ed21c70b11d9e8b986db366db9034e022feb

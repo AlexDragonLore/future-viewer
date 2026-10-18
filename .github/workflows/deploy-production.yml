@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  RELEASE_SHA: 676e9bed23b4ad24108a6d401bea9d570954ed63
+  RELEASE_SHA: 87cae8e9ded3bdb2080180e0e3f1b6d546d50ec4
 
 jobs:
   deploy:
@@ -25,7 +25,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: 676e9bed23b4ad24108a6d401bea9d570954ed63
+          ref: 87cae8e9ded3bdb2080180e0e3f1b6d546d50ec4
           path: release
           persist-credentials: false
       - uses: actions/setup-dotnet@v4
@@ -41,14 +41,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_SHA}/check-runs" > "$RUNNER_TEMP/release-checks.json"
           python3 - <<'CHECKS'
-          import json,os
-          checks=json.load(open(os.environ['RUNNER_TEMP']+'/release-checks.json'))['check_runs']
-          for name in ('build',):
-              matches=[c for c in checks if c['name']==name and c['app']['slug']=='github-actions']
-              assert any(c['head_sha']==os.environ['RELEASE_SHA'] and c['status']=='completed' and c['conclusion']=='success' for c in matches), 'Required release checks are not successful: '+name
-          print('Frontend checks passed for the pinned release')
+          import json,os,subprocess,time
+          endpoint='repos/'+os.environ['GITHUB_REPOSITORY']+'/commits/'+os.environ['RELEASE_SHA']+'/check-runs'
+          for attempt in range(40):
+              checks=json.loads(subprocess.check_output(['gh','api',endpoint],text=True))['check_runs']
+              matches=[c for c in checks if c['name']=='build' and c['app']['slug']=='github-actions' and c['head_sha']==os.environ['RELEASE_SHA']]
+              if any(c['status']=='completed' and c['conclusion']=='success' for c in matches):
+                  print('Frontend checks passed for the pinned release'); break
+              if any(c['status']=='completed' and c['conclusion']!='success' for c in matches):
+                  raise SystemExit('Required frontend check failed')
+              print('Waiting for the pinned frontend check',flush=True)
+              time.sleep(15)
+          else: raise SystemExit('Timed out waiting for frontend checks')
           CHECKS
       - name: Configure existing deployment identity
         env:
