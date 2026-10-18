@@ -215,8 +215,14 @@ test('registration opens at the top after scrolling down the guest result', asyn
 })
 
 test('guest API errors return to a usable home instead of authentication', async ({ page, context }) => {
-  await mockApi(context)
-  await context.route('**/api/readings/guest', route => route.fulfill({ status: 429, json: { message: 'Слишком много запросов. Повторите позже.' } }))
+  const calls = await mockApi(context)
+  let attempts = 0
+  await context.route('**/api/readings/guest', route => {
+    attempts++
+    return attempts === 1
+      ? route.fulfill({ status: 429, json: { message: 'Слишком много запросов. Повторите позже.' } })
+      : route.fallback()
+  })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Открой свой расклад' })).toBeVisible()
   const necessary = page.getByTestId('accept-necessary')
@@ -225,5 +231,15 @@ test('guest API errors return to a usable home instead of authentication', async
   await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page.getByTestId('question-validation')).toContainText('Слишком много запросов')
   await expect(page).toHaveURL(/\/$/)
-  await expect(page.getByRole('button', { name: 'Открыть 3 карты бесплатно' })).toBeEnabled()
+  const question = page.getByRole('textbox', { name: 'Твой вопрос', exact: true })
+  const start = page.getByRole('button', { name: 'Открыть 3 карты бесплатно' })
+  await expect(question).toHaveValue('')
+  await expect(start).toBeDisabled()
+  await question.fill(previewReading.question)
+  await expect(start).toBeEnabled()
+  await start.click()
+  await expect(page).toHaveURL(/\/result$/, { timeout: 15000 })
+  await expect(page.getByTestId('guest-unlock')).toBeVisible({ timeout: 10000 })
+  expect(attempts).toBe(2)
+  expect(calls.create).toBe(1)
 })
