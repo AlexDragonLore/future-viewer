@@ -85,7 +85,7 @@ public sealed class AdminSubscriptionSummaryTests(IntegrationTestFixture fixture
     }
 
     [Fact]
-    public async Task Pages_use_bounded_queries_aggregate_scores_in_sql_and_do_not_select_private_user_fields_or_answer_bodies()
+    public async Task Pages_use_bounded_queries_and_do_not_select_private_user_fields_or_answer_bodies()
     {
         var marker = Guid.NewGuid().ToString("N");
         var now = DateTime.UtcNow;
@@ -98,12 +98,6 @@ public sealed class AdminSubscriptionSummaryTests(IntegrationTestFixture fixture
             var reading = Reading(user, marker);
             original.Readings.Add(reading);
             original.PaymentOrders.Add(Order(user, "pro-7d", 7, 99m, now));
-            original.ReadingFeedbacks.Add(new ReadingFeedback
-            {
-                UserId = user.Id, ReadingId = reading.Id, Token = Guid.NewGuid().ToString("N"),
-                ScheduledAt = now, Status = FeedbackStatus.Scored, AiScore = 7,
-                SelfReport = new string('z', 3_000)
-            });
         }
         await original.SaveChangesAsync();
         var capture = new QueryCapture();
@@ -111,14 +105,13 @@ public sealed class AdminSubscriptionSummaryTests(IntegrationTestFixture fixture
             .UseNpgsql(original.Database.GetConnectionString()).AddInterceptors(capture).Options);
         var readings = new ReadingRepository(db);
         var userRepository = new UserRepository(db);
-        var feedbacks = new FeedbackRepository(db);
         var achievements = new AchievementRepository(db);
-        var service = new AdminService(feedbacks, readings, userRepository, achievements,
-            new AchievementService(achievements, readings, feedbacks, userRepository),
+        var service = new AdminService(readings, userRepository, achievements,
+            new AchievementService(achievements, readings, userRepository),
             NullLogger<AdminService>.Instance, orders: new PaymentOrderRepository(db));
 
         var userPage = await service.SearchUsersAsync(marker, 1, 20);
-        userPage.Items.Should().HaveCount(20).And.OnlyContain(u => u.TotalReadings == 1 && u.TotalFeedbacks == 1 && u.TotalScore == 7);
+        userPage.Items.Should().HaveCount(20).And.OnlyContain(u => u.TotalReadings == 1);
         userPage.Items.Should().OnlyContain(u => u.Subscription!.LastPurchase!.TariffCode == "pro-7d");
         capture.Commands.Should().HaveCount(3);
         capture.Commands.Should().OnlyContain(sql => !sql.Contains("password_hash") && !sql.Contains("self_report"));

@@ -4,9 +4,7 @@ import { ref } from 'vue'
 import { createAdminPageCache } from '@/utils/adminPageCache'
 import { adminApi } from '@/api/adminApi'
 import { extractApiError } from '@/api/httpClient'
-import type { FeedbackStatus } from '@/types'
 import type {
-  AdminFeedback,
   AdminReading,
   AdminReadingAudience,
   AdminReadingListResponse,
@@ -14,10 +12,7 @@ import type {
   AdminStats,
   AdminUserDetail,
   AdminUserListItem,
-  CreateAdminFeedbackPayload,
-  CreateSyntheticFeedbackPayload,
   SetSubscriptionPayload,
-  UpdateAdminFeedbackPayload,
 } from '@/types/admin'
 
 export const useAdminStore = defineStore('admin', () => {
@@ -38,18 +33,6 @@ export const useAdminStore = defineStore('admin', () => {
   let readingRequest = 0
   let userRequest = 0
   let detailRequest = 0
-  let feedbackRequest = 0
-
-  const feedbacks = ref<AdminFeedback[]>([])
-  const feedbackTotal = ref(0)
-  const feedbackPage = ref(1)
-  const feedbackPageSize = ref(20)
-  const feedbackUserFilter = ref<string | null>(null)
-  const feedbackStatusFilter = ref<FeedbackStatus | null>(null)
-  const feedbackLoading = ref(false)
-  const feedbackError = ref<string | null>(null)
-  const feedbackToast = ref<string | null>(null)
-
   const users = ref<AdminUserListItem[]>([])
   const userTotal = ref(0)
   const userPage = ref(1)
@@ -67,8 +50,8 @@ export const useAdminStore = defineStore('admin', () => {
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
 
-  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingLoading, readingError, feedbacks, feedbackTotal, feedbackPage, feedbackPageSize, feedbackUserFilter, feedbackStatusFilter, feedbackLoading, feedbackError, feedbackToast, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
-    readingRequest++; userRequest++; detailRequest++; feedbackRequest++
+  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingLoading, readingError, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
+    readingRequest++; userRequest++; detailRequest++
     readingController?.abort(); userController?.abort()
     readingCache.clear(); userCache.clear()
   })
@@ -136,104 +119,6 @@ export const useAdminStore = defineStore('admin', () => {
     readingLoading.value = false; userLoading.value = false
     readingPage.value = readingDisplayedPage.value
     userPage.value = userDisplayedPage.value
-  }
-
-  async function loadFeedbacks(): Promise<void> {
-    const request = ++feedbackRequest
-    feedbackLoading.value = true
-    feedbackError.value = null
-    try {
-      const result = await adminApi.listFeedbacks({
-        userId: feedbackUserFilter.value,
-        status: feedbackStatusFilter.value,
-        page: feedbackPage.value,
-        pageSize: feedbackPageSize.value,
-      })
-      if (request !== feedbackRequest) return
-      feedbacks.value = result.items
-      feedbackTotal.value = result.total
-    } catch (e) {
-      if (request !== feedbackRequest) return
-      feedbackError.value = extractApiError(e, 'Не удалось загрузить отзывы')
-    } finally {
-      if (request === feedbackRequest) feedbackLoading.value = false
-    }
-  }
-
-  function setFeedbackPage(page: number): void {
-    feedbackPage.value = Math.max(1, page)
-  }
-
-  function setFeedbackUserFilter(value: string | null): void {
-    feedbackUserFilter.value = value && value.trim() !== '' ? value.trim() : null
-    feedbackPage.value = 1
-  }
-
-  function setFeedbackStatusFilter(value: FeedbackStatus | null): void {
-    feedbackStatusFilter.value = value
-    feedbackPage.value = 1
-  }
-
-  async function createFeedback(payload: CreateAdminFeedbackPayload): Promise<AdminFeedback | null> {
-    feedbackError.value = null
-    try {
-      const created = await adminApi.createFeedback(payload)
-      invalidateAdminPages()
-      feedbackToast.value = 'Отзыв создан'
-      await loadFeedbacks()
-      return created
-    } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось создать отзыв')
-      return null
-    }
-  }
-
-  async function createSyntheticFeedback(payload: CreateSyntheticFeedbackPayload): Promise<AdminFeedback | null> {
-    feedbackError.value = null
-    try {
-      const created = await adminApi.createSyntheticFeedback(payload)
-      invalidateAdminPages()
-      feedbackToast.value = 'Синтетический отзыв создан'
-      await loadFeedbacks()
-      return created
-    } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось создать синтетический отзыв')
-      return null
-    }
-  }
-
-  async function updateFeedback(id: string, payload: UpdateAdminFeedbackPayload): Promise<AdminFeedback | null> {
-    feedbackError.value = null
-    try {
-      const updated = await adminApi.updateFeedback(id, payload)
-      invalidateAdminPages()
-      const idx = feedbacks.value.findIndex((f) => f.id === id)
-      if (idx >= 0) feedbacks.value[idx] = updated
-      feedbackToast.value = 'Сохранено'
-      return updated
-    } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось сохранить отзыв')
-      return null
-    }
-  }
-
-  async function deleteFeedback(id: string): Promise<boolean> {
-    feedbackError.value = null
-    try {
-      await adminApi.deleteFeedback(id)
-      invalidateAdminPages()
-      feedbacks.value = feedbacks.value.filter((f) => f.id !== id)
-      feedbackTotal.value = Math.max(0, feedbackTotal.value - 1)
-      feedbackToast.value = 'Удалено'
-      return true
-    } catch (e) {
-      feedbackError.value = extractApiError(e, 'Не удалось удалить отзыв')
-      return false
-    }
-  }
-
-  function clearFeedbackToast(): void {
-    feedbackToast.value = null
   }
 
   async function loadUsers(force = false): Promise<void> {
@@ -435,24 +320,6 @@ export const useAdminStore = defineStore('admin', () => {
     readingDisplayedPage, userDisplayedPage,
     readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingLoading, readingError,
     loadReadings, setReadingSearch, setReadingAudience, setReadingPage,
-    feedbacks,
-    feedbackTotal,
-    feedbackPage,
-    feedbackPageSize,
-    feedbackUserFilter,
-    feedbackStatusFilter,
-    feedbackLoading,
-    feedbackError,
-    feedbackToast,
-    loadFeedbacks,
-    setFeedbackPage,
-    setFeedbackUserFilter,
-    setFeedbackStatusFilter,
-    createFeedback,
-    createSyntheticFeedback,
-    updateFeedback,
-    deleteFeedback,
-    clearFeedbackToast,
     users,
     userTotal,
     userPage,

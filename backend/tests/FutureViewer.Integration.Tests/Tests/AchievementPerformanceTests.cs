@@ -15,45 +15,7 @@ namespace FutureViewer.Integration.Tests.Tests;
 public sealed class AchievementPerformanceTests(IntegrationTestFixture fixture) : IClassFixture<IntegrationTestFixture>
 {
     [Fact]
-    public async Task Scores_are_aggregated_without_feedback_bodies_and_match_previous_nonnull_scored_semantics()
-    {
-        using var scope = fixture.Services.CreateScope();
-        var original = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var owner = NewUser();
-        var other = NewUser();
-        original.Users.AddRange(owner, other);
-        foreach (var (user, score, status) in new (User, int?, FeedbackStatus)[]
-                 { (owner, 10, FeedbackStatus.Scored), (owner, 8, FeedbackStatus.Scored),
-                   (owner, 6, FeedbackStatus.Scored), (owner, null, FeedbackStatus.Scored),
-                   (owner, 10, FeedbackStatus.Pending), (other, 10, FeedbackStatus.Scored) })
-        {
-            var reading = new Reading { SpreadType = SpreadType.SingleCard, UserId = user.Id, Question = "fixture", SavedToHistory = true };
-            original.Readings.Add(reading);
-            original.ReadingFeedbacks.Add(new ReadingFeedback
-            {
-                UserId = user.Id, ReadingId = reading.Id, Token = Guid.NewGuid().ToString("N"),
-                Status = status, AiScore = score, ScheduledAt = DateTime.UtcNow,
-                SelfReport = new string('s', 4000), AiScoreReason = new string('r', 2000)
-            });
-        }
-        await original.SaveChangesAsync();
-        var capture = new QueryCapture();
-        await using var db = CreateDb(original, capture);
-        var repository = new FeedbackRepository(db);
-        var scores = await repository.GetScoreStatsAsync(owner.Id);
-        scores.ScoredCount.Should().Be(3);
-        scores.Perfect10Count.Should().Be(1);
-        scores.AverageScore.Should().Be(8);
-        capture.Commands.Should().ContainSingle();
-        capture.Commands[0].Should().NotContain("self_report").And.NotContain("ai_score_reason");
-        db.ChangeTracker.Entries().Should().BeEmpty();
-        var empty = await repository.GetScoreStatsAsync(Guid.NewGuid());
-        empty.ScoredCount.Should().Be(0);
-        empty.AverageScore.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task Combined_status_reads_catalog_and_owned_achievements_once_and_uses_six_selects()
+    public async Task Combined_status_reads_catalog_and_owned_achievements_once_and_uses_five_selects()
     {
         using var scope = fixture.Services.CreateScope();
         var original = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -67,9 +29,9 @@ public sealed class AchievementPerformanceTests(IntegrationTestFixture fixture) 
         await using var db = CreateDb(original, capture);
         var service = Service(db);
         var status = await service.CheckAndGetAllAsync(user.Id);
-        status.Should().HaveCount(11);
+        status.Should().HaveCount(7);
         status.Single(a => a.Code == AchievementService.Codes.FirstReading).UnlockedAt.Should().NotBeNull();
-        capture.Commands.Should().HaveCount(6);
+        capture.Commands.Should().HaveCount(5);
         capture.Commands.Count(sql => sql.Contains("FROM achievements AS")).Should().Be(1);
         capture.Commands.Count(sql => sql.Contains("FROM user_achievements AS")).Should().Be(1);
         capture.Commands.Should().OnlyContain(sql => !sql.Contains("self_report"));
@@ -104,7 +66,7 @@ public sealed class AchievementPerformanceTests(IntegrationTestFixture fixture) 
     }
 
     private static AchievementService Service(AppDbContext db) => new(
-        new AchievementRepository(db), new ReadingRepository(db), new FeedbackRepository(db), new UserRepository(db));
+        new AchievementRepository(db), new ReadingRepository(db), new UserRepository(db));
     private static User NewUser() => new() { Email = $"achievement-perf-{Guid.NewGuid():N}@example.com", PasswordHash = "unused" };
     private static AppDbContext CreateDb(AppDbContext original, QueryCapture? capture = null)
     {

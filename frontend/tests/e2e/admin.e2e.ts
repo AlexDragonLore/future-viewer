@@ -1,7 +1,7 @@
 import type { AdminReading } from '@/types/admin'
+import { installPaidAccessFixture } from './paidAccess.fixture'
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import {
-  adminFeedbackFixtures,
   adminAudienceReadingFixtures,
   adminFixtureResponses,
   adminFixtureSession,
@@ -9,8 +9,10 @@ import {
   adminUserDetailFixture,
 } from '../fixtures/admin'
 
-async function openAdmin(page: Page, path = '/admin', sourceRows: readonly AdminReading[] = adminReadingFixtures) {
-  const requests = { readings: [] as { page: number; search: string; audience: string }[], answers: [] as string[], unexpected: [] as string[] }
+async function openAdmin(page: Page, path = '/admin', sourceRows: readonly AdminReading[] = adminReadingFixtures, holdGuestResponse = false) {
+  let releaseGuests!: () => void
+  const guestResponse = new Promise<void>(resolve => { releaseGuests = resolve })
+  const requests = { releaseGuests, readings: [] as { page: number; search: string; audience: string }[], answers: [] as string[], unexpected: [] as string[] }
   await page.route('**/api/**', async route => {
     const request = route.request()
     const url = new URL(request.url())
@@ -36,7 +38,8 @@ async function openAdmin(page: Page, path = '/admin', sourceRows: readonly Admin
           || audience === 'registered' && reading.userId !== null || audience === 'guests' && reading.userId === null)
         && `${reading.userEmail} ${reading.question}`.toLowerCase().includes(search.toLowerCase()),
       )
-      if (pageNumber === 2 || audience === 'guests') await new Promise(resolve => setTimeout(resolve, 300))
+      if (audience === 'guests' && holdGuestResponse) await guestResponse
+      else if (pageNumber === 2 || audience === 'guests') await new Promise(resolve => setTimeout(resolve, 300))
       return route.fulfill({ json: {
         items: rows.slice((pageNumber - 1) * pageSize, pageNumber * pageSize).map(({ interpretation: _answer, ...reading }) => reading), total: rows.length,
       } })
@@ -116,6 +119,7 @@ test('latest messages show full content, hidden status, user details and reset p
   await expect(drawer).toBeVisible()
   await expect(drawer).toContainText(adminUserDetailFixture.email)
   await expect(drawer).toContainText('Как решиться на смену работы')
+  await expect(drawer).not.toContainText(/Последние отзывы|Отзывов:|Баллов:/)
   await expectContained(drawer)
   await drawer.screenshot({ path: testInfo.outputPath('admin-user-drawer.png') })
   await page.getByTestId('admin-user-drawer-close').click()
@@ -149,16 +153,21 @@ test('latest messages show full content, hidden status, user details and reset p
   expect(requests.unexpected).toEqual([])
 })
 
-test('feedback exposes complete question, response and scoring reason without horizontal overflow', async ({ page }, testInfo) => {
-  const requests = await openAdmin(page, '/admin/feedbacks')
-  const details = page.locator('[data-testid="admin-feedback-content"]:visible').first()
-  await expect(details).toBeVisible()
-  await details.locator('summary').click()
-  await expectFullText(details, adminFeedbackFixtures[0].question)
-  await expectFullText(details, adminFeedbackFixtures[0].selfReport)
-  await expectFullText(details, adminFeedbackFixtures[0].aiScoreReason)
+test('retired feedback admin link opens messages and remaining sections contain no feedback metrics', async ({ page }, testInfo) => {
+  const requests = await openAdmin(page, '/admin/feedbacks?token=legacy-secret#legacy-secret')
+  await expect(page).toHaveURL(/\/admin\/readings$/)
+  await expect(page.getByTestId('admin-tab-feedbacks')).toHaveCount(0)
+  await page.getByTestId('admin-tab-users').click()
+  await expect(page.getByTestId('admin-users-view')).toBeVisible()
+  await expect(page.getByTestId('admin-view')).not.toContainText(/Отзывов|Баллов/)
   await expectContained(page.getByTestId('admin-view'))
-  await page.screenshot({ path: testInfo.outputPath('admin-feedback-expanded.png'), fullPage: true })
+  await page.screenshot({ path: testInfo.outputPath('admin-users.png'), fullPage: true })
+  await page.getByTestId('admin-tab-stats').click()
+  await expect(page.getByTestId('admin-stats-grid')).toBeVisible()
+  await expect(page.getByTestId('admin-stat-scored-month')).toHaveCount(0)
+  await expect(page.getByTestId('admin-stat-readings-week')).toContainText('143')
+  await expectContained(page.getByTestId('admin-view'))
+  await page.screenshot({ path: testInfo.outputPath('admin-stats.png'), fullPage: true })
   expect(requests.unexpected).toEqual([])
 })
 
@@ -183,7 +192,7 @@ test('users show actual purchases on desktop and mobile and in the detail drawer
 
 
 test('audience filters combine with search, reset pagination, and support keyboard switching', async ({ page }, testInfo) => {
-  const requests = await openAdmin(page, '/admin', adminAudienceReadingFixtures)
+  const requests = await openAdmin(page, '/admin', adminAudienceReadingFixtures, true)
   const rows = page.getByTestId('admin-reading-row')
   await expect(rows).toHaveCount(20)
   await expect(page.getByTestId('admin-reading-audience-all')).toHaveAttribute('aria-pressed', 'true')
@@ -225,6 +234,7 @@ test('audience filters combine with search, reset pagination, and support keyboa
   await expect(guestsButton).toHaveAttribute('aria-pressed', 'true')
   await expect(rows).toHaveCount(0)
   await expect(page.getByRole('status').filter({ hasText: 'Загружаю' })).toBeVisible()
+  requests.releaseGuests()
   await expect(rows).toHaveCount(matches.filter(row => row.userId === null).length)
   await expect(page.getByTestId('admin-reading-user')).toHaveCount(0)
   const requestCount = requests.readings.length
@@ -249,3 +259,14 @@ test('audience filters wrap without overflow at320px', async ({ page }, testInfo
   await expectContained(page.getByTestId('admin-view'))
   await page.screenshot({ path: testInfo.outputPath('admin-audience-320.png') })
 })
+
+for (const path of ['/feedback', '/feedback/legacy-token']) {
+  test(`retired public link ${path} opens clean home without feedback requests`, async ({ page, context }) => {
+    const requests = await installPaidAccessFixture(context, { authenticated: false })
+    await page.goto(`${path}?token=legacy-secret#legacy-secret`)
+    await expect(page).toHaveURL(/^http:\/\/127\.0\.0\.1:4173\/$/)
+    await expect(page.getByRole('heading', { level: 1, name: 'Открой свой расклад' })).toBeVisible()
+    expect(requests.unexpectedApis).toEqual([])
+    expect(requests.checkoutAttempts).toEqual([])
+  })
+}

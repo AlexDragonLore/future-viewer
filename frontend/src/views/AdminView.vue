@@ -8,7 +8,6 @@ const route = useRoute()
 
 const tabs = [
   { name: 'admin-readings', label: 'Сообщения', testId: 'admin-tab-readings' },
-  { name: 'admin-feedbacks', label: 'Отзывы', testId: 'admin-tab-feedbacks' },
   { name: 'admin-users', label: 'Пользователи', testId: 'admin-tab-users' },
   { name: 'admin-stats', label: 'Статистика', testId: 'admin-tab-stats' },
 ]

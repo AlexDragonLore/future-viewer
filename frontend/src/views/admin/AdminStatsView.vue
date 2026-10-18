@@ -61,12 +61,6 @@ function refresh(): void {
         hint="последние 7 дней"
         test-id="admin-stat-readings-week"
       />
-      <AdminStatTile
-        label="Оценённых отзывов"
-        :value="store.stats.scoredFeedbacksThisMonth"
-        hint="последние 30 дней"
-        test-id="admin-stat-scored-month"
-      />
     </div>
 
     <div v-else-if="store.statsLoading" class="empty" role="status">Загружаю статистику…</div>

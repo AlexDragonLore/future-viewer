@@ -96,9 +96,7 @@ public sealed class UserRepository : IUserRepository
                         && u.SubscriptionExpiresAt != null && u.SubscriptionExpiresAt > now,
                     ExpiresAt = u.SubscriptionExpiresAt
                 },
-                TotalReadings = u.Readings.Count(),
-                TotalFeedbacks = u.Feedbacks.Count(),
-                TotalScore = u.Feedbacks.Where(f => f.Status == FeedbackStatus.Scored).Sum(f => f.AiScore ?? 0)
+                TotalReadings = u.Readings.Count()
             }).ToListAsync(ct);
     }
 

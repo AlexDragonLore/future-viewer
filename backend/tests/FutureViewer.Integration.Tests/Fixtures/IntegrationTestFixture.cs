@@ -91,10 +91,6 @@ public sealed class IntegrationTestFixture : WebApplicationFactory<Program>, IAs
             if (memoryDescriptor is not null) services.Remove(memoryDescriptor);
             services.AddSingleton<IAIMemoryExtractor, StubMemoryExtractor>();
 
-            var scorerDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IFeedbackScorer));
-            if (scorerDescriptor is not null) services.Remove(scorerDescriptor);
-            services.AddSingleton<IFeedbackScorer, StubFeedbackScorer>();
-
             var emailDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(IEmailSender));
             if (emailDescriptor is not null) services.Remove(emailDescriptor);
             services.AddSingleton<IEmailSender>(EmailSender);

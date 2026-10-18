@@ -10,32 +10,25 @@ public sealed class AchievementService
     public static class Codes
     {
         public const string FirstReading = "first_reading";
-        public const string FirstFeedback = "first_feedback";
         public const string Streak3 = "streak_3";
         public const string Streak7 = "streak_7";
         public const string Streak30 = "streak_30";
         public const string Total10 = "total_10";
         public const string Total50 = "total_50";
         public const string Total100 = "total_100";
-        public const string ScoreMaster = "score_master";
-        public const string Perfect10 = "perfect_10";
-        public const string HighFive = "high_five";
     }
 
     private readonly IAchievementRepository _achievements;
     private readonly IReadingRepository _readings;
-    private readonly IFeedbackRepository _feedbacks;
     private readonly IUserRepository _users;
 
     public AchievementService(
         IAchievementRepository achievements,
         IReadingRepository readings,
-        IFeedbackRepository feedbacks,
         IUserRepository users)
     {
         _achievements = achievements;
         _readings = readings;
-        _feedbacks = feedbacks;
         _users = users;
     }
 
@@ -55,7 +48,6 @@ public sealed class AchievementService
         _ = await _users.GetByIdAsync(userId, ct)
             ?? throw new NotFoundException("User not found");
         var readingCount = await _readings.CountByUserAsync(userId, ct);
-        var scores = await _feedbacks.GetScoreStatsAsync(userId, ct);
         var maxStreak = 0;
         if (readingCount > 0)
         {
@@ -67,13 +59,9 @@ public sealed class AchievementService
         if (readingCount >= 10) codes.Add(Codes.Total10);
         if (readingCount >= 50) codes.Add(Codes.Total50);
         if (readingCount >= 100) codes.Add(Codes.Total100);
-        if (scores.ScoredCount >= 1) codes.Add(Codes.FirstFeedback);
         if (maxStreak >= 3) codes.Add(Codes.Streak3);
         if (maxStreak >= 7) codes.Add(Codes.Streak7);
         if (maxStreak >= 30) codes.Add(Codes.Streak30);
-        if (scores.Perfect10Count >= 1) codes.Add(Codes.Perfect10);
-        if (scores.Perfect10Count >= 5) codes.Add(Codes.HighFive);
-        if (scores.ScoredCount >= 10 && scores.AverageScore >= 8d) codes.Add(Codes.ScoreMaster);
         if (codes.Count == 0 && !includeStatus) return new([], [], []);
 
         var all = await _achievements.GetAllAsync(ct);

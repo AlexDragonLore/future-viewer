@@ -619,80 +619,6 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.ToTable("reading_cards", (string)null);
                 });
 
-            modelBuilder.Entity("FutureViewer.Domain.Entities.ReadingFeedback", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<int?>("AiScore")
-                        .HasColumnType("integer")
-                        .HasColumnName("ai_score");
-
-                    b.Property<string>("AiScoreReason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("ai_score_reason");
-
-                    b.Property<DateTime?>("AnsweredAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("answered_at");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<bool?>("IsSincere")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_sincere");
-
-                    b.Property<DateTime?>("NotifiedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("notified_at");
-
-                    b.Property<Guid>("ReadingId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("reading_id");
-
-                    b.Property<DateTime>("ScheduledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("scheduled_at");
-
-                    b.Property<string>("SelfReport")
-                        .HasMaxLength(4000)
-                        .HasColumnType("character varying(4000)")
-                        .HasColumnName("self_report");
-
-                    b.Property<int>("Status")
-                        .HasColumnType("integer")
-                        .HasColumnName("status");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)")
-                        .HasColumnName("token");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReadingId")
-                        .IsUnique();
-
-                    b.HasIndex("ScheduledAt");
-
-                    b.HasIndex("Token")
-                        .IsUnique();
-
-                    b.HasIndex("UserId", "Status");
-
-                    b.ToTable("reading_feedbacks", (string)null);
-                });
-
             modelBuilder.Entity("FutureViewer.Domain.Entities.TarotCard", b =>
                 {
                     b.Property<int>("Id")
@@ -1138,25 +1064,6 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("Reading");
                 });
 
-            modelBuilder.Entity("FutureViewer.Domain.Entities.ReadingFeedback", b =>
-                {
-                    b.HasOne("FutureViewer.Domain.Entities.Reading", "Reading")
-                        .WithOne("Feedback")
-                        .HasForeignKey("FutureViewer.Domain.Entities.ReadingFeedback", "ReadingId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("FutureViewer.Domain.Entities.User", "User")
-                        .WithMany("Feedbacks")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Reading");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("FutureViewer.Domain.Entities.UserAchievement", b =>
                 {
                     b.HasOne("FutureViewer.Domain.Entities.Achievement", "Achievement")
@@ -1223,8 +1130,6 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("FutureViewer.Domain.Entities.Reading", b =>
                 {
                     b.Navigation("Cards");
-
-                    b.Navigation("Feedback");
                 });
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.TarotCard", b =>
@@ -1239,8 +1144,6 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.Navigation("AnnouncementReads");
 
                     b.Navigation("Consents");
-
-                    b.Navigation("Feedbacks");
 
                     b.Navigation("MemoryRules");
 

@@ -2,18 +2,15 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useProfileStore } from '@/stores/useProfileStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import ScoreBadge from '@/components/ScoreBadge.vue'
 import SubscriptionBanner from '@/components/SubscriptionBanner.vue'
 import PrivacyCenter from '@/components/PrivacyCenter.vue'
 import { extractApiError } from '@/api/httpClient'
 import { usePrivacyStore } from '@/stores/usePrivacyStore'
-import { FeedbackStatus, type FeedbackInfo } from '@/types'
 
 const store = useProfileStore()
 const auth = useAuthStore()
 const privacy = usePrivacyStore()
 
-const recentFeedbacks = computed(() => store.feedbacks.slice(0, 5))
 const firstName = ref('')
 const lastName = ref('')
 const birthYear = ref('')
@@ -50,25 +47,6 @@ onMounted(() => {
     auth.refreshSubscription()
   }
 })
-
-function statusLabel(status: FeedbackStatus): string {
-  switch (status) {
-    case FeedbackStatus.Pending:
-      return 'Ожидает'
-    case FeedbackStatus.Notified:
-      return 'Уведомлён'
-    case FeedbackStatus.Answered:
-      return 'Отвечено'
-    case FeedbackStatus.Scored:
-      return 'Оценено'
-    default:
-      return ''
-  }
-}
-
-function averageScore(feedback: FeedbackInfo): number | null {
-  return feedback.aiScore ?? null
-}
 
 async function savePersonalization() {
   personalizationError.value = null
@@ -192,26 +170,6 @@ async function clearMemory() {
       </section>
 
       <PrivacyCenter />
-
-      <section class="mystic-card p-6" data-testid="profile-feedbacks">
-        <div class="text-xs uppercase tracking-widest text-mystic-accent/80 mb-3">Последние отклики</div>
-        <div v-if="recentFeedbacks.length === 0" class="text-sm text-mystic-silver/60">
-          Откликов пока нет.
-        </div>
-        <ul v-else class="space-y-3">
-          <li v-for="f in recentFeedbacks" :key="f.id" class="feedback-row">
-            <ScoreBadge :score="averageScore(f)" size="sm" />
-            <div class="feedback-meta">
-              <div class="feedback-question">«{{ f.question }}»</div>
-              <div class="feedback-sub">
-                <span>{{ statusLabel(f.status) }}</span>
-                <span>·</span>
-                <span>{{ new Date(f.createdAt).toLocaleDateString() }}</span>
-              </div>
-            </div>
-          </li>
-        </ul>
-      </section>
     </template>
   </main>
 </template>
@@ -219,30 +177,6 @@ async function clearMemory() {
 <style scoped>
 .profile-title {
   overflow-wrap: anywhere;
-}
-.feedback-row {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-}
-.feedback-meta {
-  flex: 1;
-  min-width: 0;
-}
-.feedback-question {
-  font-size: 0.9rem;
-  color: rgba(232, 213, 242, 0.9);
-  font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.feedback-sub {
-  font-size: 0.72rem;
-  color: rgba(224, 212, 186, 0.55);
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.15rem;
 }
 .profile-input {
   width: 100%;
@@ -314,13 +248,6 @@ async function clearMemory() {
   .profile-title {
     font-size: 2rem;
     line-height: 1.15;
-  }
-  .feedback-row {
-    align-items: flex-start;
-  }
-  .feedback-sub {
-    flex-wrap: wrap;
-    gap: 0.25rem 0.45rem;
   }
   .memory-row {
     flex-direction: column;

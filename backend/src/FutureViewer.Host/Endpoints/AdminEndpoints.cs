@@ -15,7 +15,6 @@ public static class AdminEndpoints
             .RequireAuthorization("Admin");
 
         MapReadingEndpoints(group);
-        MapFeedbackEndpoints(group);
         MapUserEndpoints(group);
         MapAchievementEndpoints(group);
         MapStatsEndpoints(group);
@@ -64,85 +63,6 @@ public static class AdminEndpoints
             var stats = await service.GetStatsAsync(ct);
             return Results.Ok(stats);
         });
-    }
-
-    private static void MapFeedbackEndpoints(RouteGroupBuilder group)
-    {
-        group.MapGet("/feedbacks", async (
-            Guid? userId,
-            FeedbackStatus? status,
-            int? page,
-            int? pageSize,
-            AdminService service,
-            CancellationToken ct) =>
-        {
-            var result = await service.SearchFeedbacksAsync(userId, status, page ?? 1, pageSize ?? 20, ct);
-            return Results.Ok(new { items = result.Items, total = result.Total });
-        });
-
-        group.MapPost("/feedbacks", async (
-            CreateAdminFeedbackBody body,
-            AdminService service,
-            HttpContext ctx,
-            CancellationToken ct) =>
-        {
-            if (body is null) return Results.BadRequest();
-            var (actorId, actorEmail) = ctx.User.GetActor();
-            var dto = await service.CreateScheduledAsync(
-                actorId, actorEmail,
-                body.ReadingId, body.ScheduledAt, body.BypassDelay, body.Replace, ct);
-            return Results.Created($"/api/admin/feedbacks/{dto.Id}", dto);
-        });
-
-        group.MapPost("/feedbacks/synthetic", async (
-            CreateSyntheticFeedbackBody body,
-            AdminService service,
-            HttpContext ctx,
-            CancellationToken ct) =>
-        {
-            if (body is null) return Results.BadRequest();
-            var (actorId, actorEmail) = ctx.User.GetActor();
-            var dto = await service.CreateSyntheticAsync(
-                actorId, actorEmail,
-                body.ReadingId, body.AiScore, body.AiScoreReason,
-                body.IsSincere ?? true, body.SelfReport, ct);
-            return Results.Created($"/api/admin/feedbacks/{dto.Id}", dto);
-        });
-
-        group.MapPut("/feedbacks/{id:guid}", async (
-            Guid id,
-            UpdateAdminFeedbackBody body,
-            AdminService service,
-            HttpContext ctx,
-            CancellationToken ct) =>
-        {
-            if (body is null) return Results.BadRequest();
-            var (actorId, actorEmail) = ctx.User.GetActor();
-            var dto = await service.UpdateAsync(actorId, actorEmail, id, new AdminFeedbackUpdate
-            {
-                AiScore = body.AiScore,
-                AiScoreReason = body.AiScoreReason,
-                IsSincere = body.IsSincere,
-                Status = body.Status,
-                SelfReport = body.SelfReport,
-                ScheduledAt = body.ScheduledAt,
-                NotifiedAt = body.NotifiedAt,
-                AnsweredAt = body.AnsweredAt
-            }, ct);
-            return Results.Ok(dto);
-        });
-
-        group.MapDelete("/feedbacks/{id:guid}", async (
-            Guid id,
-            AdminService service,
-            HttpContext ctx,
-            CancellationToken ct) =>
-        {
-            var (actorId, actorEmail) = ctx.User.GetActor();
-            await service.DeleteFeedbackAsync(actorId, actorEmail, id, ct);
-            return Results.NoContent();
-        });
-
     }
 
     private static void MapUserEndpoints(RouteGroupBuilder group)
@@ -255,35 +175,6 @@ public static class AdminEndpoints
                     ?? principal.FindFirstValue("email")
                     ?? "unknown";
         return (id, email);
-    }
-
-    public sealed class CreateAdminFeedbackBody
-    {
-        public Guid ReadingId { get; init; }
-        public DateTime? ScheduledAt { get; init; }
-        public bool BypassDelay { get; init; }
-        public bool Replace { get; init; }
-    }
-
-    public sealed class CreateSyntheticFeedbackBody
-    {
-        public Guid ReadingId { get; init; }
-        public int AiScore { get; init; }
-        public string? AiScoreReason { get; init; }
-        public bool? IsSincere { get; init; }
-        public string? SelfReport { get; init; }
-    }
-
-    public sealed class UpdateAdminFeedbackBody
-    {
-        public int? AiScore { get; init; }
-        public string? AiScoreReason { get; init; }
-        public bool? IsSincere { get; init; }
-        public FeedbackStatus? Status { get; init; }
-        public string? SelfReport { get; init; }
-        public DateTime? ScheduledAt { get; init; }
-        public DateTime? NotifiedAt { get; init; }
-        public DateTime? AnsweredAt { get; init; }
     }
 
     public sealed class SetAdminBody

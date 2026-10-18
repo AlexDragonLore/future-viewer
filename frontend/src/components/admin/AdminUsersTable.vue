@@ -26,8 +26,6 @@ function onRow(u: AdminUserListItem): void {
             <th class="mobile-hide">Админ</th>
             <th>Подписка / покупка</th>
             <th class="num">Раскладов</th>
-            <th class="num mobile-hide">Отзывов</th>
-            <th class="num">Баллов</th>
           </tr>
         </thead>
         <tbody>
@@ -48,8 +46,6 @@ function onRow(u: AdminUserListItem): void {
               <AdminSubscriptionBadge :subscription="u.subscription" />
             </td>
             <td class="num">{{ u.totalReadings }}</td>
-            <td class="num mobile-hide">{{ u.totalFeedbacks }}</td>
-            <td class="num">{{ u.totalScore }}</td>
           </tr>
         </tbody>
       </table>
@@ -71,10 +67,6 @@ function onRow(u: AdminUserListItem): void {
           <AdminSubscriptionBadge :subscription="u.subscription" />
           <span>Раскладов</span>
           <strong>{{ u.totalReadings }}</strong>
-          <span>Отзывов</span>
-          <strong>{{ u.totalFeedbacks }}</strong>
-          <span>Баллов</span>
-          <strong>{{ u.totalScore }}</strong>
         </div>
         <span class="mobile-open">Открыть профиль →</span>
         </button>

@@ -35,7 +35,6 @@ public sealed class PrivacyExportDto
     public required DateTime GeneratedAt { get; init; }
     public required PrivacyProfileExportDto Profile { get; init; }
     public required IReadOnlyList<PrivacyReadingExportDto> Readings { get; init; }
-    public required IReadOnlyList<PrivacyFeedbackExportDto> Feedbacks { get; init; }
     public required IReadOnlyList<UserMemoryRuleDto> MemoryRules { get; init; }
     public required IReadOnlyList<PrivacyAchievementExportDto> Achievements { get; init; }
     public required IReadOnlyList<PrivacyAnnouncementReadExportDto> AnnouncementReads { get; init; }
@@ -82,21 +81,6 @@ public sealed class PrivacyReadingCardExportDto
     public required int CardId { get; init; }
     public required int Position { get; init; }
     public required bool IsReversed { get; init; }
-}
-
-public sealed class PrivacyFeedbackExportDto
-{
-    public required Guid Id { get; init; }
-    public required Guid ReadingId { get; init; }
-    public string? SelfReport { get; init; }
-    public int? AiScore { get; init; }
-    public string? AiScoreReason { get; init; }
-    public bool? IsSincere { get; init; }
-    public required string Status { get; init; }
-    public required DateTime CreatedAt { get; init; }
-    public required DateTime ScheduledAt { get; init; }
-    public DateTime? NotifiedAt { get; init; }
-    public DateTime? AnsweredAt { get; init; }
 }
 
 public sealed class PrivacyAchievementExportDto

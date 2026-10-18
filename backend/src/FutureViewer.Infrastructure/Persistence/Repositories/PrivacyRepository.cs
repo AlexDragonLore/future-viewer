@@ -61,10 +61,6 @@ public sealed class PrivacyRepository : IPrivacyRepository
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(ct);
 
-    public async Task<IReadOnlyList<ReadingFeedback>> GetFeedbacksForExportAsync(Guid userId, CancellationToken ct = default) =>
-        await _db.ReadingFeedbacks.AsNoTracking().Where(x => x.UserId == userId)
-            .OrderByDescending(x => x.CreatedAt).ToListAsync(ct);
-
     public async Task<IReadOnlyList<UserMemoryRule>> GetMemoryForExportAsync(Guid userId, CancellationToken ct = default) =>
         await _db.UserMemoryRules.AsNoTracking().Where(x => x.UserId == userId)
             .OrderBy(x => x.CreatedAt).ToListAsync(ct);

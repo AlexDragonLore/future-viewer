@@ -26,9 +26,13 @@ async function analyticsFixture(context: BrowserContext) {
     switch (path) {
       case '/api/public/config': body = { supportEmail: '', paymentsEnabled: false }; break
       case '/api/public/legal-documents': body = legalDocumentsResponse; break
-      case '/api/readings/guest': body = guestResponse(); break
+      case '/api/readings/guest':
+        expect(route.request().postDataJSON()).toMatchObject({ spreadType: 3, question: previewReading.question })
+        body = guestResponse()
+        break
       case '/api/readings/guest/preview': body = previewReading; break
       case '/api/readings/guest/unlock': body = fullReading; break
+      case `/api/readings/${fullReading.id}`: body = fullReading; break
       case '/api/auth/verify-email':
       case '/api/auth/login': body = verifiedAuth; break
       case '/api/auth/register':
@@ -61,6 +65,9 @@ test('consented guest funnel counts successful verification and unlock once acro
   await page.getByTestId('accept-all').click()
   await expect.poll(() => analytics.calls.some((call) => call[1] === 'hit')).toBe(true)
   expect(analytics.scriptRequests()).toBe(1)
+  await expect(page.getByRole('button', { name: 'Открыть 3 карты бесплатно' })).toBeDisabled()
+  expect(analytics.goals()).toHaveLength(0)
+  await page.getByRole('textbox', { name: 'Твой вопрос', exact: true }).fill(previewReading.question)
   await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page.getByTestId('guest-unlock')).toBeVisible({ timeout: 20000 })
   await expect.poll(() => analytics.goals()).toEqual(['guest_reading_started', 'guest_preview_viewed'])
@@ -84,13 +91,15 @@ test('consented guest funnel counts successful verification and unlock once acro
   await expect.poll(() => analytics.goals().filter((goal) => goal === 'email_verified').length).toBe(1)
   await expect.poll(() => analytics.goals().filter((goal) => goal === 'guest_reading_unlocked').length).toBe(1)
   await emailTab.goto('/verify-email#token=PRIVATE_VERIFICATION_TOKEN')
-  await expect(emailTab).toHaveURL(/\/$/, { timeout: 15000 })
+  await expect(emailTab).toHaveURL(/\/result$/, { timeout: 15000 })
+  await expect(emailTab.getByRole('heading', { name: 'Следующий шаг' })).toBeVisible()
   expect(analytics.goals().filter((goal) => goal === 'email_verified')).toHaveLength(1)
   expect(analytics.goals().filter((goal) => goal === 'guest_preview_viewed')).toHaveLength(1)
   expect(analytics.goals().filter((goal) => goal === 'guest_reading_unlocked')).toHaveLength(1)
 
   const transmissions = JSON.stringify(analytics.calls)
   expect(transmissions).not.toMatch(/PRIVATE_|qa-user|qa@example|qa-encrypted-ticket|11111111-1111|На что мне/)
+  expect(transmissions).not.toContain(previewReading.question)
   for (const call of analytics.calls.filter((item) => item[1] === 'reachGoal')) expect(call).toHaveLength(3)
   expect(analytics.calls.find((call) => call[1] === 'hit')?.[2])
     .toBe('http://127.0.0.1:4184/?utm_source=yandex&utm_medium=cpc&utm_campaign=123&utm_content=456&yclid=123456789012')
@@ -101,6 +110,7 @@ test('necessary-only choice keeps the complete guest journey free of analytics r
   const analytics = await analyticsFixture(context)
   await page.goto('/?utm_source=yandex')
   await page.getByTestId('accept-necessary').click()
+  await page.getByRole('textbox', { name: 'Твой вопрос', exact: true }).fill(previewReading.question)
   await page.getByRole('button', { name: 'Открыть 3 карты бесплатно' }).click()
   await expect(page.getByTestId('guest-unlock')).toBeVisible({ timeout: 20000 })
   await page.getByRole('link', { name: 'Зарегистрироваться и дочитать' }).click()

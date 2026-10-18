@@ -16,6 +16,14 @@ public sealed class RetiredIntegrationEndpointTests : IClassFixture<IntegrationT
     [InlineData("DELETE", "/api/privacy/integrations/telegram")]
     [InlineData("PUT", "/api/admin/users/11111111-1111-1111-1111-111111111111/telegram")]
     [InlineData("DELETE", "/api/admin/users/11111111-1111-1111-1111-111111111111/telegram")]
+    [InlineData("GET", "/api/feedbacks/my")]
+    [InlineData("GET", "/api/feedbacks/retired-token")]
+    [InlineData("POST", "/api/feedbacks/retired-token")]
+    [InlineData("GET", "/api/admin/feedbacks")]
+    [InlineData("POST", "/api/admin/feedbacks")]
+    [InlineData("POST", "/api/admin/feedbacks/synthetic")]
+    [InlineData("PUT", "/api/admin/feedbacks/11111111-1111-1111-1111-111111111111")]
+    [InlineData("DELETE", "/api/admin/feedbacks/11111111-1111-1111-1111-111111111111")]
     [InlineData("POST", "/api/admin/feedbacks/run-notifications")]
     [InlineData("GET", "/api/leaderboard/monthly")]
     [InlineData("GET", "/api/leaderboard/alltime")]
@@ -24,9 +32,6 @@ public sealed class RetiredIntegrationEndpointTests : IClassFixture<IntegrationT
     {
         using var client = _fixture.CreateClient();
         using var response = await client.SendAsync(new HttpRequestMessage(new HttpMethod(method), path));
-        // The existing feedback token GET route matches the retired notification path
-        // and produces 405; neither status exposes a working integration handler.
-        response.StatusCode.Should().Be(path.EndsWith("run-notifications")
-            ? HttpStatusCode.MethodNotAllowed : HttpStatusCode.NotFound);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

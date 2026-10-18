@@ -82,17 +82,6 @@
       "manual_approved": false
     },
     {
-      "policy_id": "feedback-records",
-      "data_categories": ["feedback_token", "feedback_text", "feedback_score", "notification_status"],
-      "trigger": "feedback_created",
-      "retention_period": null,
-      "legal_basis_reference": null,
-      "deletion_mechanism": "account_deletion_cascade_or_approved_feedback_cleanup",
-      "backup_handling": null,
-      "status": "blocked",
-      "manual_approved": false
-    },
-    {
       "policy_id": "privacy-request-ledgers",
       "data_categories": ["data_subject_request", "data_deletion_job", "deletion_result_reference"],
       "trigger": "privacy_request_received",

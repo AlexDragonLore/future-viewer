@@ -13,10 +13,7 @@ public sealed class AdminUserDetailDto
     public AdminSubscriptionDto? Subscription { get; init; }
     public string? YukassaSubscriptionId { get; init; }
     public required int TotalReadings { get; init; }
-    public required int TotalFeedbacks { get; init; }
-    public required int TotalScore { get; init; }
     public required IReadOnlyList<AdminReadingSummary> RecentReadings { get; init; }
-    public required IReadOnlyList<AdminFeedbackDto> RecentFeedbacks { get; init; }
     public required IReadOnlyList<AdminAchievementDto> Achievements { get; init; }
 }
 

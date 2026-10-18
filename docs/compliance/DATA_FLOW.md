@@ -112,7 +112,7 @@ sequenceDiagram
     end
 ```
 
-AI memory extraction and external feedback scoring are disabled. Application logs and audit events record only operation type, status, correlation/request ID and error type; the question and AI output are not logged.
+AI memory extraction is disabled. Feedback collection and scoring have been removed. Application logs and audit events record only operation type, status, correlation/request ID and error type; the question and AI output are not logged.
 
 ## Платёж после remediation
 

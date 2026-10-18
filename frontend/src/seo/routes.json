@@ -47,7 +47,6 @@
     { "name": "result", "path": "/result", "title": "Результат расклада | Вуаль Грядущего" },
     { "name": "history", "path": "/history", "title": "История раскладов | Вуаль Грядущего" },
     { "name": "reading-detail", "path": "/reading/:id", "title": "Детали расклада | Вуаль Грядущего" },
-    { "name": "feedback", "path": "/feedback/:token", "title": "Обратная связь | Вуаль Грядущего" },
     { "name": "achievements", "path": "/achievements", "title": "Достижения | Вуаль Грядущего" },
     { "name": "profile", "path": "/profile", "title": "Профиль | Вуаль Грядущего" },
     { "name": "legal-privacy", "path": "/legal/privacy", "title": "Политика обработки персональных данных | Вуаль Грядущего" },
@@ -62,7 +61,6 @@
     { "name": "admin-readings", "path": "/admin/readings", "title": "Сообщения — админ-панель | Вуаль Грядущего" },
     { "name": "admin-users", "path": "/admin/users", "title": "Пользователи | Вуаль Грядущего" },
     { "name": "admin-user-detail", "path": "/admin/users/:id", "title": "Пользователь | Вуаль Грядущего" },
-    { "name": "admin-feedbacks", "path": "/admin/feedbacks", "title": "Отзывы — админ-панель | Вуаль Грядущего" },
     { "name": "admin-stats", "path": "/admin/stats", "title": "Статистика | Вуаль Грядущего" }
   ]
 }

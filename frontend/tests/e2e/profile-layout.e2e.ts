@@ -3,7 +3,6 @@ import { legalDocumentsResponse } from '../fixtures/legalDocuments'
 
 const longEmail = `${'mobile.profile.'.repeat(4)}reader@${'long-domain-'.repeat(3)}example.com`
 const memoryText = `Предпочитает спокойные и подробные объяснения: ${'длиннаязаметка'.repeat(12)}`
-const feedbackQuestion = `На что обратить внимание в ближайшее время? ${'длинныйвопрос'.repeat(16)}`
 const scenarios = [
   { name: 'free', email: 'mobile@example.com', active: false },
   { name: 'free with long email', email: longEmail, active: false },
@@ -34,15 +33,11 @@ async function openProfile(page: Page, email: string, active: boolean) {
         unlockedAt: '2026-10-01T10:00:00Z',
       },
       {
-        id: 'first-feedback', code: 'first_feedback', name: 'Первый отклик',
-        description: 'Поделись первым откликом.', iconPath: '', sortOrder: 2,
+        id: 'ten-readings', code: 'total_10', name: 'Десять раскладов',
+        description: 'Сделай десять раскладов.', iconPath: '', sortOrder: 2,
         unlockedAt: null,
       },
     ],
-    '/api/feedbacks/my': [{
-      id: 'layout-feedback', readingId: 'layout-reading', question: feedbackQuestion,
-      status: 3, aiScore: 10, createdAt: '2026-10-01T10:00:00Z',
-    }],
     '/api/profile/personalization': {
       firstName: 'Александр', lastName: 'Пользователь', birthYear: 1990, isComplete: true,
       memoryRules: [{ id: 'layout-memory', text: memoryText }],
@@ -74,7 +69,6 @@ async function openProfile(page: Page, email: string, active: boolean) {
   }, email)
   await page.goto('/profile')
   await page.getByTestId('accept-necessary').click()
-  await expect(page.getByTestId('profile-feedbacks')).toContainText(feedbackQuestion)
   await expect(page.getByTestId('save-personalization')).toBeEnabled()
   await expect(page.getByTestId('profile-access')).toContainText(
     active ? 'Платный доступ активен' : 'Первый расклад на 3 карты — бесплатно, затем — одна карта в день.',
@@ -91,6 +85,7 @@ for (const width of [320, 393, 640, 768, 1280]) {
       const unexpectedRequests = await openProfile(page, scenario.email, scenario.active)
       await expect(page.getByRole('heading', { level: 1 })).toHaveText(scenario.email)
       await expect(page.getByTestId('profile-summary')).toHaveCount(0)
+      await expect(page.getByTestId('profile-feedbacks')).toHaveCount(0)
       await expect(page.locator('a[href="/leaderboard"]')).toHaveCount(0)
       await expect(page.locator('.memory-row')).toContainText(memoryText)
 
@@ -136,7 +131,7 @@ for (const width of [320, 393, 640, 768, 1280]) {
         await expect(page.getByTestId('achievements-counter')).toHaveText('Открыто 1 из 2')
         await expect(page.getByTestId('achievements-grid').getByTestId('achievement-card')).toHaveCount(2)
         await expect(page.locator('.achievement-card.unlocked')).toContainText('Первый расклад')
-        await expect(page.locator('.achievement-card.locked')).toContainText('Первый отклик')
+        await expect(page.locator('.achievement-card.locked')).toContainText('Десять раскладов')
       }
       expect(unexpectedRequests).toEqual([])
     })

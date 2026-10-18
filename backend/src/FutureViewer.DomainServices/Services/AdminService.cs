@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using FutureViewer.Domain.Entities;
 using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
@@ -11,7 +10,6 @@ namespace FutureViewer.DomainServices.Services;
 
 public sealed class AdminService
 {
-    private readonly IFeedbackRepository _feedbacks;
     private readonly IReadingRepository _readings;
     private readonly IUserRepository _users;
     private readonly IAchievementRepository _achievementsRepo;
@@ -21,7 +19,6 @@ public sealed class AdminService
     private readonly IPaymentOrderRepository? _orders;
 
     public AdminService(
-        IFeedbackRepository feedbacks,
         IReadingRepository readings,
         IUserRepository users,
         IAchievementRepository achievementsRepo,
@@ -30,7 +27,6 @@ public sealed class AdminService
         IPrivacyRepository? privacy = null,
         IPaymentOrderRepository? orders = null)
     {
-        _feedbacks = feedbacks;
         _readings = readings;
         _users = users;
         _achievementsRepo = achievementsRepo;
@@ -68,186 +64,6 @@ public sealed class AdminService
     public async Task<AdminReadingInterpretationDto> GetReadingInterpretationAsync(Guid id, CancellationToken ct = default) =>
         await _readings.GetAdminInterpretationAsync(id, ct) ?? throw new NotFoundException("Reading not found");
 
-    public async Task<AdminFeedbackListResult> SearchFeedbacksAsync(
-        Guid? userId,
-        FeedbackStatus? status,
-        int page,
-        int pageSize,
-        CancellationToken ct = default)
-    {
-        var safePage = Math.Max(1, page);
-        var safeSize = Math.Clamp(pageSize, 1, 100);
-        var skip = (safePage - 1) * safeSize;
-
-        var items = await _feedbacks.SearchAsync(userId, status, skip, safeSize, ct);
-        var total = await _feedbacks.CountAsync(userId, status, ct);
-
-        return new AdminFeedbackListResult
-        {
-            Items = items.Select(MapAdmin).ToList(),
-            Total = total
-        };
-    }
-
-    public async Task<AdminFeedbackDto> CreateScheduledAsync(
-        Guid actorId,
-        string actorEmail,
-        Guid readingId,
-        DateTime? scheduledAt,
-        bool bypassDelay,
-        bool replace,
-        CancellationToken ct = default)
-    {
-        var reading = await _readings.GetByIdAsync(readingId, ct)
-            ?? throw new NotFoundException("Reading not found");
-        if (reading.UserId is null)
-            throw new DomainException("Cannot create feedback for anonymous reading");
-
-        var existing = await _feedbacks.GetByReadingIdAsync(readingId, ct);
-        if (existing is not null)
-        {
-            if (!replace)
-                throw new ConflictException("Feedback already exists for this reading. Pass replace=true to overwrite.");
-            await _feedbacks.DeleteAsync(existing.Id, ct);
-        }
-
-        var now = DateTime.UtcNow;
-        var effectiveScheduledAt = bypassDelay
-            ? now.AddMinutes(-1)
-            : (scheduledAt ?? now + FeedbackService.ScheduleDelay);
-
-        var feedback = new ReadingFeedback
-        {
-            ReadingId = reading.Id,
-            UserId = reading.UserId.Value,
-            Token = GenerateToken(),
-            ScheduledAt = effectiveScheduledAt,
-            CreatedAt = now,
-            Status = FeedbackStatus.Pending
-        };
-
-        var saved = await _feedbacks.AddAsync(feedback, ct);
-
-        await WriteAuditAsync(
-            actorId,
-            "admin.feedback_scheduled",
-            "feedback",
-            saved.Id,
-            ct);
-
-        return MapAdmin(saved, reading, await _users.GetByIdAsync(reading.UserId.Value, ct));
-    }
-
-    public async Task<AdminFeedbackDto> CreateSyntheticAsync(
-        Guid actorId,
-        string actorEmail,
-        Guid readingId,
-        int aiScore,
-        string? aiScoreReason,
-        bool isSincere,
-        string? selfReport,
-        CancellationToken ct = default)
-    {
-        if (aiScore is < 1 or > 10)
-            throw new DomainException("aiScore must be between 1 and 10");
-
-        var reading = await _readings.GetByIdAsync(readingId, ct)
-            ?? throw new NotFoundException("Reading not found");
-        if (reading.UserId is null)
-            throw new DomainException("Cannot create synthetic feedback for anonymous reading");
-
-        var existing = await _feedbacks.GetByReadingIdAsync(readingId, ct);
-        if (existing is not null)
-            throw new ConflictException("Feedback already exists for this reading. Edit or delete the existing feedback instead.");
-
-        var now = DateTime.UtcNow;
-        var feedback = new ReadingFeedback
-        {
-            ReadingId = reading.Id,
-            UserId = reading.UserId.Value,
-            Token = GenerateToken(),
-            ScheduledAt = now,
-            CreatedAt = now,
-            NotifiedAt = now,
-            AnsweredAt = now,
-            Status = FeedbackStatus.Scored,
-            AiScore = aiScore,
-            AiScoreReason = aiScoreReason,
-            IsSincere = isSincere,
-            SelfReport = selfReport
-        };
-
-        var saved = await _feedbacks.AddAsync(feedback, ct);
-
-        await WriteAuditAsync(
-            actorId,
-            "admin.feedback_synthetic_created",
-            "feedback",
-            saved.Id,
-            ct);
-
-        await _achievements.CheckAndGrantAsync(saved.UserId, ct);
-
-        return MapAdmin(saved, reading, await _users.GetByIdAsync(reading.UserId.Value, ct));
-    }
-
-    public async Task<AdminFeedbackDto> UpdateAsync(
-        Guid actorId,
-        string actorEmail,
-        Guid feedbackId,
-        AdminFeedbackUpdate update,
-        CancellationToken ct = default)
-    {
-        var feedback = await _feedbacks.GetByIdAsync(feedbackId, ct)
-            ?? throw new NotFoundException("Feedback not found");
-
-        if (update.AiScore is { } score)
-        {
-            if (score is < 1 or > 10)
-                throw new DomainException("aiScore must be between 1 and 10");
-            feedback.AiScore = score;
-        }
-        if (update.AiScoreReason is not null) feedback.AiScoreReason = update.AiScoreReason;
-        if (update.IsSincere.HasValue) feedback.IsSincere = update.IsSincere;
-        if (update.Status.HasValue) feedback.Status = update.Status.Value;
-        if (update.SelfReport is not null) feedback.SelfReport = update.SelfReport;
-        if (update.ScheduledAt.HasValue) feedback.ScheduledAt = update.ScheduledAt.Value;
-        if (update.NotifiedAt.HasValue) feedback.NotifiedAt = update.NotifiedAt;
-        if (update.AnsweredAt.HasValue) feedback.AnsweredAt = update.AnsweredAt;
-
-        await _feedbacks.UpdateAsync(feedback, ct);
-
-        await WriteAuditAsync(
-            actorId,
-            "admin.feedback_updated",
-            "feedback",
-            feedbackId,
-            ct);
-
-        await _achievements.CheckAndGrantAsync(feedback.UserId, ct);
-
-        var reading = feedback.Reading ?? await _readings.GetByIdAsync(feedback.ReadingId, ct);
-        return MapAdmin(feedback, reading, await _users.GetByIdAsync(feedback.UserId, ct));
-    }
-
-    public async Task DeleteFeedbackAsync(
-        Guid actorId,
-        string actorEmail,
-        Guid feedbackId,
-        CancellationToken ct = default)
-    {
-        var existed = await _feedbacks.DeleteAsync(feedbackId, ct);
-        if (!existed)
-            throw new NotFoundException("Feedback not found");
-
-        await WriteAuditAsync(
-            actorId,
-            "admin.feedback_deleted",
-            "feedback",
-            feedbackId,
-            ct);
-    }
-
     public async Task<AdminUserListResult> SearchUsersAsync(
         string? search,
         int page,
@@ -275,12 +91,8 @@ public sealed class AdminService
             ?? throw new NotFoundException("User not found");
 
         var totalReadings = await _readings.CountByUserAsync(userId, ct);
-        var scoredFeedbacks = await _feedbacks.GetScoredByUserAsync(userId, ct);
-        var totalScore = scoredFeedbacks.Sum(f => f.AiScore ?? 0);
-        var allFeedbacksCount = await _feedbacks.CountAsync(userId, null, ct);
 
         var recentReadings = await _readings.SearchForAdminAsync(userId, null, 0, 20, ct);
-        var recentFeedbacks = await _feedbacks.GetByUserAsync(userId, 20, ct);
         var userAchievements = await _achievementsRepo.GetByUserAsync(userId, ct);
         var allAchievements = await _achievementsRepo.GetAllAsync(ct);
         var byId = allAchievements.ToDictionary(a => a.Id, a => a);
@@ -298,8 +110,6 @@ public sealed class AdminService
             Subscription = subscription,
             YukassaSubscriptionId = user.YukassaSubscriptionId,
             TotalReadings = totalReadings,
-            TotalFeedbacks = allFeedbacksCount,
-            TotalScore = totalScore,
             RecentReadings = recentReadings.Select(r => new AdminReadingSummary
             {
                 Id = r.Id,
@@ -311,7 +121,6 @@ public sealed class AdminService
                 CreatedAt = r.CreatedAt,
                 DeletedFromHistoryAt = r.DeletedFromHistoryAt
             }).ToList(),
-            RecentFeedbacks = recentFeedbacks.Select(f => MapAdmin(f, f.Reading, user)).ToList(),
             Achievements = userAchievements
                 .Where(ua => byId.ContainsKey(ua.AchievementId))
                 .OrderByDescending(ua => ua.UnlockedAt)
@@ -513,14 +322,12 @@ public sealed class AdminService
         var now = DateTime.UtcNow;
         var todayUtc = now.Date;
         var weekAgoUtc = now.AddDays(-7);
-        var monthAgoUtc = now.AddDays(-30);
 
         var totalUsers = await _users.CountAsync(null, ct);
         var adminCount = await _users.CountAdminsAsync(ct);
         var activeSubs = await _users.CountActiveSubscriptionsAsync(now, ct);
         var readingsToday = await _readings.CountSinceAsync(todayUtc, ct);
         var readingsThisWeek = await _readings.CountSinceAsync(weekAgoUtc, ct);
-        var scoredThisMonth = await _feedbacks.CountScoredSinceAsync(monthAgoUtc, ct);
 
         return new AdminStatsDto
         {
@@ -528,8 +335,7 @@ public sealed class AdminService
             AdminCount = adminCount,
             ActiveSubscriptions = activeSubs,
             ReadingsToday = readingsToday,
-            ReadingsThisWeek = readingsThisWeek,
-            ScoredFeedbacksThisMonth = scoredThisMonth
+            ReadingsThisWeek = readingsThisWeek
         };
     }
 
@@ -573,9 +379,6 @@ public sealed class AdminService
     private async Task<AdminUserListItem> BuildListItemAsync(User user, CancellationToken ct)
     {
         var totalReadings = await _readings.CountByUserAsync(user.Id, ct);
-        var totalFeedbacks = await _feedbacks.CountAsync(user.Id, null, ct);
-        var scored = await _feedbacks.GetScoredByUserAsync(user.Id, ct);
-        var totalScore = scored.Sum(f => f.AiScore ?? 0);
         var subscription = BuildSubscription(user);
         await AttachPurchasesAsync([(user.Id, subscription)], ct);
 
@@ -588,9 +391,7 @@ public sealed class AdminService
             SubscriptionStatus = user.SubscriptionStatus,
             SubscriptionExpiresAt = user.SubscriptionExpiresAt,
             Subscription = subscription,
-            TotalReadings = totalReadings,
-            TotalFeedbacks = totalFeedbacks,
-            TotalScore = totalScore
+            TotalReadings = totalReadings
         };
     }
 
@@ -611,56 +412,6 @@ public sealed class AdminService
         foreach (var row in rows)
             row.Subscription.LastPurchase = purchases.GetValueOrDefault(row.UserId);
     }
-
-    private static AdminFeedbackDto MapAdmin(ReadingFeedback feedback) =>
-        MapAdmin(feedback, feedback.Reading, feedback.User);
-
-    private static AdminFeedbackDto MapAdmin(ReadingFeedback feedback, Reading? reading, User? user) =>
-        new()
-        {
-            Id = feedback.Id,
-            ReadingId = feedback.ReadingId,
-            UserId = feedback.UserId,
-            UserEmail = user?.Email,
-            Question = reading?.Question,
-            SelfReport = feedback.SelfReport,
-            AiScore = feedback.AiScore,
-            AiScoreReason = feedback.AiScoreReason,
-            IsSincere = feedback.IsSincere,
-            ScheduledAt = feedback.ScheduledAt,
-            NotifiedAt = feedback.NotifiedAt,
-            AnsweredAt = feedback.AnsweredAt,
-            Status = feedback.Status,
-            CreatedAt = feedback.CreatedAt
-        };
-
-    private static string GenerateToken()
-    {
-        Span<byte> bytes = stackalloc byte[24];
-        RandomNumberGenerator.Fill(bytes);
-        return Convert.ToBase64String(bytes)
-            .Replace("+", "-")
-            .Replace("/", "_")
-            .Replace("=", string.Empty);
-    }
-}
-
-public sealed class AdminFeedbackListResult
-{
-    public required IReadOnlyList<AdminFeedbackDto> Items { get; init; }
-    public required int Total { get; init; }
-}
-
-public sealed class AdminFeedbackUpdate
-{
-    public int? AiScore { get; init; }
-    public string? AiScoreReason { get; init; }
-    public bool? IsSincere { get; init; }
-    public FeedbackStatus? Status { get; init; }
-    public string? SelfReport { get; init; }
-    public DateTime? ScheduledAt { get; init; }
-    public DateTime? NotifiedAt { get; init; }
-    public DateTime? AnsweredAt { get; init; }
 }
 
 public sealed class AdminUserListResult

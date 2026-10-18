@@ -1,7 +1,6 @@
 using System.Text.Json;
 using FluentAssertions;
 using FutureViewer.Domain.Entities;
-using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.DomainServices.Services;
 using Microsoft.Extensions.Logging;
@@ -12,76 +11,52 @@ namespace FutureViewer.DomainServices.Tests;
 public sealed class AdminAuditTests
 {
     [Fact]
-    public async Task DeleteFeedbackAsync_persists_content_free_audit_event()
+    public async Task DeleteUserAsync_persists_content_free_audit_event()
     {
         var fixture = CreateFixture();
-        var feedbackId = Guid.NewGuid();
-        fixture.Feedbacks
-            .Setup(x => x.DeleteAsync(feedbackId, It.IsAny<CancellationToken>()))
+        var target = NewUser("private-user@example.com");
+        fixture.Users.Setup(x => x.GetByIdAsync(target.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(target);
+        fixture.Users.Setup(x => x.DeleteAsync(target.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
-        await fixture.Sut.DeleteFeedbackAsync(
-            fixture.Actor.Id,
-            fixture.Actor.Email,
-            feedbackId,
-            CancellationToken.None);
+        await fixture.Sut.DeleteUserAsync(fixture.Actor.Id, fixture.Actor.Email, target.Id);
 
         var audit = fixture.AuditEvents.Should().ContainSingle().Subject;
-        audit.EventType.Should().Be("admin.feedback_deleted");
+        audit.EventType.Should().Be("admin.user_deleted");
         audit.ActorSubjectReference.Should().Be(fixture.Actor.PrivacySubjectId);
-        audit.TargetType.Should().Be("feedback");
-        audit.TargetReference.Should().Be(feedbackId);
+        audit.TargetType.Should().Be("user");
+        audit.TargetReference.Should().Be(target.PrivacySubjectId);
         audit.Outcome.Should().Be("success");
 
         var serialized = JsonSerializer.Serialize(audit);
-        serialized.Should().NotContain(fixture.Actor.Email);
-        serialized.Should().NotContain(fixture.Actor.Id.ToString());
-        serialized.Should().NotContain("private question");
+        serialized.Should().NotContain(fixture.Actor.Email).And.NotContain(target.Email);
+        serialized.Should().NotContain(fixture.Actor.Id.ToString()).And.NotContain(target.Id.ToString());
     }
 
     [Fact]
-    public async Task CreateScheduledAsync_does_not_copy_reading_content_into_audit_or_log()
+    public async Task SetAdminAsync_does_not_copy_account_details_into_audit_or_log()
     {
         var fixture = CreateFixture();
-        const string sensitiveQuestion = "private question person@example.com diagnosis";
-        var reading = new Reading
-        {
-            UserId = fixture.Actor.Id,
-            SpreadType = SpreadType.SingleCard,
-            Question = sensitiveQuestion
-        };
-        fixture.Readings
-            .Setup(x => x.GetByIdAsync(reading.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(reading);
-        fixture.Feedbacks
-            .Setup(x => x.GetByReadingIdAsync(reading.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ReadingFeedback?)null);
-        fixture.Feedbacks
-            .Setup(x => x.AddAsync(It.IsAny<ReadingFeedback>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ReadingFeedback feedback, CancellationToken _) => feedback);
+        var target = NewUser("private-user@example.com");
+        fixture.Users.Setup(x => x.GetByIdAsync(target.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(target);
 
-        await fixture.Sut.CreateScheduledAsync(
-            fixture.Actor.Id,
-            fixture.Actor.Email,
-            reading.Id,
-            scheduledAt: null,
-            bypassDelay: false,
-            replace: false,
-            CancellationToken.None);
+        await fixture.Sut.SetAdminAsync(fixture.Actor.Id, fixture.Actor.Email, target.Id, true);
 
-        var auditJson = JsonSerializer.Serialize(fixture.AuditEvents.Should().ContainSingle().Subject);
-        auditJson.Should().NotContain(sensitiveQuestion);
-        auditJson.Should().NotContain("person@example.com");
+        var audit = fixture.AuditEvents.Should().ContainSingle().Subject;
+        audit.EventType.Should().Be("admin.user_role_changed");
+        audit.ReasonCode.Should().Be("admin_enabled");
+        JsonSerializer.Serialize(audit).Should().NotContain(target.Email).And.NotContain(fixture.Actor.Email);
         fixture.Logs.Should().ContainSingle();
         fixture.Logs.Should().OnlyContain(message =>
-            !message.Contains(sensitiveQuestion, StringComparison.Ordinal)
+            !message.Contains(target.Email, StringComparison.Ordinal)
             && !message.Contains(fixture.Actor.Email, StringComparison.Ordinal)
-            && !message.Contains(reading.Id.ToString(), StringComparison.Ordinal));
+            && !message.Contains(target.Id.ToString(), StringComparison.Ordinal));
     }
 
     private static Fixture CreateFixture()
     {
-        var feedbacks = new Mock<IFeedbackRepository>();
         var readings = new Mock<IReadingRepository>();
         var users = new Mock<IUserRepository>();
         var achievements = new Mock<IAchievementRepository>();
@@ -101,10 +76,8 @@ public sealed class AdminAuditTests
         var achievementService = new AchievementService(
             achievements.Object,
             readings.Object,
-            feedbacks.Object,
             users.Object);
         var sut = new AdminService(
-            feedbacks.Object,
             readings.Object,
             users.Object,
             achievements.Object,
@@ -112,7 +85,7 @@ public sealed class AdminAuditTests
             logger,
             privacy.Object);
 
-        return new Fixture(sut, actor, feedbacks, readings, users, auditEvents, logger.Messages);
+        return new Fixture(sut, actor, users, auditEvents, logger.Messages);
     }
 
     private static User NewUser(string email) => new()
@@ -124,8 +97,6 @@ public sealed class AdminAuditTests
     private sealed record Fixture(
         AdminService Sut,
         User Actor,
-        Mock<IFeedbackRepository> Feedbacks,
-        Mock<IReadingRepository> Readings,
         Mock<IUserRepository> Users,
         List<AuditEvent> AuditEvents,
         List<string> Logs);

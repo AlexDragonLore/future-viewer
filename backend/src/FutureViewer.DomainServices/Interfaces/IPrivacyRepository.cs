@@ -16,7 +16,6 @@ public interface IPrivacyRepository
     Task<bool> RevokeConsentAsync(Guid userId, ConsentType type, DateTime revokedAt, CancellationToken ct = default);
 
     Task<IReadOnlyList<Reading>> GetReadingsForExportAsync(Guid userId, CancellationToken ct = default);
-    Task<IReadOnlyList<ReadingFeedback>> GetFeedbacksForExportAsync(Guid userId, CancellationToken ct = default);
     Task<IReadOnlyList<UserMemoryRule>> GetMemoryForExportAsync(Guid userId, CancellationToken ct = default);
     Task<IReadOnlyList<UserAchievement>> GetAchievementsForExportAsync(Guid userId, CancellationToken ct = default);
     Task<IReadOnlyList<AnnouncementRead>> GetAnnouncementReadsForExportAsync(Guid userId, CancellationToken ct = default);

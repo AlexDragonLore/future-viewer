@@ -5,7 +5,6 @@ using FutureViewer.Domain.Enums;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
-using Microsoft.Extensions.Logging;
 
 namespace FutureViewer.DomainServices.Services;
 
@@ -15,34 +14,28 @@ public sealed class ReadingService
     private readonly CardDeckService _deck;
     private readonly InterpretationService _interpreter;
     private readonly SubscriptionService _subscription;
-    private readonly FeedbackService _feedback;
     private readonly IAIQuestionValidator _questionValidator;
     private readonly IAiPrivacyGateway _privacyGateway;
-    private readonly ILogger<ReadingService> _logger;
 
     public ReadingService(
         IReadingRepository repo,
         CardDeckService deck,
         InterpretationService interpreter,
         SubscriptionService subscription,
-        FeedbackService feedback,
         PersonalizationService personalization,
         IAIQuestionValidator questionValidator,
         IAIMemoryExtractor memoryExtractor,
         IUserRepository users,
-        ILogger<ReadingService> logger,
         IAiPrivacyGateway? privacyGateway = null)
     {
         _repo = repo;
         _deck = deck;
         _interpreter = interpreter;
         _subscription = subscription;
-        _feedback = feedback;
         _ = personalization; // Compatibility only: the active interpreter intentionally ignores profile and memory.
         _questionValidator = questionValidator;
         _ = memoryExtractor; // Kept in the constructor for binary/test compatibility; extraction is disabled.
         _ = users; // Retained for constructor compatibility; history no longer has an account switch.
-        _logger = logger;
         _privacyGateway = privacyGateway ?? new AiPrivacyGateway();
     }
 
@@ -126,25 +119,6 @@ public sealed class ReadingService
         reading.AiModel = interpretation.Model;
         await _repo.UpdateAsync(reading, ct);
 
-        if (saveToHistory && reading.UserId is not null)
-        {
-            try
-            {
-                await _feedback.ScheduleAsync(reading, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(
-                    "Failed to schedule feedback for reading {ReadingId}; errorType={ErrorType}",
-                    reading.Id,
-                    ex.GetType().Name);
-            }
-        }
-
         // AI memory remains disabled until a separately versioned personalization
         // consent is active and a privacy-reviewed structured schema is available.
         return Map(reading, spread, privacy.SafeText, interpretation.Text);
@@ -221,21 +195,6 @@ public sealed class ReadingService
                 catch
                 {
                     // Best-effort persist; don't mask the original exception.
-                }
-            }
-
-            if (sb.Length > 0 && reading.UserId is not null)
-            {
-                try
-                {
-                    await _feedback.ScheduleAsync(reading, CancellationToken.None);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(
-                        "Failed to schedule feedback for streaming reading {ReadingId}; errorType={ErrorType}",
-                        reading.Id,
-                        ex.GetType().Name);
                 }
             }
         }

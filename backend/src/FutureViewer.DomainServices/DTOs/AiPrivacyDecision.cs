@@ -4,7 +4,6 @@ public enum AiPrivacyOperation
 {
     QuestionValidation,
     TarotInterpretation,
-    FeedbackScoring,
     MemoryExtraction
 }
 

@@ -182,22 +182,11 @@ public sealed class PrivacyEndpointTests : IClassFixture<IntegrationTestFixture>
             db.Users.Add(other);
             db.Readings.AddRange(hiddenReading, transientReading, otherReading);
             db.Achievements.Add(achievement);
-            foreach (var (userId, reading, prefix) in new[]
+            foreach (var (userId, prefix) in new[]
                      {
-                         (auth.UserId, hiddenReading, "Own"), (other.Id, otherReading, "Other")
+                         (auth.UserId, "Own"), (other.Id, "Other")
                      })
             {
-                db.ReadingFeedbacks.Add(new ReadingFeedback
-                {
-                    UserId = userId,
-                    ReadingId = reading.Id,
-                    Token = $"secret-token-{Guid.NewGuid():N}",
-                    SelfReport = $"{prefix} feedback",
-                    AiScore = 7,
-                    AiScoreReason = $"{prefix} score reason",
-                    ScheduledAt = DateTime.UtcNow,
-                    Status = FeedbackStatus.Scored
-                });
                 db.UserMemoryRules.Add(new UserMemoryRule { UserId = userId, Text = $"{prefix} memory" });
                 db.UserAchievements.Add(new UserAchievement { UserId = userId, AchievementId = achievement.Id });
                 var announcementId = userId == auth.UserId ? ownAnnouncementId : Guid.NewGuid();
@@ -224,12 +213,11 @@ public sealed class PrivacyEndpointTests : IClassFixture<IntegrationTestFixture>
         var export = await response.Content.ReadFromJsonAsync<PrivacyExportDto>();
         export!.Readings.Select(x => x.Id).Should().BeEquivalentTo(new[] { hiddenReading.Id, transientReading.Id });
         export.Readings.Should().ContainSingle(x => x.Id == hiddenReading.Id && x.DeletedFromHistoryAt != null);
-        export.Feedbacks.Should().ContainSingle(x => x.SelfReport == "Own feedback" && x.AiScoreReason == "Own score reason");
         export.MemoryRules.Should().ContainSingle(x => x.Text == "Own memory");
         export.Achievements.Should().ContainSingle(x => x.AchievementId == achievement.Id);
         export.AnnouncementReads.Should().ContainSingle(x => x.AnnouncementId == ownAnnouncementId);
         var json = await response.Content.ReadAsStringAsync();
-        json.Should().NotContain("secret-token-").And.NotContain("passwordHash").And.NotContain(other.Email);
+        json.Should().NotContain("feedbacks").And.NotContain("passwordHash").And.NotContain(other.Email);
     }
 
     [Fact]

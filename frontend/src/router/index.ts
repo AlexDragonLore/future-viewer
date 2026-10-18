@@ -37,7 +37,7 @@ export const router = createRouter({
     { path: '/legal/ai-disclaimer', name: 'legal-ai-disclaimer', component: () => import('@/views/LegalDocumentView.vue'), props: { documentType: 'ai-disclaimer' } },
     { path: '/legal/data-request', name: 'legal-data-request', component: () => import('@/views/LegalDocumentView.vue'), props: { documentType: 'data-request' } },
     { path: '/legal/processors', name: 'legal-processors', component: () => import('@/views/LegalDocumentView.vue'), props: { documentType: 'processors' } },
-    { path: '/feedback/:token', name: 'feedback', component: () => import('@/views/FeedbackView.vue'), meta: { noindex: true } },
+    { path: '/feedback/:token?', redirect: { path: '/', query: {}, hash: '' } },
     { path: '/leaderboard', redirect: '/' },
     { path: '/achievements', name: 'achievements', component: () => import('@/views/AchievementsView.vue'), meta: { requiresAuth: true, noindex: true } },
     { path: '/profile', name: 'profile', component: () => import('@/views/ProfileView.vue'), meta: { requiresAuth: true, noindex: true } },
@@ -48,7 +48,7 @@ export const router = createRouter({
       children: [
         { path: '', name: 'admin', redirect: { name: 'admin-readings' } },
         { path: 'readings', name: 'admin-readings', component: () => import('@/views/admin/AdminReadingsView.vue'), meta: { noindex: true } },
-        { path: 'feedbacks', name: 'admin-feedbacks', component: () => import('@/views/admin/AdminFeedbacksView.vue'), meta: { noindex: true } },
+        { path: 'feedbacks', redirect: { name: 'admin-readings', query: {}, hash: '' } },
         { path: 'users', name: 'admin-users', component: () => import('@/views/admin/AdminUsersView.vue'), meta: { noindex: true } },
         { path: 'users/:id', name: 'admin-user-detail', component: () => import('@/views/admin/AdminUsersView.vue'), props: true, meta: { noindex: true } },
         { path: 'stats', name: 'admin-stats', component: () => import('@/views/admin/AdminStatsView.vue'), meta: { noindex: true } },

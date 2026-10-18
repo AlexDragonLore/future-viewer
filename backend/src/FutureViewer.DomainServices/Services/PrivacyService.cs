@@ -176,7 +176,6 @@ public sealed class PrivacyService
         await _privacy.AddDataSubjectRequestAsync(request, ct);
 
         var readings = await _privacy.GetReadingsForExportAsync(userId, ct);
-        var feedbacks = await _privacy.GetFeedbacksForExportAsync(userId, ct);
         var memory = await _privacy.GetMemoryForExportAsync(userId, ct);
         var achievements = await _privacy.GetAchievementsForExportAsync(userId, ct);
         var announcementReads = await _privacy.GetAnnouncementReadsForExportAsync(userId, ct);
@@ -230,20 +229,6 @@ public sealed class PrivacyService
                     Position = c.Position,
                     IsReversed = c.IsReversed
                 }).ToList()
-            }).ToList(),
-            Feedbacks = feedbacks.Select(x => new PrivacyFeedbackExportDto
-            {
-                Id = x.Id,
-                ReadingId = x.ReadingId,
-                SelfReport = x.SelfReport,
-                AiScore = x.AiScore,
-                AiScoreReason = x.AiScoreReason,
-                IsSincere = x.IsSincere,
-                Status = x.Status.ToString(),
-                CreatedAt = x.CreatedAt,
-                ScheduledAt = x.ScheduledAt,
-                NotifiedAt = x.NotifiedAt,
-                AnsweredAt = x.AnsweredAt
             }).ToList(),
             MemoryRules = memory.Select(x => new UserMemoryRuleDto
             {

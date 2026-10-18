@@ -149,27 +149,6 @@ export interface CardGlossary {
   deckVariants: DeckVariantInfo[]
 }
 
-export enum FeedbackStatus {
-  Pending = 0,
-  Notified = 1,
-  Answered = 2,
-  Scored = 3,
-}
-
-export interface FeedbackInfo {
-  id: string
-  readingId: string
-  question: string
-  interpretation: string | null
-  aiScore: number | null
-  aiScoreReason: string | null
-  isSincere: boolean | null
-  selfReport: string | null
-  status: FeedbackStatus
-  createdAt: string
-  answeredAt: string | null
-}
-
 export interface AchievementInfo {
   id: string
   code: string

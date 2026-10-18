@@ -46,23 +46,6 @@ export const adminAudienceReadingFixtures: AdminReading[] = adminReadingFixtures
   return row
 })
 
-export const adminFeedbackFixtures = [{
-  id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-  readingId: adminReadingFixtures[0].id,
-  userId: readerId,
-  userEmail: readerEmail,
-  question: adminReadingFixtures[0].question,
-  selfReport: `${'Я попробовал выделить время на отдых и спокойное планирование, и это помогло. '.repeat(6)}Финальная часть отзыва: стало проще действовать.`,
-  aiScore: 9,
-  aiScoreReason: `${'В отзыве есть конкретное действие и понятное наблюдение за результатом. '.repeat(4)}Финальная часть оценки: осмысленная обратная связь.`,
-  isSincere: true,
-  scheduledAt: '2026-10-06T10:00:00Z',
-  notifiedAt: null,
-  answeredAt: '2026-10-06T12:05:00Z',
-  status: 3,
-  createdAt: '2026-10-05T10:00:00Z',
-}]
-
 export const adminUserFixtures = [{
   id: readerId,
   email: readerEmail,
@@ -72,15 +55,12 @@ export const adminUserFixtures = [{
   subscriptionExpiresAt: '2026-11-01T00:00:00Z',
   subscription: adminPaidSubscriptionFixture,
   totalReadings: adminReadingFixtures.length,
-  totalFeedbacks: 1,
-  totalScore: 19,
 }]
 
 export const adminUserDetailFixture = {
   ...adminUserFixtures[0],
   yukassaSubscriptionId: null,
   recentReadings: adminReadingFixtures.slice(0, 3),
-  recentFeedbacks: adminFeedbackFixtures,
   achievements: [{
     id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
     code: 'first-reading',
@@ -101,9 +81,8 @@ export const adminFixtureResponses: Record<string, unknown> = {
   '/api/admin/readings': { items: adminReadingFixtures.slice(0, 20), total: adminReadingFixtures.length },
   '/api/admin/users': { items: adminUserFixtures, total: adminUserFixtures.length },
   [`/api/admin/users/${readerId}`]: adminUserDetailFixture,
-  '/api/admin/feedbacks': { items: adminFeedbackFixtures, total: adminFeedbackFixtures.length },
   '/api/admin/stats': {
     totalUsers: 125, adminCount: 2, activeSubscriptions: 18,
-    readingsToday: 30, readingsThisWeek: 143, scoredFeedbacksThisMonth: 28,
+    readingsToday: 30, readingsThisWeek: 143,
   },
 }

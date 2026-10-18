@@ -47,7 +47,6 @@ public sealed class AdminStatsEndpointTests : IClassFixture<IntegrationTestFixtu
         stats.ActiveSubscriptions.Should().BeGreaterThanOrEqualTo(1);
         stats.ReadingsToday.Should().BeGreaterThanOrEqualTo(1);
         stats.ReadingsThisWeek.Should().BeGreaterThanOrEqualTo(1);
-        stats.ScoredFeedbacksThisMonth.Should().BeGreaterThanOrEqualTo(0);
     }
 
     private async Task<Guid> CreateReading(HttpClient client)

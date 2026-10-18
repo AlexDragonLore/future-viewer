@@ -162,8 +162,6 @@ public sealed class PrivacyServiceTests
         fixture.Passwords.Setup(x => x.Verify("correct", fixture.User.PasswordHash)).Returns(true);
         fixture.Privacy.Setup(x => x.GetReadingsForExportAsync(fixture.User.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<Reading>());
-        fixture.Privacy.Setup(x => x.GetFeedbacksForExportAsync(fixture.User.Id, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Array.Empty<ReadingFeedback>());
         fixture.Privacy.Setup(x => x.GetMemoryForExportAsync(fixture.User.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserMemoryRule>());
         fixture.Privacy.Setup(x => x.GetAchievementsForExportAsync(fixture.User.Id, It.IsAny<CancellationToken>()))

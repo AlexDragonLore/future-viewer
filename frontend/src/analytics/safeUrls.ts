@@ -1,7 +1,7 @@
 const SAFE_PATHS = new Set([
   '/', '/reading', '/result', '/history', '/auth', '/verify-email', '/forgot-password',
   '/reset-password', '/glossary', '/faq', '/about', '/payment/success',
-  '/achievements', '/profile', '/admin', '/admin/users', '/admin/feedbacks', '/admin/stats',
+  '/achievements', '/profile', '/admin', '/admin/users', '/admin/stats',
   '/legal/privacy', '/legal/personal-data-consent', '/legal/cookies', '/legal/offer',
   '/legal/marketing-consent', '/legal/ai-disclaimer', '/legal/data-request', '/legal/processors',
 ])
@@ -9,7 +9,6 @@ const SAFE_PATHS = new Set([
 function safePath(path: string): string {
   if (SAFE_PATHS.has(path)) return path
   if (path.startsWith('/reading/')) return '/reading/detail'
-  if (path.startsWith('/feedback/')) return '/feedback'
   if (path.startsWith('/admin/users/')) return '/admin/users/detail'
   if (path.startsWith('/admin/')) return '/admin'
   if (path.startsWith('/glossary/')) return '/glossary/card'

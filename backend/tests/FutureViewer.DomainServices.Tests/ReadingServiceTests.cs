@@ -6,7 +6,6 @@ using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Exceptions;
 using FutureViewer.DomainServices.Interfaces;
 using FutureViewer.DomainServices.Services;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace FutureViewer.DomainServices.Tests;
@@ -62,12 +61,11 @@ public sealed class ReadingServiceTests
         memory.Setup(m => m.GetByUserAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserMemoryRule>());
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
-        var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, memory.Object);
         var questionValidator = AcceptedQuestionValidator();
         var memoryExtractor = EmptyMemoryExtractor();
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, personalization, questionValidator.Object, memoryExtractor.Object, users.Object, NullLogger<ReadingService>.Instance);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, personalization, questionValidator.Object, memoryExtractor.Object, users.Object);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest { SpreadType = SpreadType.ThreeCard, Question = "Что меня ждёт?" },
@@ -128,12 +126,11 @@ public sealed class ReadingServiceTests
         memory.Setup(m => m.GetByUserAsync(It.IsAny<Guid>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Array.Empty<UserMemoryRule>());
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
-        var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, memory.Object);
         var questionValidator = AcceptedQuestionValidator();
         var memoryExtractor = EmptyMemoryExtractor();
 
-        var sut = new ReadingService(repo.Object, deck, interpret, subscription, feedback, personalization, questionValidator.Object, memoryExtractor.Object, users.Object, NullLogger<ReadingService>.Instance);
+        var sut = new ReadingService(repo.Object, deck, interpret, subscription, personalization, questionValidator.Object, memoryExtractor.Object, users.Object);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest
@@ -165,7 +162,6 @@ public sealed class ReadingServiceTests
         var users = CompleteUserRepo();
         var memory = EmptyMemoryRepo();
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
-        var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, memory.Object);
         var questionValidator = new Mock<IAIQuestionValidator>();
         questionValidator.Setup(v => v.ValidateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -181,12 +177,10 @@ public sealed class ReadingServiceTests
             new CardDeckService(new TestDeck()),
             interpret,
             subscription,
-            feedback,
             personalization,
             questionValidator.Object,
             EmptyMemoryExtractor().Object,
-            users.Object,
-            NullLogger<ReadingService>.Instance);
+            users.Object);
 
         var act = () => sut.CreateAsync(
             new CreateReadingRequest { SpreadType = SpreadType.SingleCard, Question = "что будет?" },
@@ -223,7 +217,6 @@ public sealed class ReadingServiceTests
             .ReturnsAsync(new InterpretationResult { Text = "ok", Model = "stub", GeneratedAt = DateTime.UtcNow });
         var users = CompleteUserRepo();
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(), Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
-        var feedback = new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>());
         var personalization = new PersonalizationService(users.Object, EmptyMemoryRepo().Object);
         var questionValidator = new Mock<IAIQuestionValidator>();
         questionValidator.Setup(v => v.ValidateAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -239,12 +232,10 @@ public sealed class ReadingServiceTests
             new CardDeckService(new TestDeck()),
             new InterpretationService(ai.Object),
             subscription,
-            feedback,
             personalization,
             questionValidator.Object,
             EmptyMemoryExtractor().Object,
-            users.Object,
-            NullLogger<ReadingService>.Instance);
+            users.Object);
 
         var result = await sut.CreateAsync(
             new CreateReadingRequest
@@ -294,9 +285,8 @@ public sealed class ReadingServiceTests
         var subscription = new SubscriptionService(users.Object, repo.Object, Mock.Of<IPaymentProvider>(),
             Mock.Of<IProcessedPaymentRepository>(), new PassThroughUnitOfWork());
         var service = new ReadingService(repo.Object, new CardDeckService(new TestDeck()), new InterpretationService(ai.Object),
-            subscription, new FeedbackService(Mock.Of<IFeedbackRepository>(), repo.Object, Mock.Of<IFeedbackScorer>()),
-            personalization, AcceptedQuestionValidator().Object, EmptyMemoryExtractor().Object, users.Object,
-            NullLogger<ReadingService>.Instance);
+            subscription,
+            personalization, AcceptedQuestionValidator().Object, EmptyMemoryExtractor().Object, users.Object);
         var userId = Guid.NewGuid();
         var request = new CreateReadingRequest
         {

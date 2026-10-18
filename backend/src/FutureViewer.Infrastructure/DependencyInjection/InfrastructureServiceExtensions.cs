@@ -43,7 +43,6 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<ICardDeck, CardDeckRepository>();
         services.AddScoped<IProcessedPaymentRepository, ProcessedPaymentRepository>();
         services.AddScoped<IPaymentOrderRepository, PaymentOrderRepository>();
-        services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IAchievementRepository, AchievementRepository>();
         services.AddScoped<IUserMemoryRepository, UserMemoryRepository>();
         services.AddScoped<IAnnouncementRepository, AnnouncementRepository>();
@@ -65,7 +64,6 @@ public static class InfrastructureServiceExtensions
         // These secondary AI uses are disabled by default. They previously sent raw
         // question/answer/self-report content to the provider without separate consent.
         services.AddSingleton<IAIMemoryExtractor, DisabledMemoryExtractor>();
-        services.AddSingleton<IFeedbackScorer, PrivacyPreservingFeedbackScorer>();
         var emailOptions = configuration.GetSection(EmailOptions.SectionName).Get<EmailOptions>() ?? new EmailOptions();
         if (emailOptions.GetTransport() == "RegruWebmail")
         {

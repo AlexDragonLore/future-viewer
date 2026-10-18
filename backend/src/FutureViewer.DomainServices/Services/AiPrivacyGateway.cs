@@ -16,7 +16,6 @@ namespace FutureViewer.DomainServices.Services;
 public sealed partial class AiPrivacyGateway : IAiPrivacyGateway
 {
     public const int MaxQuestionLength = 500;
-    public const int MaxFeedbackLength = 2_000;
     public const int MaxDerivedTextLength = 12_000;
 
     public const string SensitiveDataMessage =
@@ -40,7 +39,6 @@ public sealed partial class AiPrivacyGateway : IAiPrivacyGateway
         var maxLength = operation switch
         {
             AiPrivacyOperation.QuestionValidation or AiPrivacyOperation.TarotInterpretation => MaxQuestionLength,
-            AiPrivacyOperation.FeedbackScoring => MaxFeedbackLength,
             _ => MaxDerivedTextLength
         };
 

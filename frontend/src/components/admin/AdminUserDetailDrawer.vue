@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAdminStore } from '@/stores/useAdminStore'
 import { useAuthStore } from '@/stores/useAuthStore'
-import { FeedbackStatus, SubscriptionStatusValue } from '@/types'
+import { SubscriptionStatusValue } from '@/types'
 import AdminSubscriptionBadge from '@/components/admin/AdminSubscriptionBadge.vue'
 import AdminReadingMessage from '@/components/admin/AdminReadingMessage.vue'
 
@@ -61,10 +61,6 @@ function handleKeydown(event: KeyboardEvent) {
     event.preventDefault()
     first?.focus()
   }
-}
-
-function feedbackStatus(status: FeedbackStatus) {
-  return ['Ожидает ответа', 'Уведомление отправлено', 'Получен ответ', 'Оценён'][status] ?? '—'
 }
 
 function localDateTime(value: string | null) {
@@ -194,19 +190,6 @@ async function recheckAchievements(): Promise<void> {
       </section>
 
       <section class="section">
-        <h4>Последние отзывы ({{ store.selectedUser.recentFeedbacks.length }})</h4>
-        <ul v-if="store.selectedUser.recentFeedbacks.length" class="list recent-messages">
-          <li v-for="feedback in store.selectedUser.recentFeedbacks" :key="feedback.id">
-            <div class="feedback-meta">{{ feedbackStatus(feedback.status) }} · {{ new Date(feedback.createdAt).toLocaleDateString('ru-RU') }} · Балл: {{ feedback.aiScore ?? '—' }}</div>
-            <p v-if="feedback.question" class="feedback-question">{{ feedback.question }}</p>
-            <p class="feedback-report">{{ feedback.selfReport || 'Пользователь ещё не ответил.' }}</p>
-            <details v-if="feedback.aiScoreReason" class="mt-2"><summary>Комментарий к оценке</summary><p class="feedback-report">{{ feedback.aiScoreReason }}</p></details>
-          </li>
-        </ul>
-        <p v-else class="text-mystic-muted text-sm">Отзывов пока нет.</p>
-      </section>
-
-      <section class="section">
         <h4>Роль</h4>
         <div class="flex items-center gap-3">
           <span :class="['badge', store.selectedUser.isAdmin ? 'admin' : 'muted']">
@@ -260,10 +243,8 @@ async function recheckAchievements(): Promise<void> {
 
       <section class="section">
         <h4>Статистика</h4>
-        <div class="grid grid-cols-3 gap-2 text-sm">
+        <div class="text-sm">
           <div><span class="text-mystic-muted">Раскладов:</span> {{ store.selectedUser.totalReadings }}</div>
-          <div><span class="text-mystic-muted">Отзывов:</span> {{ store.selectedUser.totalFeedbacks }}</div>
-          <div><span class="text-mystic-muted">Баллов:</span> {{ store.selectedUser.totalScore }}</div>
         </div>
       </section>
 
@@ -338,9 +319,6 @@ async function recheckAchievements(): Promise<void> {
 .drawer-topbar { position: sticky; top: -1.5rem; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: -1.5rem -1.5rem 1.2rem; padding: 0.75rem 1.5rem; background: #100b1d; border-bottom: 1px solid rgba(245, 194, 107, 0.2); }
 .drawer-topbar h2 { color: #f5c26b; font-size: 0.9rem; }
 .recent-messages > li + li { border-top: 1px solid rgba(245, 194, 107, 0.15); padding-top: 1rem; margin-top: 1rem; }
-.feedback-meta { color: rgba(224, 212, 186, 0.6); font-size: 0.75rem; }
-.feedback-question { margin: 0.65rem 0; font-style: italic; color: #f5c26b; white-space: pre-wrap; }
-.feedback-report { white-space: pre-wrap; line-height: 1.6; margin-top: 0.5rem; }
 summary { color: #f5c26b; cursor: pointer; }
 .drawer :focus-visible { outline: 2px solid #f5c26b; outline-offset: 3px; }
 .drawer {

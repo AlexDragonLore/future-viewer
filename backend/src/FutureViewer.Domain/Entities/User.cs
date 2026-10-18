@@ -36,7 +36,6 @@ public sealed class User
 
 
     public ICollection<Reading> Readings { get; init; } = new List<Reading>();
-    public ICollection<ReadingFeedback> Feedbacks { get; init; } = new List<ReadingFeedback>();
     public ICollection<UserAchievement> Achievements { get; init; } = new List<UserAchievement>();
     public ICollection<UserMemoryRule> MemoryRules { get; init; } = new List<UserMemoryRule>();
     public ICollection<AnnouncementRead> AnnouncementReads { get; init; } = new List<AnnouncementRead>();

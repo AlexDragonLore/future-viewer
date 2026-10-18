@@ -65,7 +65,6 @@ describe('applyRouteSeo', () => {
     ['result', '/result'],
     ['profile', '/profile'],
     ['reading-detail', '/reading/7dcf-private-reading'],
-    ['feedback', '/feedback/private-token'],
     ['admin-users', '/admin/users'],
     ['verify-email', '/verify-email'],
   ])('removes public structured data when navigating to %s', (name, path) => {
