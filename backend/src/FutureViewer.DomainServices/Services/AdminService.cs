@@ -43,15 +43,16 @@ public sealed class AdminService
         int pageSize,
         CancellationToken ct = default,
         bool includeInterpretation = true,
-        AdminReadingAudience audience = AdminReadingAudience.All)
+        AdminReadingAudience audience = AdminReadingAudience.All,
+        AdminReadingReviewFilter? review = null)
     {
         var safeSize = Math.Clamp(pageSize, 1, 100);
         var safePage = Math.Clamp(page, 1, int.MaxValue / safeSize);
         var skip = (safePage - 1) * safeSize;
         // Use one instant for access/retention filtering, row metadata and the total.
         var now = DateTime.UtcNow;
-        var readings = await _readings.SearchAdminListAsync(userId, search, skip, safeSize, includeInterpretation, ct, audience, now);
-        var total = await _readings.CountForAdminAsync(userId, search, ct, audience, now);
+        var readings = await _readings.SearchAdminListAsync(userId, search, skip, safeSize, includeInterpretation, ct, audience, now, review);
+        var total = await _readings.CountForAdminAsync(userId, search, ct, audience, now, review);
         await AttachPurchasesAsync(readings.Where(r => r.UserId != null && r.Subscription != null)
             .Select(r => (r.UserId!.Value, r.Subscription!)), ct);
         return new AdminReadingListResult
@@ -59,6 +60,13 @@ public sealed class AdminService
             Items = readings,
             Total = total
         };
+    }
+
+    public async Task MarkReadingsViewedAsync(Guid actorId, string actorEmail, Guid[] readingIds, CancellationToken ct = default)
+    {
+        await _readings.MarkAdminReadingsViewedAsync(actorId, readingIds.Distinct().ToArray(), ct);
+        _logger.LogInformation("Admin {ActorUserId} ({ActorEmail}) action {Action} target {TargetId}",
+            actorId, actorEmail, "readings.viewed", string.Join(",", readingIds));
     }
 
     public async Task<AdminReadingInterpretationDto> GetReadingInterpretationAsync(Guid id, CancellationToken ct = default) =>

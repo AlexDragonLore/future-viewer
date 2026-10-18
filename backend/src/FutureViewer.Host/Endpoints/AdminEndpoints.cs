@@ -31,6 +31,8 @@ public static class AdminEndpoints
             int? pageSize,
             bool? includeInterpretation,
             string? audience,
+            bool? unseenOnly,
+            string? sort,
             AdminService service,
             HttpContext ctx,
             CancellationToken ct) =>
@@ -38,6 +40,9 @@ public static class AdminEndpoints
             ctx.Response.Headers.CacheControl = "no-store";
             if (audience is not (null or "" or "all" or "subscribers" or "registered" or "guests"))
                 return Results.BadRequest(new { error = "invalid_audience", message = "Неизвестный фильтр пользователей." });
+            if (sort is not (null or "" or "newest" or "oldest"))
+                return Results.BadRequest(new { error = "invalid_sort", message = "Неизвестный порядок сообщений." });
+            var (actorId, _) = ctx.User.GetActor();
             var filter = audience switch
             {
                 "subscribers" => AdminReadingAudience.Subscribers,
@@ -45,7 +50,19 @@ public static class AdminEndpoints
                 "guests" => AdminReadingAudience.Guests,
                 _ => AdminReadingAudience.All
             };
-            return Results.Ok(await service.SearchReadingsAsync(userId, search, page ?? 1, pageSize ?? 20, ct, includeInterpretation ?? true, filter));
+            return Results.Ok(await service.SearchReadingsAsync(userId, search, page ?? 1, pageSize ?? 20, ct, includeInterpretation ?? true, filter,
+                new AdminReadingReviewFilter(actorId, unseenOnly ?? false, sort == "oldest")));
+        });
+
+        group.MapPost("/readings/viewed", async (
+            MarkReadingsViewedBody body, AdminService service, HttpContext ctx, CancellationToken ct) =>
+        {
+            ctx.Response.Headers.CacheControl = "no-store";
+            if (body?.ReadingIds is not { Length: > 0 and <= 100 })
+                return Results.BadRequest(new { error = "invalid_reading_ids", message = "Передайте от 1 до 100 сообщений." });
+            var (actorId, actorEmail) = ctx.User.GetActor();
+            await service.MarkReadingsViewedAsync(actorId, actorEmail, body.ReadingIds, ct);
+            return Results.NoContent();
         });
 
         group.MapGet("/readings/{id:guid}/interpretation", async (
@@ -55,6 +72,8 @@ public static class AdminEndpoints
             return Results.Ok(await service.GetReadingInterpretationAsync(id, ct));
         });
     }
+
+    private sealed record MarkReadingsViewedBody(Guid[]? ReadingIds);
 
     private static void MapStatsEndpoints(RouteGroupBuilder group)
     {

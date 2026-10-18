@@ -93,17 +93,19 @@ public sealed class ReadingRepository : IReadingRepository
             .ToListAsync(ct);
 
     public Task<int> CountForAdminAsync(Guid? userId, string? search, CancellationToken ct = default,
-        AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null) =>
-        AdminReadingsQuery(userId, search, audience, asOfUtc).CountAsync(ct);
+        AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null, AdminReadingReviewFilter? review = null) =>
+        AdminReadingsQuery(userId, search, audience, asOfUtc, review).CountAsync(ct);
 
     public async Task<IReadOnlyList<AdminReadingDto>> SearchAdminListAsync(
         Guid? userId, string? search, int skip, int take, bool includeInterpretation,
-        CancellationToken ct = default, AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null)
+        CancellationToken ct = default, AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null, AdminReadingReviewFilter? review = null)
     {
         var now = asOfUtc ?? DateTime.UtcNow;
-        return await AdminReadingsQuery(userId, search, audience, now)
-            .OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id)
-            .Skip(skip).Take(take)
+        var query = AdminReadingsQuery(userId, search, audience, now, review);
+        var ordered = review?.OldestFirst == true
+            ? query.OrderBy(r => r.CreatedAt).ThenBy(r => r.Id)
+            : query.OrderByDescending(r => r.CreatedAt).ThenByDescending(r => r.Id);
+        return await ordered.Skip(skip).Take(take)
             .Select(r => new AdminReadingDto
             {
                 Id = r.Id, UserId = r.UserId, UserEmail = r.User == null ? null : r.User.Email,
@@ -123,13 +125,28 @@ public sealed class ReadingRepository : IReadingRepository
             }).ToListAsync(ct);
     }
 
+    public async Task MarkAdminReadingsViewedAsync(Guid adminId, Guid[] readingIds, CancellationToken ct = default)
+    {
+        var now = DateTime.UtcNow;
+        var guestCutoff = now - GuestReadingRetention.ContentDuration;
+        // One atomic insert-select: concurrent tabs/retries cannot duplicate receipts,
+        // and expired/private content cannot acquire receipts via guessed IDs.
+        await _db.Database.ExecuteSqlInterpolatedAsync($@"
+            INSERT INTO admin_reading_views (admin_id, reading_id, viewed_at)
+            SELECT {adminId}, id, {now} FROM readings
+            WHERE id = ANY({readingIds}) AND (
+                (user_id IS NOT NULL AND saved_to_history)
+                OR (user_id IS NULL AND created_at > {guestCutoff} AND question <> ''))
+            ON CONFLICT (admin_id, reading_id) DO NOTHING", ct);
+    }
+
     public Task<AdminReadingInterpretationDto?> GetAdminInterpretationAsync(Guid id, CancellationToken ct = default) =>
         AdminReadingsQuery(null, null).Where(r => r.Id == id)
             .Select(r => new AdminReadingInterpretationDto { Id = r.Id, Interpretation = r.AiInterpretation })
             .SingleOrDefaultAsync(ct);
 
     private IQueryable<Reading> AdminReadingsQuery(Guid? userId, string? search,
-        AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null)
+        AdminReadingAudience audience = AdminReadingAudience.All, DateTime? asOfUtc = null, AdminReadingReviewFilter? review = null)
     {
         // Retained content stays available to admins after removal from user history.
         // Guest content expires independently of when the cleanup job next runs.
@@ -148,6 +165,8 @@ public sealed class ReadingRepository : IReadingRepository
                 && r.User.SubscriptionExpiresAt != null && r.User.SubscriptionExpiresAt > now),
             _ => throw new ArgumentOutOfRangeException(nameof(audience))
         };
+        if (review?.UnseenOnly == true)
+            query = query.Where(r => !_db.AdminReadingViews.Any(v => v.AdminId == review.AdminId && v.ReadingId == r.Id));
         if (userId.HasValue) query = query.Where(r => r.UserId == userId.Value);
         if (!string.IsNullOrWhiteSpace(search))
         {

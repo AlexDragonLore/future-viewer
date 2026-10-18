@@ -27,6 +27,27 @@ describe('AdminReadingsView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.spyOn(useAdminStore(), 'loadReadings').mockResolvedValue()
+    vi.spyOn(useAdminStore(), 'markDisplayedReadingsViewed').mockResolvedValue()
+  })
+
+  it('acknowledges rendered rows without opening answers and stops observing after leaving', async () => {
+    const store = useAdminStore()
+    const wrapper = mountReadings()
+    store.readings = [savedReading, guestReading]
+    await flushPromises()
+    expect(store.markDisplayedReadingsViewed).toHaveBeenCalled()
+    expect(wrapper.findAll('[data-testid="admin-reading-answer"]')).toHaveLength(0)
+    await wrapper.get('[data-testid="admin-reading-unseen"]').trigger('click')
+    await wrapper.get('[data-testid="admin-reading-sort"]').setValue('oldest')
+    expect(store.readingUnseenOnly).toBe(true)
+    expect(store.readingSort).toBe('oldest')
+    expect(store.readingPage).toBe(1)
+    expect(wrapper.find('[data-testid="admin-reading-prev"]').exists()).toBe(false)
+    wrapper.unmount()
+    vi.mocked(store.markDisplayedReadingsViewed).mockClear()
+    store.readings = [savedReading]
+    await flushPromises()
+    expect(store.markDisplayedReadingsViewed).not.toHaveBeenCalled()
   })
 
   it('shows an anonymous question and its expiry without a user action', () => {

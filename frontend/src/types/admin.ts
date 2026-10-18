@@ -55,6 +55,8 @@ export interface AdminReadingListResponse {
 export type AdminReadingAudience = 'all' | 'subscribers' | 'registered' | 'guests'
 
 export interface ReadingSearchFilters {
+  unseenOnly?: boolean
+  sort?: 'newest' | 'oldest'
   audience?: AdminReadingAudience
   includeInterpretation?: boolean
   search?: string | null

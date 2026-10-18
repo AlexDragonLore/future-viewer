@@ -71,6 +71,27 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.ToTable("achievements", (string)null);
                 });
 
+            modelBuilder.Entity("FutureViewer.Domain.Entities.AdminReadingView", b =>
+                {
+                    b.Property<Guid>("AdminId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("admin_id");
+
+                    b.Property<Guid>("ReadingId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reading_id");
+
+                    b.Property<DateTime>("ViewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("viewed_at");
+
+                    b.HasKey("AdminId", "ReadingId");
+
+                    b.HasIndex("ReadingId");
+
+                    b.ToTable("admin_reading_views", (string)null);
+                });
+
             modelBuilder.Entity("FutureViewer.Domain.Entities.Announcement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -977,6 +998,21 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "CreatedAt");
 
                     b.ToTable("user_memory_rules", (string)null);
+                });
+
+            modelBuilder.Entity("FutureViewer.Domain.Entities.AdminReadingView", b =>
+                {
+                    b.HasOne("FutureViewer.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AdminId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FutureViewer.Domain.Entities.Reading", null)
+                        .WithMany()
+                        .HasForeignKey("ReadingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FutureViewer.Domain.Entities.AnnouncementRead", b =>

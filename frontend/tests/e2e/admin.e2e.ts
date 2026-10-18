@@ -10,15 +10,23 @@ import {
 } from '../fixtures/admin'
 
 async function openAdmin(page: Page, path = '/admin', sourceRows: readonly AdminReading[] = adminReadingFixtures, holdGuestResponse = false) {
+  const viewed = new Set<string>()
+  const viewedBatches: string[][] = []
   let releaseGuests!: () => void
   const guestResponse = new Promise<void>(resolve => { releaseGuests = resolve })
-  const requests = { releaseGuests, readings: [] as { page: number; search: string; audience: string }[], answers: [] as string[], unexpected: [] as string[] }
+  const requests = { viewed, viewedBatches, releaseGuests, readings: [] as { page: number; search: string; audience: string }[], answers: [] as string[], unexpected: [] as string[] }
   await page.route('**/api/**', async route => {
     const request = route.request()
     const url = new URL(request.url())
     if (!url.pathname.startsWith('/api/')) return route.fallback()
     if (url.pathname.startsWith('/api/admin/')) {
       expect(request.headers().authorization).toBe(`Bearer ${adminFixtureSession.token}`)
+    }
+    if (url.pathname === '/api/admin/readings/viewed' && request.method() === 'POST') {
+      const ids = request.postDataJSON().readingIds as string[]
+      viewedBatches.push(ids)
+      ids.forEach(id => viewed.add(id))
+      return route.fulfill({ status: 204 })
     }
     if (request.method() !== 'GET') {
       requests.unexpected.push(`${request.method()} ${url.pathname}`)
@@ -34,10 +42,12 @@ async function openAdmin(page: Page, path = '/admin', sourceRows: readonly Admin
       requests.readings.push({ page: pageNumber, search, audience })
       const rows = sourceRows.filter(reading =>
         (!userId || reading.userId === userId)
+        && (url.searchParams.get('unseenOnly') !== 'true' || !viewed.has(reading.id))
         && (audience === 'all' || audience === 'subscribers' && reading.subscription?.isActive
           || audience === 'registered' && reading.userId !== null || audience === 'guests' && reading.userId === null)
         && `${reading.userEmail} ${reading.question}`.toLowerCase().includes(search.toLowerCase()),
       )
+      if (url.searchParams.get('sort') === 'oldest') rows.reverse()
       if (audience === 'guests' && holdGuestResponse) await guestResponse
       else if (pageNumber === 2 || audience === 'guests') await new Promise(resolve => setTimeout(resolve, 300))
       return route.fulfill({ json: {
@@ -270,3 +280,31 @@ for (const path of ['/feedback', '/feedback/legacy-token']) {
     expect(requests.checkoutAttempts).toEqual([])
   })
 }
+
+test('viewed batches persist across navigation and unread oldest-first queue never skips messages', async ({ page }, testInfo) => {
+  const requests = await openAdmin(page)
+  await expect.poll(() => requests.viewed.size).toBe(20)
+  expect(requests.viewedBatches[0]).toEqual(adminReadingFixtures.slice(0, 20).map(row => row.id))
+  expect(requests.answers).toEqual([])
+  await page.getByTestId('admin-reading-unseen').click()
+  await expect.poll(() => requests.viewed.size).toBe(40)
+  await expect(page.getByTestId('admin-reading-row')).toHaveCount(20)
+  await page.getByTestId('admin-reading-next-unseen').click()
+  await expect(page.getByTestId('admin-reading-row')).toHaveCount(1)
+  await expect.poll(() => requests.viewed.size).toBe(41)
+  expect(new Set(requests.viewedBatches.flat()).size).toBe(41)
+  await expect(page.getByTestId('admin-reading-next-unseen')).toBeDisabled()
+  await page.getByTestId('admin-readings-refresh').click()
+  await expect(page.getByTestId('admin-readings-empty')).toContainText('Непросмотренных')
+  await page.getByTestId('admin-reading-seen-all').click()
+  await page.getByTestId('admin-reading-sort').selectOption('oldest')
+  await expect(page.getByTestId('admin-reading-row').first()).toContainText('Архивный вопрос 41')
+  await expect(page.getByTestId('admin-reading-row')).toHaveCount(20)
+  await expectContained(page.getByTestId('admin-view'))
+  await page.screenshot({ path: testInfo.outputPath('admin-unseen-oldest.png') })
+  await page.getByTestId('admin-tab-users').click()
+  await page.getByTestId('admin-tab-readings').click()
+  await page.getByTestId('admin-reading-unseen').click()
+  await expect(page.getByTestId('admin-readings-empty')).toBeVisible()
+  expect(requests.unexpected).toEqual([])
+})

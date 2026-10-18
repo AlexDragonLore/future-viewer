@@ -18,6 +18,8 @@ export const adminApi = {
       params: {
         includeInterpretation: filters.includeInterpretation ?? false,
         audience: filters.audience ?? 'all',
+        unseenOnly: filters.unseenOnly ?? false,
+        sort: filters.sort ?? 'newest',
         search: filters.search || undefined,
         userId: filters.userId || undefined,
         page: filters.page ?? 1,
@@ -25,6 +27,10 @@ export const adminApi = {
       },
     })
     return data
+  },
+
+  async markReadingsViewed(readingIds: string[], signal?: AbortSignal): Promise<void> {
+    await httpClient.post('/api/admin/readings/viewed', { readingIds }, { signal })
   },
 
   async getReadingInterpretation(id: string, signal?: AbortSignal): Promise<{ id: string; interpretation: string | null }> {

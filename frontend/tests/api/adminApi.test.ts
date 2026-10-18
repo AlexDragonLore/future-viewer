@@ -11,7 +11,7 @@ describe('admin reading audience query', () => {
     expect(httpClient.get).toHaveBeenCalledOnce()
     expect(httpClient.get).toHaveBeenCalledWith('/api/admin/readings', {
       signal: controller.signal,
-      params: { audience, search: 'вопрос', userId: 'user-id', page: 2, pageSize: 20, includeInterpretation: false },
+      params: { audience, unseenOnly: false, sort: 'newest', search: 'вопрос', userId: 'user-id', page: 2, pageSize: 20, includeInterpretation: false },
     })
   })
   it('defaults to all without changing the lightweight-list contract', async () => {

@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace FutureViewer.Integration.Tests.Tests;
 
-public sealed class AdminReadingEndpointTests(IntegrationTestFixture fixture) : IClassFixture<IntegrationTestFixture>
+public sealed partial class AdminReadingEndpointTests(IntegrationTestFixture fixture) : IClassFixture<IntegrationTestFixture>
 {
     [Fact]
     public async Task Anonymous_cannot_read_admin_messages()

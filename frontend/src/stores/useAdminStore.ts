@@ -22,6 +22,13 @@ export const useAdminStore = defineStore('admin', () => {
   const readingPageSize = ref(20)
   const readingSearch = ref<string | null>(null)
   const readingAudience = ref<AdminReadingAudience>('all')
+  const readingUnseenOnly = ref(false)
+  const readingSort = ref<'newest' | 'oldest'>('newest')
+  const readingSeenLoading = ref(false)
+  const readingSeenError = ref<string | null>(null)
+  let seenController: AbortController | undefined
+  let seenPending: Promise<void> | undefined
+  let seenRows: AdminReading[] | undefined
   const readingLoading = ref(false)
   const readingError = ref<string | null>(null)
   const readingDisplayedPage = ref(1)
@@ -50,8 +57,9 @@ export const useAdminStore = defineStore('admin', () => {
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
 
-  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingLoading, readingError, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
+  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingUnseenOnly, readingSort, readingSeenLoading, readingSeenError, readingLoading, readingError, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
     readingRequest++; userRequest++; detailRequest++
+    seenController?.abort(); seenPending = undefined; seenRows = undefined
     readingController?.abort(); userController?.abort()
     readingCache.clear(); userCache.clear()
   })
@@ -61,17 +69,23 @@ export const useAdminStore = defineStore('admin', () => {
     readingController?.abort()
     const controller = new AbortController()
     readingController = controller
-    const page = readingPage.value
-    const filters = { search: readingSearch.value, audience: readingAudience.value, page, pageSize: readingPageSize.value, includeInterpretation: false }
+    const page = readingUnseenOnly.value ? 1 : readingPage.value
+    readingPage.value = page
+    const filters = { search: readingSearch.value, audience: readingAudience.value, unseenOnly: readingUnseenOnly.value, sort: readingSort.value, page, pageSize: readingPageSize.value, includeInterpretation: false }
     const key = JSON.stringify(filters)
     if (force) readingCache.clear()
     readingLoading.value = true
     readingError.value = null
     try {
-      const cached = readingCache.get(key)
+      // Finish the visible page acknowledgment before querying the shrinking unread queue.
+      if (seenPending) await seenPending
+      if (request !== readingRequest) return
+      const cached = readingUnseenOnly.value ? undefined : readingCache.get(key)
       const result = cached ?? await adminApi.listReadings(filters, controller.signal)
       if (request !== readingRequest) return
-      if (!cached) readingCache.set(key, result)
+      if (!cached && !readingUnseenOnly.value) readingCache.set(key, result)
+      seenRows = undefined
+      readingSeenError.value = null
       readings.value = result.items
       readingTotal.value = result.total
       readingDisplayedPage.value = page
@@ -84,6 +98,44 @@ export const useAdminStore = defineStore('admin', () => {
     }
   }
 
+  // Called by the mounted view after Vue has rendered this exact page, never by prefetches.
+  async function markDisplayedReadingsViewed(): Promise<void> {
+    if (readingLoading.value || readingError.value || !readings.value.length || seenRows === readings.value) return
+    const rows = readings.value
+    const controller = new AbortController()
+    seenController = controller
+    seenRows = rows
+    readingSeenLoading.value = true
+    readingSeenError.value = null
+    const pending = (async () => {
+      try {
+        await adminApi.markReadingsViewed(rows.map(row => row.id), controller.signal)
+      } catch (e) {
+        if (!controller.signal.aborted && readings.value === rows) {
+          seenRows = undefined
+          readingSeenError.value = extractApiError(e, 'Не удалось сохранить просмотр. Повторите попытку.')
+        }
+      } finally {
+        if (seenController === controller) readingSeenLoading.value = false
+      }
+    })()
+    seenPending = pending
+    await pending
+    if (seenPending === pending) seenPending = undefined
+  }
+
+  function setReadingUnseenOnly(value: boolean): void {
+    if (readingUnseenOnly.value === value) return
+    clearReadingResults()
+    readingUnseenOnly.value = value
+  }
+
+  function setReadingSort(value: 'newest' | 'oldest'): void {
+    if (readingSort.value === value) return
+    clearReadingResults()
+    readingSort.value = value
+  }
+
   function clearReadingResults(): void {
     readingRequest++
     readingController?.abort()
@@ -92,6 +144,7 @@ export const useAdminStore = defineStore('admin', () => {
     readingTotal.value = 0
     readingPage.value = 1
     readingDisplayedPage.value = 1
+    readingSeenError.value = null
     readingLoading.value = false
     readingError.value = null
   }
@@ -318,8 +371,8 @@ export const useAdminStore = defineStore('admin', () => {
 
   return {
     readingDisplayedPage, userDisplayedPage,
-    readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingLoading, readingError,
-    loadReadings, setReadingSearch, setReadingAudience, setReadingPage,
+    readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingUnseenOnly, readingSort, readingSeenLoading, readingSeenError, readingLoading, readingError,
+    loadReadings, markDisplayedReadingsViewed, setReadingUnseenOnly, setReadingSort, setReadingSearch, setReadingAudience, setReadingPage,
     users,
     userTotal,
     userPage,
