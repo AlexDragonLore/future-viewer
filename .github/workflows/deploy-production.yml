@@ -1,17 +1,18 @@
-name: admin-audience-release-delivery
+name: feedback-retirement-release-delivery
 
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
+  checks: read
 
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 env:
-  RELEASE_SHA: c2543b3f6a44544e269dc9aa178f7ed953937b31
+  RELEASE_SHA: ace5ed21c70b11d9e8b986db366db9034e022feb
 
 jobs:
   deploy:
@@ -24,9 +25,23 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: c2543b3f6a44544e269dc9aa178f7ed953937b31
+          ref: ace5ed21c70b11d9e8b986db366db9034e022feb
           path: release
           persist-credentials: false
+      - name: Require successful checks for the exact release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_SHA}/check-runs" > "$RUNNER_TEMP/release-checks.json"
+          python3 - <<'CHECKS'
+          import json,os
+          checks=json.load(open(os.environ['RUNNER_TEMP']+'/release-checks.json'))['check_runs']
+          for name in ('build','build-test'):
+              matches=[c for c in checks if c['name']==name and c['app']['slug']=='github-actions']
+              assert any(c['head_sha']==os.environ['RELEASE_SHA'] and c['status']=='completed' and c['conclusion']=='success' for c in matches), 'Required release checks are not successful: '+name
+          print('Frontend and backend checks passed for the pinned release')
+          CHECKS
       - name: Configure existing deployment identity
         env:
           DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
@@ -98,14 +113,15 @@ jobs:
                       output.write('ARCHIVE_'+role.upper()+'_CONFIG_ID='+digest+'\n')
                       print(role+' archived configuration: '+digest)
           IMAGE_IDS
-          cp delivery/scripts/deploy-guest-history-release.sh "$RUNNER_TEMP/fv-delivery/deploy.sh"
+          cp delivery/scripts/deploy-feedback-retirement-release.sh "$RUNNER_TEMP/fv-delivery/deploy.sh"
           cp delivery/scripts/verify-staged-retention-images.py "$RUNNER_TEMP/fv-delivery/verify-images.py"
+          cp delivery/scripts/feedback-retirement-migration.sql "$RUNNER_TEMP/fv-delivery/migration.sql"
           cd "$RUNNER_TEMP/fv-delivery"
-          sha256sum images.tar.gz deploy.sh verify-images.py > SHA256SUMS
+          sha256sum images.tar.gz deploy.sh verify-images.py migration.sql > SHA256SUMS
           remote_dir="$(ssh fv-retention-release 'umask 077; mktemp -d /tmp/fv-history-release.XXXXXXXX')"
           [[ "$remote_dir" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]
           printf 'REMOTE_RELEASE_DIR=%s\n' "$remote_dir" >> "$GITHUB_ENV"
-          scp images.tar.gz deploy.sh verify-images.py SHA256SUMS "fv-retention-release:$remote_dir/"
+          scp images.tar.gz deploy.sh verify-images.py migration.sql SHA256SUMS "fv-retention-release:$remote_dir/"
           ssh fv-retention-release "cd '$remote_dir' && sha256sum -c SHA256SUMS && sudo -n docker load -i images.tar.gz"
           ssh fv-retention-release "sudo -n docker image inspect --format '{{.Id}}' 'future-viewer-backend:$RELEASE_SHA' 'future-viewer-frontend:$RELEASE_SHA'"
       - name: Verify loaded image content and resolve server IDs
@@ -138,11 +154,14 @@ jobs:
           curl --fail --silent --show-error --max-time 25 -o /dev/null https://alex-taro.ru/
           curl --fail --silent --show-error --max-time 25 -o /dev/null https://janetka.ru/
           test "$(curl --silent --max-time 25 -o /dev/null -w '%{http_code}' https://alex-taro.ru/api/admin/readings)" = 401
+          for path in /api/feedbacks/my /api/feedbacks/probe /api/admin/feedbacks; do
+            test "$(curl --silent --max-time 25 -o /dev/null -w '%{http_code}' "https://alex-taro.ru$path")" = 404
+          done
       - name: Remove temporary delivery and credential
         if: always()
         run: |
           if [[ "${REMOTE_RELEASE_DIR:-}" =~ ^/tmp/fv-history-release\.[A-Za-z0-9]+$ ]]; then
-            ssh fv-retention-release "rm -f -- '$REMOTE_RELEASE_DIR/images.tar.gz' '$REMOTE_RELEASE_DIR/deploy.sh' '$REMOTE_RELEASE_DIR/verify-images.py' '$REMOTE_RELEASE_DIR/SHA256SUMS'; rmdir -- '$REMOTE_RELEASE_DIR'" || true
+            ssh fv-retention-release "rm -f -- '$REMOTE_RELEASE_DIR/images.tar.gz' '$REMOTE_RELEASE_DIR/deploy.sh' '$REMOTE_RELEASE_DIR/verify-images.py' '$REMOTE_RELEASE_DIR/migration.sql' '$REMOTE_RELEASE_DIR/SHA256SUMS'; rmdir -- '$REMOTE_RELEASE_DIR'" || true
           fi
           ssh -O exit fv-retention-release 2>/dev/null || true
           rm -f ~/.ssh/future_viewer_deploy
