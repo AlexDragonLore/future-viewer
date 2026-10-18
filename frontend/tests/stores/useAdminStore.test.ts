@@ -57,6 +57,18 @@ describe('useAdminStore', () => {
     expect(readingsMock).toHaveBeenLastCalledWith(expect.objectContaining({ unseenOnly: true, sort: 'oldest', page: 1 }), expect.any(AbortSignal))
   })
 
+  it('signals a rendered page on a cached reload even when its rows do not change', async () => {
+    const store = useAdminStore()
+    readingsMock.mockResolvedValue({ items: [adminReadingFixtures[0]], total: 1 })
+    await store.loadReadings()
+    const revision = store.readingRevision
+    const rows = store.readings
+    await store.loadReadings()
+    expect(readingsMock).toHaveBeenCalledTimes(1)
+    expect(store.readings).toBe(rows)
+    expect(store.readingRevision).toBe(revision + 1)
+  })
+
   it('retries failed acknowledgments and aborts them on account change', async () => {
     const store = useAdminStore()
     readingsMock.mockResolvedValue({ items: [adminReadingFixtures[0]], total: 1 })

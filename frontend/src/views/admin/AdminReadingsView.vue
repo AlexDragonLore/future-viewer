@@ -21,7 +21,7 @@ let pageNavigation = 0
 const pageCount = computed(() => Math.max(1, Math.ceil(store.readingTotal / store.readingPageSize)))
 
 onMounted(() => store.loadReadings())
-watch([() => store.readings, () => store.readingLoading], () => {
+watch([() => store.readingRevision, () => store.readings, () => store.readingLoading], () => {
   void store.markDisplayedReadingsViewed()
 }, { flush: 'post' })
 

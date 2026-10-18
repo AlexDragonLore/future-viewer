@@ -32,6 +32,7 @@ export const useAdminStore = defineStore('admin', () => {
   const readingLoading = ref(false)
   const readingError = ref<string | null>(null)
   const readingDisplayedPage = ref(1)
+  const readingRevision = ref(0)
   const userDisplayedPage = ref(1)
   const readingCache = createAdminPageCache<AdminReadingListResponse>()
   const userCache = createAdminPageCache<AdminUserListResponse>()
@@ -57,7 +58,7 @@ export const useAdminStore = defineStore('admin', () => {
   const statsLoading = ref(false)
   const statsError = ref<string | null>(null)
 
-  resetOnAccountChange({ readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingUnseenOnly, readingSort, readingSeenLoading, readingSeenError, readingLoading, readingError, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
+  resetOnAccountChange({ readingRevision, readingDisplayedPage, userDisplayedPage, readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingUnseenOnly, readingSort, readingSeenLoading, readingSeenError, readingLoading, readingError, users, userTotal, userPage, userPageSize, userSearch, userLoading, userError, userToast, selectedUser, selectedUserLoading, selectedUserError, stats, statsLoading, statsError }, () => {
     readingRequest++; userRequest++; detailRequest++
     seenController?.abort(); seenPending = undefined; seenRows = undefined
     readingController?.abort(); userController?.abort()
@@ -89,6 +90,7 @@ export const useAdminStore = defineStore('admin', () => {
       readings.value = result.items
       readingTotal.value = result.total
       readingDisplayedPage.value = page
+      readingRevision.value++
     } catch (e) {
       if (request !== readingRequest) return
       readingPage.value = readingDisplayedPage.value
@@ -370,7 +372,7 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   return {
-    readingDisplayedPage, userDisplayedPage,
+    readingRevision, readingDisplayedPage, userDisplayedPage,
     readings, readingTotal, readingPage, readingPageSize, readingSearch, readingAudience, readingUnseenOnly, readingSort, readingSeenLoading, readingSeenError, readingLoading, readingError,
     loadReadings, markDisplayedReadingsViewed, setReadingUnseenOnly, setReadingSort, setReadingSearch, setReadingAudience, setReadingPage,
     users,

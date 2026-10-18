@@ -21,6 +21,8 @@
 
 ## Local verification result
 - 452 backend tests passed (10 domain, 181 domain services, 261 integration), including the new migration up/down and cascading deletion checks.
-- Frontend type-check/build, 354 unit tests, 16 desktop/mobile admin Playwright scenarios and backend/frontend technical checks passed.
+- Frontend type-check/build, 355 unit tests, 16 desktop/mobile admin Playwright scenarios and backend/frontend technical checks passed.
 - In-app browser inspected a synthetic admin page with personal unseen filtering and oldest-first sorting; responsive screenshots verified 320 px layout without overflow. No production admin session was used.
 - The new receipt history starts with this release; past visits were not tracked and cannot be reconstructed.
+
+- Final review added an explicit successful-load revision so returning to an already cached page also acknowledges it. Type-check/build, all 355 unit tests and 16 admin browser scenarios passed again.
