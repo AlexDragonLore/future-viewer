@@ -26,3 +26,4 @@
 - The new receipt history starts with this release; past visits were not tracked and cannot be reconstructed.
 
 - Final review added an explicit successful-load revision so returning to an already cached page also acknowledges it. Type-check/build, all 355 unit tests and 16 admin browser scenarios passed again.
+- Full GitHub browser CI exposed a second admin fixture in the SEO navigation scenario that rejected the new acknowledgment POST. Updated it to verify the authenticated request and the exact displayed IDs; both desktop/mobile scenarios and type-check passed. The failed delivery stopped at its test gate before obtaining deployment credentials or changing production.

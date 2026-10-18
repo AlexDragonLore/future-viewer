@@ -17,6 +17,7 @@ async function headerLink(page: Page, desktop: string, mobile: string) {
 
 test('catalog SEO loads only for content and clears on client navigation to private routes', async ({ page }, testInfo) => {
   const catalogRequests: string[] = []
+  const viewed: string[][] = []
   const unexpected: string[] = []
   const pageErrors: string[] = []
   page.on('pageerror', error => pageErrors.push(error.message))
@@ -31,6 +32,11 @@ test('catalog SEO loads only for content and clears on client navigation to priv
         accessToken: adminFixtureSession.token, userId: adminFixtureSession.userId,
         email: adminFixtureSession.email, isAdmin: true, expiresAt: '2030-01-01T00:00:00Z',
       } })
+    }
+    if (url.pathname === '/api/admin/readings/viewed' && request.method() === 'POST') {
+      expect(request.headers().authorization).toBe(`Bearer ${adminFixtureSession.token}`)
+      viewed.push(request.postDataJSON().readingIds)
+      return route.fulfill({ status: 204 })
     }
     if (request.method() === 'GET' && url.pathname in adminFixtureResponses) {
       return route.fulfill({ json: adminFixtureResponses[url.pathname] })
@@ -88,6 +94,7 @@ test('catalog SEO loads only for content and clears on client navigation to priv
   expect(admin.jsonld).toEqual([])
   expect(admin.sameDocument).toBe(true)
   expect(catalogRequests).toHaveLength(1)
+  await expect.poll(() => viewed).toEqual([adminFixtureResponses['/api/admin/readings'].items.map(row => row.id)])
   expect(unexpected).toEqual([])
   expect(pageErrors).toEqual([])
   await page.screenshot({ path: testInfo.outputPath('private-admin-cleared-seo.png') })
