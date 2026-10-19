@@ -38,11 +38,10 @@ describe('useAdminStore', () => {
 
   it('acknowledges rendered rows and waits before loading the next unread batch without offsets', async () => {
     const store = useAdminStore()
-    store.setReadingUnseenOnly(true)
-    store.setReadingSort('oldest')
     readingsMock.mockResolvedValueOnce({ items: [adminReadingFixtures[0]], total: 2 })
     readingsMock.mockResolvedValueOnce({ items: [adminReadingFixtures[1]], total: 1 })
     await store.loadReadings()
+    expect(readingsMock).toHaveBeenCalledWith(expect.objectContaining({ unseenOnly: true, sort: 'oldest', page: 1 }), expect.any(AbortSignal))
     expect(markViewedMock).not.toHaveBeenCalled()
     let finish!: () => void
     markViewedMock.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
@@ -59,6 +58,7 @@ describe('useAdminStore', () => {
 
   it('signals a rendered page on a cached reload even when its rows do not change', async () => {
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     readingsMock.mockResolvedValue({ items: [adminReadingFixtures[0]], total: 1 })
     await store.loadReadings()
     const revision = store.readingRevision
@@ -82,8 +82,8 @@ describe('useAdminStore', () => {
     expect(markViewedMock).toHaveBeenCalledTimes(2)
     await store.markDisplayedReadingsViewed()
     expect(markViewedMock).toHaveBeenCalledTimes(2)
-    store.setReadingUnseenOnly(true)
-    store.setReadingSort('oldest')
+    store.setReadingUnseenOnly(false)
+    store.setReadingSort('newest')
     await store.loadReadings()
     let reject!: (error: Error) => void
     markViewedMock.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail }))
@@ -95,8 +95,8 @@ describe('useAdminStore', () => {
     await pending
     expect(store.readings).toEqual([])
     expect(store.readingSeenError).toBeNull()
-    expect(store.readingUnseenOnly).toBe(false)
-    expect(store.readingSort).toBe('newest')
+    expect(store.readingUnseenOnly).toBe(true)
+    expect(store.readingSort).toBe('oldest')
   })
 
   it('searches messages from the first page and ignores an older response', async () => {
@@ -108,7 +108,7 @@ describe('useAdminStore', () => {
     const older = store.loadReadings()
     store.setReadingSearch('  сложного разговора  ')
     await store.loadReadings()
-    expect(readingsMock).toHaveBeenLastCalledWith({ search: 'сложного разговора', audience: 'all', unseenOnly: false, sort: 'newest', page: 1, pageSize: 20, includeInterpretation: false }, expect.any(AbortSignal))
+    expect(readingsMock).toHaveBeenLastCalledWith({ search: 'сложного разговора', audience: 'all', unseenOnly: true, sort: 'oldest', page: 1, pageSize: 20, includeInterpretation: false }, expect.any(AbortSignal))
     finishOld({ items: [adminReadingFixtures[0]], total: 21 })
     await older
     expect(store.readings[0].id).toBe(adminReadingFixtures[1].id)
@@ -142,6 +142,7 @@ describe('useAdminStore', () => {
   it('keeps the visible page while loading and rolls back its page number on failure', async () => {
     readingsMock.mockResolvedValueOnce({ items: [adminReadingFixtures[0]], total: 21 })
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     await store.loadReadings()
     let reject!: (error: Error) => void
     readingsMock.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail }))
@@ -160,6 +161,7 @@ describe('useAdminStore', () => {
     vi.useFakeTimers()
     readingsMock.mockResolvedValue({ items: [adminReadingFixtures[0]], total: 21 })
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     await store.loadReadings()
     store.setReadingPage(2)
     await store.loadReadings()
@@ -181,6 +183,7 @@ describe('useAdminStore', () => {
     usersMock.mockResolvedValue({ items: [adminUserDetailFixture], total: 1 })
     subscriptionMock.mockResolvedValue({ ...adminUserDetailFixture, subscription: { status: 0, isActive: false, expiresAt: null, lastPurchase: null } })
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     await store.loadReadings()
     const signal = readingsMock.mock.calls[0][1] as AbortSignal
     await store.loadReadings()
@@ -196,6 +199,7 @@ describe('useAdminStore', () => {
 
   it('switches audience from page two without losing search and ignores the aborted response', async () => {
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     store.setReadingSearch('  разговор  ')
     readingsMock.mockResolvedValueOnce({ items: [adminReadingFixtures[0]], total: 41 })
     await store.loadReadings()
@@ -213,7 +217,7 @@ describe('useAdminStore', () => {
     expect(store.readingSearch).toBe('разговор')
     readingsMock.mockResolvedValueOnce({ items: [adminReadingFixtures[1]], total: 1 })
     await store.loadReadings()
-    expect(readingsMock).toHaveBeenLastCalledWith({ search: 'разговор', audience: 'subscribers', unseenOnly: false, sort: 'newest', page: 1, pageSize: 20, includeInterpretation: false }, expect.any(AbortSignal))
+    expect(readingsMock).toHaveBeenLastCalledWith({ search: 'разговор', audience: 'subscribers', unseenOnly: false, sort: 'oldest', page: 1, pageSize: 20, includeInterpretation: false }, expect.any(AbortSignal))
     finishOld({ items: [adminReadingFixtures[0]], total: 41 })
     await old
     expect(store.readings).toEqual([adminReadingFixtures[1]])
@@ -238,6 +242,7 @@ describe('useAdminStore', () => {
   it('reuses pages within an audience but invalidates them when switching audiences', async () => {
     readingsMock.mockResolvedValue({ items: [adminReadingFixtures[0]], total: 41 })
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     await store.loadReadings()
     store.setReadingAudience('registered')
     await store.loadReadings()

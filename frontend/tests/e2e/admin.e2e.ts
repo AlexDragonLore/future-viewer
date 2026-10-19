@@ -80,6 +80,12 @@ async function openAdmin(page: Page, path = '/admin', sourceRows: readonly Admin
   return requests
 }
 
+async function showAllNewest(page: Page) {
+  await page.getByTestId('admin-reading-seen-all').click()
+  await page.getByTestId('admin-reading-sort').selectOption('newest')
+  await expect(page.getByTestId('admin-readings-refresh')).toBeEnabled()
+}
+
 async function expectContained(root: Locator) {
   const overflowing = await root.locator('*').evaluateAll(elements => elements.flatMap(element => {
     const bounds = element.getBoundingClientRect()
@@ -101,6 +107,7 @@ async function expectFullText(root: Locator, text: string) {
 
 test('latest messages show full content, hidden status, user details and reset pagination on search', async ({ page }, testInfo) => {
   const requests = await openAdmin(page)
+  await showAllNewest(page)
   await expect(page).toHaveURL(/\/admin\/readings$/)
   const rows = page.getByTestId('admin-reading-row')
   const newest = rows.first()
@@ -203,9 +210,10 @@ test('users show actual purchases on desktop and mobile and in the detail drawer
 
 test('audience filters combine with search, reset pagination, and support keyboard switching', async ({ page }, testInfo) => {
   const requests = await openAdmin(page, '/admin', adminAudienceReadingFixtures, true)
+  await showAllNewest(page)
   const rows = page.getByTestId('admin-reading-row')
   await expect(rows).toHaveCount(20)
-  await expect(page.getByTestId('admin-reading-audience-all')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('admin-reading-audience')).toHaveValue('all')
   await page.screenshot({ path: testInfo.outputPath('admin-audience-all.png') })
   await page.getByTestId('admin-reading-next').click()
   await expect(rows.first()).toContainText('Архивный вопрос 21')
@@ -214,8 +222,8 @@ test('audience filters combine with search, reset pagination, and support keyboa
   await expect(rows.first()).toContainText('Архивный вопрос 3')
   const matches = adminAudienceReadingFixtures.filter(row => row.question.includes('Архивный'))
 
-  await page.getByTestId('admin-reading-audience-registered').click()
-  await expect(page.getByTestId('admin-reading-audience-registered')).toHaveAttribute('aria-pressed', 'true')
+  await page.getByTestId('admin-reading-audience').selectOption('registered')
+  await expect(page.getByTestId('admin-reading-audience')).toHaveValue('registered')
   await expect(rows).toHaveCount(20)
   const registered = matches.filter(row => row.userId !== null)
   await expect(page.getByTestId('admin-readings-total')).toHaveText(`Всего: ${registered.length}`)
@@ -228,7 +236,7 @@ test('audience filters combine with search, reset pagination, and support keyboa
   await page.getByTestId('admin-reading-next').click()
   await expect(rows).toHaveCount(registered.length - 20)
 
-  await page.getByTestId('admin-reading-audience-subscribers').click()
+  await page.getByTestId('admin-reading-audience').selectOption('subscribers')
   const subscribers = matches.filter(row => row.subscription?.isActive)
   await expect(rows).toHaveCount(subscribers.length)
   await expect(page.getByTestId('admin-readings-total')).toHaveText(`Всего: ${subscribers.length}`)
@@ -238,37 +246,49 @@ test('audience filters combine with search, reset pagination, and support keyboa
   await expect(rows.filter({ hasText: 'Архивный вопрос 8:' })).toHaveCount(0) // expired paid access
   await page.screenshot({ path: testInfo.outputPath('admin-audience-subscribers.png') })
 
-  const guestsButton = page.getByTestId('admin-reading-audience-guests')
-  await guestsButton.focus()
-  await guestsButton.press('Enter')
-  await expect(guestsButton).toHaveAttribute('aria-pressed', 'true')
+  const audience = page.getByTestId('admin-reading-audience')
+  await audience.selectOption('guests')
+  await expect(audience).toHaveValue('guests')
   await expect(rows).toHaveCount(0)
   await expect(page.getByRole('status').filter({ hasText: 'Загружаю' })).toBeVisible()
   requests.releaseGuests()
   await expect(rows).toHaveCount(matches.filter(row => row.userId === null).length)
   await expect(page.getByTestId('admin-reading-user')).toHaveCount(0)
   const requestCount = requests.readings.length
-  await guestsButton.click()
+  await audience.selectOption('guests')
   expect(requests.readings).toHaveLength(requestCount)
   await page.screenshot({ path: testInfo.outputPath('admin-audience-guests.png') })
   await expectContained(page.getByTestId('admin-view'))
+  await page.getByTestId('admin-reading-unseen').focus()
+  await page.getByTestId('admin-reading-unseen').press('Enter')
+  await expect(page.getByTestId('admin-reading-unseen')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('admin-readings-empty')).toBeVisible()
   expect(requests.unexpected).toEqual([])
 })
 
-test('audience filters wrap without overflow at320px', async ({ page }, testInfo) => {
-  await page.setViewportSize({ width: 320, height: 740 })
-  await openAdmin(page, '/admin', adminAudienceReadingFixtures)
-  const group = page.getByRole('group', { name: 'Фильтр авторов вопросов' })
-  await expect(group.getByRole('button')).toHaveCount(4)
-  for (const button of await group.getByRole('button').all()) {
-    await expect(button).toBeVisible()
-    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
-  }
-  await group.getByRole('button', { name: 'Зарегистрированные', exact: true }).click()
-  await expect(page.getByTestId('admin-readings-total')).toHaveText('Всего: 31')
-  await expectContained(page.getByTestId('admin-view'))
-  await page.screenshot({ path: testInfo.outputPath('admin-audience-320.png') })
-})
+for (const width of [320, 390]) {
+  test(`message filters fit at ${width}px with readable labels and touch targets`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 844 })
+    await openAdmin(page, '/admin', adminAudienceReadingFixtures)
+    const filters = page.getByTestId('admin-reading-filters')
+    await expect(page.getByTestId('admin-reading-unseen')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('admin-reading-sort')).toHaveValue('oldest')
+    await expect(page.getByTestId('admin-reading-audience')).toHaveValue('all')
+    await expect(page.getByRole('combobox', { name: 'Авторы', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Порядок', exact: true })).toBeVisible()
+    for (const control of await filters.locator('button, select').all()) {
+      await expect(control).toBeVisible()
+      expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    }
+    await expectContained(page.getByTestId('admin-view'))
+    await filters.screenshot({ path: testInfo.outputPath(`admin-filters-${width}.png`) })
+    await page.screenshot({ path: testInfo.outputPath(`admin-unread-${width}.png`) })
+    await page.getByTestId('admin-reading-seen-all').click()
+    await page.getByTestId('admin-reading-audience').selectOption('registered')
+    await expect(page.getByTestId('admin-readings-total')).toHaveText('Всего: 31')
+    await expectContained(page.getByTestId('admin-view'))
+  })
+}
 
 for (const path of ['/feedback', '/feedback/legacy-token']) {
   test(`retired public link ${path} opens clean home without feedback requests`, async ({ page, context }) => {
@@ -284,9 +304,12 @@ for (const path of ['/feedback', '/feedback/legacy-token']) {
 test('viewed batches persist across navigation and unread oldest-first queue never skips messages', async ({ page }, testInfo) => {
   const requests = await openAdmin(page)
   await expect.poll(() => requests.viewed.size).toBe(20)
-  expect(requests.viewedBatches[0]).toEqual(adminReadingFixtures.slice(0, 20).map(row => row.id))
+  expect(requests.viewedBatches[0]).toEqual([...adminReadingFixtures].reverse().slice(0, 20).map(row => row.id))
+  await expect(page.getByTestId('admin-reading-unseen')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('admin-reading-sort')).toHaveValue('oldest')
+  await expect(page.getByTestId('admin-reading-row').first()).toContainText('Архивный вопрос 41')
   expect(requests.answers).toEqual([])
-  await page.getByTestId('admin-reading-unseen').click()
+  await page.getByTestId('admin-reading-next-unseen').click()
   await expect.poll(() => requests.viewed.size).toBe(40)
   await expect(page.getByTestId('admin-reading-row')).toHaveCount(20)
   await page.getByTestId('admin-reading-next-unseen').click()
@@ -295,7 +318,7 @@ test('viewed batches persist across navigation and unread oldest-first queue nev
   expect(new Set(requests.viewedBatches.flat()).size).toBe(41)
   await expect(page.getByTestId('admin-reading-next-unseen')).toBeDisabled()
   await page.getByTestId('admin-readings-refresh').click()
-  await expect(page.getByTestId('admin-readings-empty')).toContainText('Непросмотренных')
+  await expect(page.getByTestId('admin-readings-empty')).toContainText('Непрочитанных')
   await page.getByTestId('admin-reading-seen-all').click()
   await page.getByTestId('admin-reading-sort').selectOption('oldest')
   await expect(page.getByTestId('admin-reading-row').first()).toContainText('Архивный вопрос 41')

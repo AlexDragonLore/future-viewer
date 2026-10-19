@@ -22,8 +22,8 @@ export const useAdminStore = defineStore('admin', () => {
   const readingPageSize = ref(20)
   const readingSearch = ref<string | null>(null)
   const readingAudience = ref<AdminReadingAudience>('all')
-  const readingUnseenOnly = ref(false)
-  const readingSort = ref<'newest' | 'oldest'>('newest')
+  const readingUnseenOnly = ref(true)
+  const readingSort = ref<'newest' | 'oldest'>('oldest')
   const readingSeenLoading = ref(false)
   const readingSeenError = ref<string | null>(null)
   let seenController: AbortController | undefined

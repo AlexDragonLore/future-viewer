@@ -37,8 +37,8 @@ describe('AdminReadingsView', () => {
     await flushPromises()
     expect(store.markDisplayedReadingsViewed).toHaveBeenCalled()
     expect(wrapper.findAll('[data-testid="admin-reading-answer"]')).toHaveLength(0)
-    await wrapper.get('[data-testid="admin-reading-unseen"]').trigger('click')
-    await wrapper.get('[data-testid="admin-reading-sort"]').setValue('oldest')
+    expect(wrapper.get('[data-testid="admin-reading-unseen"]').attributes('aria-pressed')).toBe('true')
+    expect((wrapper.get('[data-testid="admin-reading-sort"]').element as HTMLSelectElement).value).toBe('oldest')
     expect(store.readingUnseenOnly).toBe(true)
     expect(store.readingSort).toBe('oldest')
     expect(store.readingPage).toBe(1)
@@ -96,6 +96,7 @@ describe('AdminReadingsView', () => {
 
   it('scrolls after a successful page change but keeps the viewport on a failed request', async () => {
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     store.readings = adminReadingFixtures.slice(0, 20)
     store.readingTotal = 41
     const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
@@ -118,6 +119,7 @@ describe('AdminReadingsView', () => {
 
   it('does not scroll for a superseded page request after a new search', async () => {
     const store = useAdminStore()
+    store.setReadingUnseenOnly(false)
     store.readings = adminReadingFixtures.slice(0, 20)
     store.readingTotal = 41
     const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {})
@@ -141,18 +143,18 @@ describe('AdminReadingsView', () => {
     store.readingPage = 3
     store.readings = [savedReading]
     const wrapper = mountReadings()
-    const subscribers = wrapper.get('[data-testid="admin-reading-audience-subscribers"]')
-    expect(wrapper.get('[data-testid="admin-reading-audience-registered"]').attributes('aria-pressed')).toBe('true')
+    const audience = wrapper.get('[data-testid="admin-reading-audience"]')
+    expect((audience.element as HTMLSelectElement).value).toBe('registered')
     expect(store.loadReadings).toHaveBeenCalledTimes(1)
-    await subscribers.trigger('click')
+    await audience.setValue('subscribers')
     expect(store.readingAudience).toBe('subscribers')
     expect(store.readingPage).toBe(1)
     expect(store.readingSearch).toBe('saved question')
     expect((wrapper.get('[data-testid="admin-reading-search"]').element as HTMLInputElement).value).toBe('saved question')
     expect(store.readings).toEqual([])
-    expect(subscribers.attributes('aria-pressed')).toBe('true')
+    expect((audience.element as HTMLSelectElement).value).toBe('subscribers')
     expect(store.loadReadings).toHaveBeenCalledTimes(2)
-    await subscribers.trigger('click')
+    await audience.setValue('subscribers')
     expect(store.loadReadings).toHaveBeenCalledTimes(2)
     await wrapper.get('[data-testid="admin-reading-search"]').setValue('new question')
     await wrapper.get('form').trigger('submit')
@@ -161,6 +163,7 @@ describe('AdminReadingsView', () => {
   })
 
   it('describes an empty audience without implying the whole history is empty', () => {
+    useAdminStore().setReadingUnseenOnly(false)
     useAdminStore().setReadingAudience('guests')
     const wrapper = mountReadings()
     expect(wrapper.get('[data-testid="admin-readings-empty"]').text()).toBe('По выбранному фильтру сообщений нет.')
