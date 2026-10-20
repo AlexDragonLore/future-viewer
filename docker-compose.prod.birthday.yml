@@ -1,6 +1,0 @@
-# Private assets stay on the host, outside Git and the application images.
-# Include this override whenever recreating the production backend.
-services:
-  backend:
-    volumes:
-      - /opt/fv-app/birthday:/app/private-birthday:ro

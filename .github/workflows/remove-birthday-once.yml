@@ -1,0 +1,103 @@
+name: remove-birthday-once
+
+on:
+  push:
+    branches: ["codex/remove-birthday-20261020-e6155a"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  backend-ci:
+    uses: ./.github/workflows/backend.yml
+  frontend-ci:
+    uses: ./.github/workflows/frontend.yml
+  retire:
+    needs: [backend-ci, frontend-ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Configure the existing pinned deployment connection
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          install -m 700 -d "$RUNNER_TEMP/retire-ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/retire-ssh/key"
+          printf '%s\n' '80.87.104.245 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIe+wys2gdXm1hTHtWupCc1RMbVE296SI2SN34OXWltK' > "$RUNNER_TEMP/retire-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/retire-ssh/"*
+          cat > "$RUNNER_TEMP/retire-ssh/connect" <<'SH'
+          #!/bin/bash
+          exec ssh -i "$RUNNER_TEMP/retire-ssh/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/retire-ssh/known_hosts" \
+            -o ConnectTimeout=20 -o ServerAliveInterval=10 "$@"
+          SH
+          chmod 700 "$RUNNER_TEMP/retire-ssh/connect"
+      - name: Retrieve only existing public frontend build arguments
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/retire-ssh/connect" deploy@80.87.104.245 'bash -s' > "$RUNNER_TEMP/frontend-args.json" <<'SH'
+          set -euo pipefail
+          cd /opt/future-viewer
+          sudo -n env FV_SHARED_EDGE_PORT=18080 docker compose --env-file /opt/fv-app/.env.production \
+            -f docker-compose.prod.yml -p future-viewer config --format json \
+            | python3 -c 'import json,sys; a=json.load(sys.stdin)["services"]["frontend"]["build"]["args"]; print(json.dumps({k:v for k,v in a.items() if k.startswith("VITE_")}))'
+          SH
+      - name: Build the checked release images
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/remove-birthday.py
+          python3 - <<'PY'
+          import os, json, subprocess
+          from pathlib import Path
+          sha = os.environ["GITHUB_SHA"]
+          subprocess.run(["docker", "build", "--platform", "linux/amd64", "-t",
+                          "future-viewer-backend:" + sha, "backend"], check=True)
+          args = json.loads((Path(os.environ["RUNNER_TEMP"]) / "frontend-args.json").read_text())
+          command = ["docker", "build", "--platform", "linux/amd64", "--target", "prod",
+                     "-t", "future-viewer-frontend:" + sha]
+          for key, value in args.items():
+              assert key.startswith("VITE_")
+              command += ["--build-arg", key + "=" + str(value or "")]
+          subprocess.run(command + ["frontend"], check=True)
+          PY
+      - name: Verify the retired page in the built frontend
+        run: |
+          set -euo pipefail
+          docker run --rm --entrypoint nginx "future-viewer-frontend:$GITHUB_SHA" -t
+          docker run --rm --entrypoint sh "future-viewer-frontend:$GITHUB_SHA" -c \
+            'test -z "$(find /usr/share/nginx/html -iname "*BirthdayView*" -o -path "*/birthday/index.html")"'
+          docker run -d --name retired-page-check -p 127.0.0.1:18088:80 "future-viewer-frontend:$GITHUB_SHA"
+          trap 'docker rm -f retired-page-check' EXIT
+          for attempt in $(seq 1 15); do
+            if curl --silent --fail -H 'Host: alex-taro.ru' http://127.0.0.1:18088/ >/dev/null; then break; fi
+            sleep 1
+          done
+          for path in /birthday /birthday/ /birthday/old; do
+            status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              -H 'Host: alex-taro.ru' "http://127.0.0.1:18088$path")"
+            test "$status" = 410
+          done
+      - name: Transfer checked images and retire the feature
+        run: |
+          set -euo pipefail
+          docker save "future-viewer-backend:$GITHUB_SHA" "future-viewer-frontend:$GITHUB_SHA" \
+            | gzip -1 > "$RUNNER_TEMP/images.tar.gz"
+          (cd "$RUNNER_TEMP" && sha256sum images.tar.gz > images.sha256)
+          stage="/tmp/fv-remove-birthday-${GITHUB_SHA:0:12}"
+          "$RUNNER_TEMP/retire-ssh/connect" deploy@80.87.104.245 "install -d -m 700 '$stage'"
+          rsync --partial --inplace --bwlimit=4096 --timeout=60 -e "$RUNNER_TEMP/retire-ssh/connect" \
+            "$RUNNER_TEMP/images.tar.gz" "$RUNNER_TEMP/images.sha256" "deploy@80.87.104.245:$stage/"
+          "$RUNNER_TEMP/retire-ssh/connect" deploy@80.87.104.245 \
+            "sudo -n python3 - '$GITHUB_SHA' '$GITHUB_REF_NAME'" < deploy/remove-birthday.py
+      - name: Remove ephemeral deployment credentials
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/retire-ssh" "$RUNNER_TEMP/frontend-args.json"

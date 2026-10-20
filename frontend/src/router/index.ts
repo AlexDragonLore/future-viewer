@@ -6,11 +6,10 @@ export const router = createRouter({
   history: createWebHistory(),
   scrollBehavior(to, _from, savedPosition) {
     if (savedPosition) return savedPosition
-    if (to.hash && to.name !== 'birthday') return { el: to.hash, behavior: 'smooth', top: 80 }
+    if (to.hash && !/^\/birthday(?:\/|$)/i.test(to.path)) return { el: to.hash, behavior: 'smooth', top: 80 }
     return { top: 0 }
   },
   routes: [
-    { path: '/birthday', name: 'birthday', component: () => import('@/views/BirthdayView.vue'), meta: { noindex: true, privateExperience: true } },
     { path: '/', name: 'home', component: () => import('@/views/HomeView.vue') },
     { path: '/reading', name: 'reading', component: () => import('@/views/ReadingView.vue'), meta: { noindex: true } },
     { path: '/result', name: 'result', component: () => import('@/views/ResultView.vue'), meta: { noindex: true } },
@@ -69,3 +68,4 @@ router.beforeEach((to) => {
 router.afterEach((to, _from, failure) => {
   if (!failure) void applyRouteSeo(to)
 })
+
