@@ -34,3 +34,10 @@
 Во время передачи prebuilt archive локальный SSH перестал получать серверный banner; сайт и БД продолжили отвечать. Добавлена ручная read-only проверка `production-ssh-check` через GitHub runner с существующим deploy secret и ранее проверенным pinned host key. Она не меняет сервер и не выводит credentials. Проверенный application release остаётся `d94a73c6f59b8baadd0818e7d4db0cf888166d18`; последующий диагностический commit не меняет application inputs.
 
 Проверка с GitHub runner прошла. Для завершения используется ручной `deploy-birthday`: собирает тот же фиксированный application SHA, извлекает только публичные VITE build arguments с production, передаёт архив с checksum и ограничением скорости и запускает `deploy/deploy-birthday.py`. Скрипт требует исходный production SHA, неизменные application inputs и миграции, сохраняет env/images для отката и обновляет только backend/frontend. Приватные вложения и настройки остаются в уже подготовленной закрытой директории сервера; в GitHub не передаются.
+
+### Production result — 2026-10-20
+- [Deployment run](https://github.com/AlexDragonLore/future-viewer/actions/runs/39405536912) succeeded; backend and frontend run application image tag `d94a73c6f59b8baadd0818e7d4db0cf888166d18`.
+- Required production Compose `ps` passed. PostgreSQL stayed healthy; Caddy and PostgreSQL container identities and proxy configuration were preserved.
+- `/health` returned `status: ok`, `database: ready`. Rollback snapshot is `/opt/fv-app/releases/birthday-d94a73c6`.
+- Production HTTP smoke passed: invalid key, invalid/incomplete ticket gates, all five answers, 500 points, 15,000-ruble gift, original JPEG SHA-256 equality, no-store and noindex headers.
+- In-app production browser completed all five stages, showed the postcard and certificate, and reopened the original invitation successfully. No browser errors were reported. The certificate was not redeemed.
