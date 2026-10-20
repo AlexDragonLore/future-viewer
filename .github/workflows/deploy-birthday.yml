@@ -1,0 +1,108 @@
+name: deploy-birthday
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+# One-time, guarded release of the application revision already tested locally.
+# Private gift files/settings were staged over the existing authenticated SSH
+# connection. They are never uploaded to GitHub or included in images.
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      RELEASE_SHA: d94a73c6f59b8baadd0818e7d4db0cf888166d18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure existing pinned deployment connection
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          install -m 700 -d "$RUNNER_TEMP/birthday-ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/birthday-ssh/key"
+          printf '%s\n' '80.87.104.245 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIe+wys2gdXm1hTHtWupCc1RMbVE296SI2SN34OXWltK' > "$RUNNER_TEMP/birthday-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/birthday-ssh/"*
+          cat > "$RUNNER_TEMP/birthday-ssh/connect" <<'SH'
+          #!/bin/bash
+          exec ssh -i "$RUNNER_TEMP/birthday-ssh/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$RUNNER_TEMP/birthday-ssh/known_hosts" \
+            -o ConnectTimeout=20 -o ServerAliveInterval=10 "$@"
+          SH
+          chmod 700 "$RUNNER_TEMP/birthday-ssh/connect"
+
+      - name: Check staging and retrieve only public frontend build settings
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/birthday-ssh/connect" deploy@80.87.104.245 \
+            'test -f /tmp/fv-birthday-d94a73c6/certificate.jpg && test -f /tmp/fv-birthday-d94a73c6/postcard.jpg && test -f /tmp/fv-birthday-d94a73c6/production-settings.json'
+          "$RUNNER_TEMP/birthday-ssh/connect" deploy@80.87.104.245 'bash -s' > "$RUNNER_TEMP/frontend-args.json" <<'SH'
+          set -euo pipefail
+          cd /opt/future-viewer
+          sudo -n env FV_SHARED_EDGE_PORT=18080 docker compose --env-file /opt/fv-app/.env.production \
+            -f docker-compose.prod.yml -p future-viewer config --format json \
+            | python3 -c 'import json,sys; a=json.load(sys.stdin)["services"]["frontend"]["build"]["args"]; print(json.dumps({k:v for k,v in a.items() if k.startswith("VITE_")}))'
+          SH
+
+      - name: Build the exact verified application revision
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/birthday-release" "$RELEASE_SHA"
+          python3 - <<'PY'
+          import os, json, subprocess
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"]) / "birthday-release"
+          tag = os.environ["RELEASE_SHA"]
+          subprocess.run(["docker", "build", "--platform", "linux/amd64", "-t",
+                          "future-viewer-backend:" + tag, str(root / "backend")], check=True)
+          args = json.loads((Path(os.environ["RUNNER_TEMP"]) / "frontend-args.json").read_text())
+          command = ["docker", "build", "--platform", "linux/amd64", "--target", "prod",
+                     "-t", "future-viewer-frontend:" + tag]
+          for key, value in args.items():
+              assert key.startswith("VITE_")
+              command += ["--build-arg", key + "=" + str(value or "")]
+          subprocess.run(command + [str(root / "frontend")], check=True)
+          PY
+
+      - name: Transfer images with checksum and bounded bandwidth
+        run: |
+          set -euo pipefail
+          docker save "future-viewer-backend:$RELEASE_SHA" "future-viewer-frontend:$RELEASE_SHA" \
+            | gzip -1 > "$RUNNER_TEMP/images.tar.gz"
+          (cd "$RUNNER_TEMP" && sha256sum images.tar.gz > images.sha256)
+          rsync --partial --inplace --bwlimit=4096 --timeout=60 \
+            -e "$RUNNER_TEMP/birthday-ssh/connect" \
+            "$RUNNER_TEMP/images.tar.gz" "$RUNNER_TEMP/images.sha256" \
+            deploy@80.87.104.245:/tmp/fv-birthday-d94a73c6/
+
+      - name: Preserve rollback state and update only application containers
+        run: |
+          set -euo pipefail
+          python3 -m py_compile deploy/deploy-birthday.py
+          "$RUNNER_TEMP/birthday-ssh/connect" deploy@80.87.104.245 \
+            'sudo -n python3 -' < deploy/deploy-birthday.py
+
+      - name: Verify production health and private route
+        run: |
+          set -euo pipefail
+          curl --retry 10 --retry-all-errors --retry-delay 2 --fail --silent --show-error https://alex-taro.ru/health
+          curl --fail --silent --show-error -D "$RUNNER_TEMP/birthday-headers" -o /dev/null https://alex-taro.ru/birthday
+          grep -qi 'x-robots-tag: noindex' "$RUNNER_TEMP/birthday-headers"
+          status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -H 'Content-Type: application/json' --data '{"ticket":"invalid"}' https://alex-taro.ru/api/birthday/gift)"
+          test "$status" = 401
+
+      - name: Remove ephemeral SSH material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/birthday-ssh" "$RUNNER_TEMP/frontend-args.json"

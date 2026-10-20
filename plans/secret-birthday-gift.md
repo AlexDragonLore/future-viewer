@@ -32,3 +32,5 @@
 
 ### SSH recovery
 Во время передачи prebuilt archive локальный SSH перестал получать серверный banner; сайт и БД продолжили отвечать. Добавлена ручная read-only проверка `production-ssh-check` через GitHub runner с существующим deploy secret и ранее проверенным pinned host key. Она не меняет сервер и не выводит credentials. Проверенный application release остаётся `d94a73c6f59b8baadd0818e7d4db0cf888166d18`; последующий диагностический commit не меняет application inputs.
+
+Проверка с GitHub runner прошла. Для завершения используется ручной `deploy-birthday`: собирает тот же фиксированный application SHA, извлекает только публичные VITE build arguments с production, передаёт архив с checksum и ограничением скорости и запускает `deploy/deploy-birthday.py`. Скрипт требует исходный production SHA, неизменные application inputs и миграции, сохраняет env/images для отката и обновляет только backend/frontend. Приватные вложения и настройки остаются в уже подготовленной закрытой директории сервера; в GitHub не передаются.
