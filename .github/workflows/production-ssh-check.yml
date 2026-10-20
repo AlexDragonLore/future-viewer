@@ -1,0 +1,31 @@
+name: production-ssh-check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Check existing production SSH access without changing the server
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "$workdir"' EXIT
+          chmod 700 "$workdir"
+          printf '%s\n' "$DEPLOY_KEY" > "$workdir/key"
+          # Existing production key, pinned from the verified local known_hosts.
+          printf '%s\n' '80.87.104.245 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIe+wys2gdXm1hTHtWupCc1RMbVE296SI2SN34OXWltK' > "$workdir/known_hosts"
+          chmod 600 "$workdir/key" "$workdir/known_hosts"
+          ssh -i "$workdir/key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$workdir/known_hosts" \
+            -o ConnectTimeout=20 -o ServerAliveInterval=10 \
+            deploy@80.87.104.245 \
+            'printf "SSH reachable\n"; cd /opt/future-viewer; git rev-parse HEAD; df -h /tmp; sudo -n docker ps --filter label=com.docker.compose.project=future-viewer --format "{{.Names}} {{.Status}}"'
