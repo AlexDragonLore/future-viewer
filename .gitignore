@@ -435,3 +435,6 @@ $RECYCLE.BIN/
 
 # Local dependency symlinks in isolated release worktrees
 frontend/node_modules
+
+# Private birthday invitation and redeemable certificate (never serve statically)
+.private/

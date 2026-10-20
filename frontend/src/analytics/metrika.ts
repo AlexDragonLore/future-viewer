@@ -105,7 +105,14 @@ class AnalyticsClient {
     this.initedEvent = `yacounter${this.counter ?? 0}inited`
     try { this.cookies.loadCookiePreferences() } catch { /* Optional analytics cannot block app startup. */ }
     this.removeRouteHook = router.afterEach((_to, _from, failure) => {
-      if (!failure) this.pageview()
+      if (failure) return
+      if (this.isPrivate()) {
+        this.disable()
+        this.landing = undefined
+      } else {
+        this.load()
+        this.pageview()
+      }
     })
     this.stopConsentWatch = watch(this.cookies.preferences, (_choice, previousChoice) => {
       if (this.allowed()) this.load()
@@ -123,10 +130,16 @@ class AnalyticsClient {
 
   private allowed(): boolean {
     try {
-      return !this.disposed && this.counter !== undefined && this.cookies.isAllowed('analytics')
+      return !this.disposed && !this.isPrivate() && this.counter !== undefined && this.cookies.isAllowed('analytics')
     } catch {
       return false
     }
+  }
+
+  private isPrivate(): boolean {
+    const route = this.router.currentRoute.value
+    const path = route.matched.length ? route.path : window.location.pathname
+    return route.meta.privateExperience === true || /^\/birthday\/?$/i.test(path)
   }
 
   private call(method: string, ...args: unknown[]): boolean {

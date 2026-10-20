@@ -65,6 +65,27 @@ afterEach(() => {
 })
 
 describe('optional Metrika counter', () => {
+  it('never loads on the private birthday invitation, even with analytics consent', async () => {
+    cookies.acceptAll()
+    const router = await setupRouter('/birthday#key=private-invitation')
+    start(router)
+    expect(tag()).toBeNull()
+    expect(trackGoal('registration_started')).toBe(false)
+    await router.push('/birthday')
+    expect(tag()).toBeNull()
+  })
+
+  it('disables an existing counter when entering the birthday experience', async () => {
+    cookies.acceptAll()
+    const router = await setupRouter('/')
+    start(router)
+    const ym = makeReady()
+    ym.mockClear()
+    await router.push('/birthday#key=private-invitation')
+    expect(tag()).toBeNull()
+    expect(ym.mock.calls.some(call => call[1] === 'destruct')).toBe(true)
+    expect(ym.mock.calls.some(call => call[1] === 'hit')).toBe(false)
+  })
   it('does not load or retain goals before consent and after refusal', async () => {
     start(await setupRouter('/?utm_source=yandex'))
     expect(tag()).toBeNull()

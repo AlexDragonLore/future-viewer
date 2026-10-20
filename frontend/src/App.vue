@@ -13,6 +13,7 @@ import { useReadingStore } from '@/stores/useReadingStore'
 
 const publicConfig = usePublicConfigStore()
 const route = useRoute()
+const privateExperience = computed(() => route.meta.privateExperience === true)
 const readingStore = useReadingStore()
 const { prefersReducedMotion } = useMotionPreferences()
 
@@ -34,7 +35,7 @@ function syncSession(event: StorageEvent) {
 }
 
 onMounted(() => {
-  publicConfig.load()
+  if (!privateExperience.value) publicConfig.load()
   window.addEventListener('storage', syncSession)
   window.addEventListener('pointerdown', unlockAudio, { once: true, passive: true })
   window.addEventListener('keydown', unlockAudio, { once: true })
@@ -50,7 +51,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <RouterView v-if="privateExperience" />
   <div
+    v-else
     class="app-shell min-h-screen relative overflow-hidden bg-gradient-to-b from-mystic-deepest via-mystic-deep to-mystic-mid text-mystic-silver font-body"
     :class="{ 'performance-mode': performanceMode }"
   >

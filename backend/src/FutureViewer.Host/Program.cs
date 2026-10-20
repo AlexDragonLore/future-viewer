@@ -31,6 +31,8 @@ var dataProtection = builder.Services.AddDataProtection().SetApplicationName("Fu
 if (builder.Configuration["DataProtection:KeysPath"] is { Length: > 0 } keysPath)
     dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
 builder.Services.AddSingleton<GuestReadingTickets>();
+builder.Services.Configure<BirthdayOptions>(builder.Configuration.GetSection("Birthday"));
+builder.Services.AddSingleton<BirthdayAccess>();
 builder.Services.Configure<SupportOptions>(builder.Configuration.GetSection(SupportOptions.SectionName));
 
 // Forwarded client addresses are security inputs for rate limits and payment
@@ -148,6 +150,16 @@ builder.Services.AddRateLimiter(options =>
                 AutoReplenishment = true
             }));
 
+    options.AddPolicy("birthday-unlock", context => RateLimitPartition.GetFixedWindowLimiter(
+        GetClientPartition(context),
+        _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10,
+            Window = TimeSpan.FromMinutes(5),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+
     options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
         GetClientPartition(context),
         _ => new FixedWindowRateLimiterOptions
@@ -228,6 +240,7 @@ app.MapGet("/health", async (AppDbContext db, CancellationToken ct) =>
             statusCode: StatusCodes.Status503ServiceUnavailable);
 }).DisableRateLimiting();
 app.MapPublic();
+app.MapBirthday();
 app.MapLegalDocuments();
 app.MapReadings();
 app.MapAuth();

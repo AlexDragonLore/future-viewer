@@ -37,6 +37,12 @@
     }
   ],
   "noindexRoutes": [
+    {
+      "path": "/birthday",
+      "name": "birthday",
+      "title": "Особенная история | Вуаль Грядущего",
+      "description": "Личное приглашение в маленькое приключение."
+    },
     { "name": "auth", "path": "/auth", "title": "Вход | Вуаль Грядущего" },
     { "name": "forgot-password", "path": "/forgot-password", "title": "Восстановление пароля | Вуаль Грядущего" },
     { "name": "verify-email", "path": "/verify-email", "title": "Подтверждение email | Вуаль Грядущего" },
