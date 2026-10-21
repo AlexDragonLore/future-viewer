@@ -16,6 +16,12 @@ Generate answers with the same provider, model, and settings for both exports. R
 
 | Case | What to review |
 | --- | --- |
+| `quantity-count` | Opens with one concrete symbolic count of guests, explains it through the cards, and adds no unsolicited time range or refusal to count. |
+| `quantity-playful-single` | Gives a number even for a playful invented noun and one reversed card; preserves the noun instead of inventing its meaning or analyzing the questioner's motives. |
+| `quantity-playful-large` | Gives a count for the same playful noun in a ten-card reading without replacing it with a time range or a refusal to count. |
+| `quantity-none` | Allows zero meetings when the cards show a pause or ending, keeps the requested week, and does not promise a later meeting. |
+| `quantity-existing-period` | Answers with a count of ideas within the requested month; does not replace the count with a waiting period. |
+| `quantity-stream` | Uses the same count scenario with streaming enabled; the opening must already contain the numeric answer. |
 | `timing-positive` | Gives a useful approximate range early, linked to the fast-moving cards, without guaranteeing an event or an exact date. |
 | `timing-positive-single` | Answers the timing question with a useful approximate range from one Eight of Wands; the position named "Advice" must not turn the answer into an evasive suggestion. |
 | `timing-slow` | Gives a slower approximate range consistent with the pause in the cards instead of reusing the fast case's timing. |

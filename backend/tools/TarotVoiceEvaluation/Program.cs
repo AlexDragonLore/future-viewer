@@ -26,8 +26,18 @@ var buildMessages = typeof(OpenAIInterpreter).GetMethod("BuildMessages", Binding
     ?? throw new InvalidOperationException("OpenAIInterpreter.BuildMessages was not found; update this evaluation tool for the new prompt builder.");
 
 var fastTimingCards = Cards("Eight of Wands", "Ace of Cups", "The Sun");
+var quantityCards = Cards("Three of Cups", "Six of Pentacles", "Four of Wands");
 var cases = new[]
 {
+    Build("quantity-count", "Сколько гостей придёт на мой праздник?", Spread.ThreeCard, quantityCards),
+    Build("quantity-playful-single", "Сколько у сказочного дракона сладкуль?", Spread.SingleCard,
+        CreateCards(["Nine of Wands"], reversedPositions: [0])),
+    Build("quantity-playful-large", "Сколько у меня сладкуль?", Spread.CelticCross, CardsForLargeSpread()),
+    Build("quantity-none", "Сколько встреч будет с ним на этой неделе?", Spread.ThreeCard,
+        Cards("Four of Swords", "The Hermit", "Ten of Swords")),
+    Build("quantity-existing-period", "Сколько новых идей у меня появится за месяц?", Spread.ThreeCard,
+        Cards("Ace of Wands", "Page of Wands", "Seven of Cups")),
+    Build("quantity-stream", "Сколько гостей придёт на мой праздник?", Spread.ThreeCard, quantityCards, stream: true),
     Build("timing-positive", "Когда появится новое знакомство?", Spread.ThreeCard, fastTimingCards),
     Build("timing-positive-single", "Когда появится новое знакомство?", Spread.SingleCard,
         CreateCards(["Eight of Wands"])),
