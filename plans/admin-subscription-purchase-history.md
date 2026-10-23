@@ -22,3 +22,4 @@
 - Frontend: 361 unit tests passed; type check and production build passed.
 - Browser tests: all 6 purchase history scenarios passed across desktop/mobile, including 320px width, plus 18 existing admin scenarios passed. An initial fixture interception error was corrected before the successful rerun.
 - In-app browser: synthetic admin login, rendered purchase list, expanded payment details and refund filtering checked at desktop and 390px mobile width. Real production customer data and payment creation were not used.
+- The initial CI backend run passed all new purchase tests but exposed an existing flaky guest-reading test: its random GUID could match the phone-number privacy filter. Its search marker now uses only letters, preserving uniqueness without changing the production filter.

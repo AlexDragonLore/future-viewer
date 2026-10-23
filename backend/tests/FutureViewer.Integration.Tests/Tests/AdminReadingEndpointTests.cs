@@ -146,7 +146,9 @@ public sealed partial class AdminReadingEndpointTests(IntegrationTestFixture fix
     public async Task Admin_reads_actual_guest_content_and_claimed_reading_becomes_a_user_message()
     {
         var (admin, _) = await CreateClient(admin: true);
-        var marker = Guid.NewGuid().ToString("N");
+        // Random digit sequences in a GUID can match the real phone-number privacy filter.
+        var marker = string.Concat(Guid.NewGuid().ToString("N")
+            .Select(c => char.IsDigit(c) ? (char)('g' + c - '0') : c));
         var question = $"На что обратить внимание в работе {marker}?";
         var response = await fixture.CreateClient().PostAsJsonAsync("/api/readings/guest", new CreateReadingRequest
         {
