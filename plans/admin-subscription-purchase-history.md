@@ -26,3 +26,12 @@
 - Browser tests: all 6 purchase history scenarios passed across desktop/mobile, including 320px width, plus 18 existing admin scenarios passed. An initial fixture interception error was corrected before the successful rerun.
 - In-app browser: synthetic admin login, rendered purchase list, expanded payment details and refund filtering checked at desktop and 390px mobile width. Real production customer data and payment creation were not used.
 - The initial CI backend run passed all new purchase tests but exposed an existing flaky guest-reading test: its random GUID could match the phone-number privacy filter. Its search marker now uses only letters, preserving uniqueness without changing the production filter.
+- GitHub checks completed successfully: frontend run `39943166797` and corrected backend run `39943796916`.
+
+## Production result — 2026-10-23
+- Deployed `3694e948c76576f2ca95df70201c152f04e27d11` to both application containers, replacing `8e3370fd5d593a9fae3703a06778818411a627ef`.
+- Both amd64 images were built from the clean committed source and transferred with a verified SHA-256 checksum. Runtime environment, mounts, networks, Caddy configuration, database/proxy and other container identities matched the protected pre-release snapshot.
+- Required Compose status check showed both new application images running and Postgres healthy; `GET /health` returned HTTP 200 with `status=ok`, `database=ready`. Anonymous `GET /api/admin/purchases` returned 401.
+- Public copies of `AdminPurchasesView-xaubh7-b.js`, `AdminView-BtL3Syia.js` and `index-DBMVrmqx.js` matched the built image byte for byte. The HTML is served with `Cache-Control: no-cache`.
+- Production in-app browser loaded the site and correctly redirected `/admin/purchases` to login. No authenticated production session was available; the authenticated desktop/mobile UI and admin API were covered by the completed local browser and integration tests.
+- Server rollback record: `/opt/fv-app/releases/purchase-history-3694e948c76576f2ca95df70201c152f04e27d11/`.
