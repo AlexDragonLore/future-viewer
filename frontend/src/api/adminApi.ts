@@ -1,5 +1,7 @@
 import { httpClient } from './httpClient'
 import type {
+  AdminPurchaseListResponse,
+  PurchaseSearchFilters,
   AdminGrantedAchievement,
   AdminReadingListResponse,
   AdminStats,
@@ -12,6 +14,20 @@ import type {
 } from '@/types/admin'
 
 export const adminApi = {
+  async listPurchases(filters: PurchaseSearchFilters = {}, signal?: AbortSignal): Promise<AdminPurchaseListResponse> {
+    const { data } = await httpClient.get<AdminPurchaseListResponse>('/api/admin/purchases', {
+      signal,
+      params: {
+        search: filters.search || undefined,
+        userId: filters.userId || undefined,
+        status: filters.status ?? 'paid',
+        page: filters.page ?? 1,
+        pageSize: filters.pageSize ?? 20,
+      },
+    })
+    return data
+  },
+
   async listReadings(filters: ReadingSearchFilters = {}, signal?: AbortSignal): Promise<AdminReadingListResponse> {
     const { data } = await httpClient.get<AdminReadingListResponse>('/api/admin/readings', {
       signal,

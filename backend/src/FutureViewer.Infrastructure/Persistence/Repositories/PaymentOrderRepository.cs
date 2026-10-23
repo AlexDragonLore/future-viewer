@@ -15,6 +15,53 @@ public sealed class PaymentOrderRepository : IPaymentOrderRepository
         _db = db;
     }
 
+    public async Task<AdminPurchaseListResult> SearchSubscriptionPurchasesAsync(
+        Guid? userId, string? search, AdminPurchaseFilter status, int skip, int take,
+        CancellationToken ct = default)
+    {
+        var query = _db.PaymentOrders.AsNoTracking().Where(o => o.AccessDays > 0);
+        if (userId.HasValue) query = query.Where(o => o.UserId == userId.Value);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            // Treat wildcard characters as literal search text.
+            var pattern = "%" + search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+            var hasPublicId = Guid.TryParse(search, out var publicId);
+            query = query.Where(o => (o.User != null && EF.Functions.ILike(o.User.Email, pattern))
+                || (hasPublicId && o.PublicId == publicId)
+                || (o.ProviderPaymentId != null && EF.Functions.ILike(o.ProviderPaymentId, pattern)));
+        }
+        if (status == AdminPurchaseFilter.Refunded)
+            query = query.Where(o => o.ReceiptStatus == NpdReceiptStatus.Refunded);
+        else if (status != AdminPurchaseFilter.All)
+        {
+            query = query.Where(o => o.ReceiptStatus != NpdReceiptStatus.Refunded);
+            query = status switch
+            {
+                AdminPurchaseFilter.Paid => query.Where(o => o.Status == PaymentOrderStatus.Paid),
+                AdminPurchaseFilter.Pending => query.Where(o => o.Status == PaymentOrderStatus.Pending || o.Status == PaymentOrderStatus.ProviderCreated),
+                AdminPurchaseFilter.Canceled => query.Where(o => o.Status == PaymentOrderStatus.Canceled),
+                AdminPurchaseFilter.Failed => query.Where(o => o.Status == PaymentOrderStatus.Failed),
+                _ => throw new ArgumentOutOfRangeException(nameof(status))
+            };
+        }
+        var total = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(o => o.CompletedAt ?? o.CreatedAt)
+            .ThenByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id)
+            .Skip(skip).Take(take)
+            .Select(o => new AdminPurchaseDto
+            {
+                PublicId = o.PublicId, UserId = o.UserId, UserEmail = o.User != null ? o.User.Email : null,
+                TariffCode = o.TariffCode, AccessDays = o.AccessDays, Amount = o.Amount, Currency = o.Currency,
+                Status = o.ReceiptStatus == NpdReceiptStatus.Refunded ? "refunded"
+                    : o.Status == PaymentOrderStatus.Paid ? "paid"
+                    : o.Status == PaymentOrderStatus.Canceled ? "canceled"
+                    : o.Status == PaymentOrderStatus.Failed ? "failed" : "pending",
+                Provider = o.Provider, ProviderPaymentId = o.ProviderPaymentId,
+                CreatedAt = o.CreatedAt, CompletedAt = o.CompletedAt
+            }).ToListAsync(ct);
+        return new AdminPurchaseListResult(items, total);
+    }
+
     public async Task<PaymentOrder> AddAsync(PaymentOrder order, CancellationToken ct = default)
     {
         await _db.PaymentOrders.AddAsync(order, ct);

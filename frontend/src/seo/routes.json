@@ -60,6 +60,7 @@
     { "name": "admin", "path": "/admin", "title": "Админ-панель | Вуаль Грядущего" },
     { "name": "admin-readings", "path": "/admin/readings", "title": "Сообщения — админ-панель | Вуаль Грядущего" },
     { "name": "admin-users", "path": "/admin/users", "title": "Пользователи | Вуаль Грядущего" },
+    { "name": "admin-purchases", "path": "/admin/purchases", "title": "Покупки подписок | Вуаль Грядущего" },
     { "name": "admin-user-detail", "path": "/admin/users/:id", "title": "Пользователь | Вуаль Грядущего" },
     { "name": "admin-stats", "path": "/admin/stats", "title": "Статистика | Вуаль Грядущего" }
   ]

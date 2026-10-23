@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import { useAdminStore } from '@/stores/useAdminStore'
 import { useAuthStore } from '@/stores/useAuthStore'
 import { SubscriptionStatusValue } from '@/types'
@@ -210,6 +211,11 @@ async function recheckAchievements(): Promise<void> {
       <section class="section">
         <h4>Подписка и последняя покупка</h4>
         <AdminSubscriptionBadge :subscription="store.selectedUser.subscription" show-purchase-date class="mb-3" />
+        <RouterLink
+          :to="{ name: 'admin-purchases', query: { userId: store.selectedUser.id } }"
+          class="admin-btn inline-flex items-center mb-3"
+          data-testid="admin-user-purchases"
+        >История покупок</RouterLink>
         <div class="grid grid-cols-2 gap-3">
           <label class="flex flex-col text-xs uppercase tracking-widest text-mystic-muted gap-1">
             <span>Статус</span>

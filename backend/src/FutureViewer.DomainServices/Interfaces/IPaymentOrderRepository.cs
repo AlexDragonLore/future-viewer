@@ -5,6 +5,8 @@ namespace FutureViewer.DomainServices.Interfaces;
 
 public interface IPaymentOrderRepository
 {
+    Task<AdminPurchaseListResult> SearchSubscriptionPurchasesAsync(Guid? userId, string? search,
+        AdminPurchaseFilter status, int skip, int take, CancellationToken ct = default);
     Task<PaymentOrder> AddAsync(PaymentOrder order, CancellationToken ct = default);
     Task<PaymentOrder?> GetByPublicIdAsync(Guid publicId, CancellationToken ct = default);
     Task<PaymentOrder?> GetByPublicIdForUpdateAsync(Guid publicId, CancellationToken ct = default);

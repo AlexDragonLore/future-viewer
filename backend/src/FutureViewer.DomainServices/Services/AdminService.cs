@@ -72,6 +72,17 @@ public sealed class AdminService
     public async Task<AdminReadingInterpretationDto> GetReadingInterpretationAsync(Guid id, CancellationToken ct = default) =>
         await _readings.GetAdminInterpretationAsync(id, ct) ?? throw new NotFoundException("Reading not found");
 
+    public Task<AdminPurchaseListResult> SearchPurchasesAsync(
+        Guid? userId, string? search, AdminPurchaseFilter status, int page, int pageSize,
+        CancellationToken ct = default)
+    {
+        var safeSize = Math.Clamp(pageSize, 1, 100);
+        var safePage = Math.Clamp(page, 1, int.MaxValue / safeSize);
+        return (_orders ?? throw new InvalidOperationException("Payment repository is not configured."))
+            .SearchSubscriptionPurchasesAsync(userId, search?.Trim(), status,
+                (safePage - 1) * safeSize, safeSize, ct);
+    }
+
     public async Task<AdminUserListResult> SearchUsersAsync(
         string? search,
         int page,

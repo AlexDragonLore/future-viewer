@@ -50,6 +50,7 @@ export const router = createRouter({
         { path: 'readings', name: 'admin-readings', component: () => import('@/views/admin/AdminReadingsView.vue'), meta: { noindex: true } },
         { path: 'feedbacks', redirect: { name: 'admin-readings', query: {}, hash: '' } },
         { path: 'users', name: 'admin-users', component: () => import('@/views/admin/AdminUsersView.vue'), meta: { noindex: true } },
+        { path: 'purchases', name: 'admin-purchases', component: () => import('@/views/admin/AdminPurchasesView.vue'), meta: { noindex: true } },
         { path: 'users/:id', name: 'admin-user-detail', component: () => import('@/views/admin/AdminUsersView.vue'), props: true, meta: { noindex: true } },
         { path: 'stats', name: 'admin-stats', component: () => import('@/views/admin/AdminStatsView.vue'), meta: { noindex: true } },
       ],

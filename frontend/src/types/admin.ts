@@ -1,5 +1,36 @@
 import type { DeckType, SpreadType, SubscriptionStatusValue } from '@/types'
 
+export type AdminPurchaseStatus = 'paid' | 'pending' | 'canceled' | 'failed' | 'refunded'
+export type AdminPurchaseFilter = AdminPurchaseStatus | 'all'
+
+export interface AdminPurchase {
+  publicId: string
+  userId: string | null
+  userEmail: string | null
+  tariffCode: string
+  accessDays: number
+  amount: number
+  currency: string
+  status: AdminPurchaseStatus
+  provider: string
+  providerPaymentId: string | null
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface AdminPurchaseListResponse {
+  items: AdminPurchase[]
+  total: number
+}
+
+export interface PurchaseSearchFilters {
+  search?: string | null
+  userId?: string | null
+  status?: AdminPurchaseFilter
+  page?: number
+  pageSize?: number
+}
+
 export interface AdminUserListItem {
   id: string
   email: string

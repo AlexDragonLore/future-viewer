@@ -15,11 +15,36 @@ public static class AdminEndpoints
             .RequireAuthorization("Admin");
 
         MapReadingEndpoints(group);
+        MapPurchaseEndpoints(group);
         MapUserEndpoints(group);
         MapAchievementEndpoints(group);
         MapStatsEndpoints(group);
 
         return app;
+    }
+
+    private static void MapPurchaseEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("/purchases", async (
+            Guid? userId, string? search, string? status, int? page, int? pageSize,
+            AdminService service, HttpContext ctx, CancellationToken ct) =>
+        {
+            ctx.Response.Headers.CacheControl = "no-store";
+            AdminPurchaseFilter? filter = status switch
+            {
+                null or "" or "paid" => AdminPurchaseFilter.Paid,
+                "all" => AdminPurchaseFilter.All,
+                "pending" => AdminPurchaseFilter.Pending,
+                "canceled" => AdminPurchaseFilter.Canceled,
+                "failed" => AdminPurchaseFilter.Failed,
+                "refunded" => AdminPurchaseFilter.Refunded,
+                _ => null
+            };
+            if (filter is null)
+                return Results.BadRequest(new { error = "invalid_status", message = "Неизвестный статус покупки." });
+            return Results.Ok(await service.SearchPurchasesAsync(userId, search, filter.Value,
+                page ?? 1, pageSize ?? 20, ct));
+        });
     }
 
     private static void MapReadingEndpoints(RouteGroupBuilder group)
