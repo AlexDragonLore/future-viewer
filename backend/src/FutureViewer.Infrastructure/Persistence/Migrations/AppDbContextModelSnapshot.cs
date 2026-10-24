@@ -583,8 +583,8 @@ namespace FutureViewer.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Question")
                         .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)")
+                        .HasMaxLength(20000)
+                        .HasColumnType("character varying(20000)")
                         .HasColumnName("question");
 
                     b.Property<bool>("SavedToHistory")

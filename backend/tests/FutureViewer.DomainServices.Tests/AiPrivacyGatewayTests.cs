@@ -9,6 +9,45 @@ public sealed class AiPrivacyGatewayTests
     private readonly AiPrivacyGateway _sut = new();
 
     [Theory]
+    [InlineData(AiPrivacyOperation.QuestionValidation)]
+    [InlineData(AiPrivacyOperation.TarotInterpretation)]
+    public void Prepare_allows_a_twenty_thousand_character_question_without_truncation(AiPrivacyOperation operation)
+    {
+        var question = string.Concat(Enumerable.Repeat("Как развивать мой творческий проект? ", 600))[..19_999] + "?";
+
+        var result = _sut.Prepare(question, operation);
+
+        result.CanSendExternally.Should().BeTrue();
+        result.SafeText.Should().Be(question);
+    }
+
+    [Theory]
+    [InlineData(AiPrivacyOperation.QuestionValidation)]
+    [InlineData(AiPrivacyOperation.TarotInterpretation)]
+    public void Prepare_rejects_questions_over_twenty_thousand_characters(AiPrivacyOperation operation)
+    {
+        var question = string.Concat(Enumerable.Repeat("Как развивать мой творческий проект? ", 600))[..20_000] + "?";
+
+        var result = _sut.Prepare(question, operation);
+
+        result.CanSendExternally.Should().BeFalse();
+        result.ReasonCode.Should().Be("text_too_long");
+        result.SafeText.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Prepare_still_checks_sensitive_data_at_the_end_of_a_long_question()
+    {
+        var question = string.Concat(Enumerable.Repeat("Как развивать мой творческий проект? ", 500))
+            + "Напиши мне на ivan.petrov@example.com";
+
+        var result = _sut.Prepare(question, AiPrivacyOperation.TarotInterpretation);
+
+        result.CanSendExternally.Should().BeFalse();
+        result.ReasonCode.Should().Be("email");
+    }
+
+    [Theory]
     [InlineData("Напиши мне на ivan.petrov@example.com", "email")]
     [InlineData("Позвони мне +7 (999) 123-45-67", "phone")]
     [InlineData("У меня диагноз диабет, что делать?", "special_category")]

@@ -123,6 +123,53 @@ describe('HomeView privacy and question safety', () => {
     expect(router.currentRoute.value.name).toBe('reading')
   })
 
+  it.each([false, true])('passes a 20,000-character question intact (authenticated: %s)', async (authenticated) => {
+    if (authenticated) authenticate()
+    const { wrapper, router, store } = await mountHome()
+    const question = 'Как развивать мой творческий проект? '.repeat(600).slice(0, 19_999) + '?'
+
+    await wrapper.get('textarea').setValue(question)
+    expect(wrapper.get('textarea').attributes('maxlength')).toBe('20000')
+    expect(wrapper.get('#reading-question-count').text().replace(/\s/g, '')).toBe('20000/20000')
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeUndefined()
+    await wrapper.get('button.glow-button').trigger('click')
+    await flushPromises()
+
+    expect(store.pending?.question).toBe(question)
+    expect(router.currentRoute.value.name).toBe('reading')
+    if (authenticated) {
+      expect(validateQuestionMock.mock.calls[0][1]).toBe(question)
+    } else {
+      expect(validateQuestionMock).not.toHaveBeenCalled()
+    }
+  })
+
+  it.each([false, true])('blocks an oversized restored draft without truncating it (authenticated: %s)', async (authenticated) => {
+    if (authenticated) authenticate()
+    const question = 'Как развивать мой творческий проект? '.repeat(600).slice(0, 20_000) + '?'
+    const { wrapper, router, store } = await mountHome(() => {
+      useReadingStore().setPending({
+        question, spreadType: SpreadType.SingleCard, questionWarningAcknowledged: false, validated: false,
+      })
+    })
+
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe(question)
+    expect(wrapper.get('textarea').attributes('aria-invalid')).toBe('true')
+    expect(wrapper.get('#reading-question-length-error').text().replace(/\s/g, '')).toContain('20000')
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeDefined()
+    await wrapper.get('button.glow-button').trigger('click')
+    await flushPromises()
+
+    expect(store.pending).toBeNull()
+    expect(validateQuestionMock).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.name).toBe('home')
+
+    await wrapper.get('textarea').setValue(question.slice(0, 20_000))
+    expect(wrapper.get('textarea').attributes('aria-invalid')).toBe('false')
+    expect(wrapper.find('#reading-question-length-error').exists()).toBe(false)
+    expect(wrapper.get('button.glow-button').attributes('disabled')).toBeUndefined()
+  })
+
   it('starts a guest three-card reading with their trimmed question without a validation round trip', async () => {
     const { wrapper, router, store } = await mountHome()
     await wrapper.find('textarea').setValue('  Как посмотреть на новую задачу?  ')

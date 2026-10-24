@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using FutureViewer.Domain.Entities;
 using FutureViewer.DomainServices.DTOs;
 using FutureViewer.DomainServices.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,7 @@ namespace FutureViewer.DomainServices.Services;
 /// </summary>
 public sealed partial class AiPrivacyGateway : IAiPrivacyGateway
 {
-    public const int MaxQuestionLength = 500;
+    public const int MaxQuestionLength = Reading.MaxQuestionLength;
     public const int MaxDerivedTextLength = 12_000;
 
     public const string SensitiveDataMessage =

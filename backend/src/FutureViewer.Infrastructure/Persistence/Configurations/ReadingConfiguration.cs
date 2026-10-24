@@ -13,7 +13,7 @@ public sealed class ReadingConfiguration : IEntityTypeConfiguration<Reading>
         b.Property(x => x.Id).HasColumnName("id");
         b.Property(x => x.UserId).HasColumnName("user_id");
         b.Property(x => x.SpreadType).HasColumnName("spread_type").HasConversion<int>();
-        b.Property(x => x.Question).HasColumnName("question").HasMaxLength(1000);
+        b.Property(x => x.Question).HasColumnName("question").HasMaxLength(Reading.MaxQuestionLength);
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.DeletedFromHistoryAt).HasColumnName("deleted_from_history_at");
         b.Property(x => x.SavedToHistory)

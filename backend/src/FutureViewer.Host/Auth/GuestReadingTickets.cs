@@ -25,7 +25,8 @@ public sealed class GuestReadingTickets(IDataProtectionProvider provider)
 
     public ReadingResult Read(string? ticket)
     {
-        if (string.IsNullOrWhiteSpace(ticket) || ticket.Length > 128_000)
+        // JSON escapes non-ASCII question text before encryption and base64 encoding.
+        if (string.IsNullOrWhiteSpace(ticket) || ticket.Length > 512_000)
             throw Unavailable();
         try
         {

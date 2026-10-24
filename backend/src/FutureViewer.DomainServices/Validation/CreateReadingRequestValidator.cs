@@ -1,4 +1,5 @@
 using FluentValidation;
+using FutureViewer.Domain.Entities;
 using FutureViewer.DomainServices.DTOs;
 
 namespace FutureViewer.DomainServices.Validation;
@@ -8,7 +9,7 @@ public sealed class CreateReadingRequestValidator : AbstractValidator<CreateRead
     public CreateReadingRequestValidator()
     {
         RuleFor(x => x.SpreadType).IsInEnum();
-        RuleFor(x => x.Question).NotEmpty().MaximumLength(500);
+        RuleFor(x => x.Question).NotEmpty().MaximumLength(Reading.MaxQuestionLength);
         RuleFor(x => x.DeckType).IsInEnum();
         RuleFor(x => x.ClientTimeZone).MaximumLength(128);
     }

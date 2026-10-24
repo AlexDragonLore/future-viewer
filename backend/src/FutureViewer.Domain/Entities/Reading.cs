@@ -4,6 +4,8 @@ namespace FutureViewer.Domain.Entities;
 
 public sealed class Reading
 {
+    public const int MaxQuestionLength = 20_000;
+
     public Guid Id { get; init; } = Guid.NewGuid();
     public Guid? UserId { get; init; }
     public User? User { get; init; }

@@ -25,7 +25,9 @@ const tariffSummary = computed(() => publicConfig.paidProducts.map(product => `$
 const showGuestPaidOffer = computed(() => !auth.isAuthenticated
   && publicConfig.paymentsEnabled && publicConfig.paidProducts.length > 0)
 
+const maxQuestionLength = 20_000
 const question = ref('')
+const questionTooLong = computed(() => question.value.length > maxQuestionLength)
 const validationMessage = ref<string | null>(null)
 const validationSuggestion = ref<string | null>(null)
 const validatingQuestion = ref(false)
@@ -95,6 +97,7 @@ const blocked = computed(() => requiresSubscription.value || freeQuotaExhausted.
 const canBegin = computed(() => {
   if (validatingQuestion.value) return false
   if (auth.isAuthenticated && auth.subscriptionLoading) return false
+  if ((auth.isAuthenticated || !hasGuestReading.value) && questionTooLong.value) return false
   if (auth.isAuthenticated && !question.value.trim()) return false
   if (!auth.isAuthenticated) return hasGuestReading.value || Boolean(question.value.trim())
   return !blocked.value
@@ -249,15 +252,24 @@ async function begin() {
         <textarea
           id="reading-question"
           v-model="question"
-          rows="3"
+          rows="6"
           placeholder="Напиши свой вопрос — об отношениях, работе, планах или о том, что тебя волнует"
           class="w-full bg-black/30 border border-mystic-accent/30 rounded-lg p-3 text-mystic-silver placeholder:text-mystic-silver/30 focus:outline-none focus:border-mystic-accent transition"
-          maxlength="500"
+          :maxlength="maxQuestionLength"
           required
-          aria-describedby="reading-question-help"
+          :aria-invalid="questionTooLong"
+          :aria-describedby="questionTooLong ? 'reading-question-help reading-question-count reading-question-length-error' : 'reading-question-help reading-question-count'"
         />
-        <p id="reading-question-help" class="text-xs text-mystic-silver/60 mt-2">
-          Задай свой вопрос на любую тему. Не указывай имена и личные данные.
+        <div class="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs text-mystic-silver/60 mt-2">
+          <p id="reading-question-help" class="flex-1 min-w-48">
+            Можно подробно описать ситуацию. Не указывай имена и личные данные.
+          </p>
+          <p id="reading-question-count" class="whitespace-nowrap tabular-nums">
+            {{ question.length.toLocaleString('ru-RU') }} / {{ maxQuestionLength.toLocaleString('ru-RU') }}
+          </p>
+        </div>
+        <p v-if="questionTooLong" id="reading-question-length-error" class="text-xs text-rose-300 mt-2" role="alert">
+          Сократи вопрос до {{ maxQuestionLength.toLocaleString('ru-RU') }} символов.
         </p>
       </div>
 
